@@ -23,6 +23,7 @@ namespace RStream {
 
 	public:
 		buffer(const size_t _capacity) : capacity(_capacity), count(0), pos(nullptr) {
+			// new or malloc or memalign? which faster?
 			buf = new T[capacity];
 		}
 
@@ -47,7 +48,7 @@ namespace RStream {
 
 			// flush buffer to update out stream
 			char * output_buf = (char * ) buf;
-			io_mgr->write_to_file(fd, output_buf, BUFFER_SIZE * sizeof(T));
+			io_mgr->write_to_file(fd, output_buf, BUFFER_CAPACITY * sizeof(T));
 
 			count = 0;
 			lock.unlock();
@@ -76,7 +77,7 @@ namespace RStream {
 			if(global_buffers == nullptr) {
 				global_buffers = new T* [num_partitions];
 				for(int i = 0; i < num_partitions; i++) {
-					global_buffers[i] = new buffer<T>(BUFFER_SIZE);
+					global_buffers[i] = new buffer<T>(BUFFER_CAPACITY);
 				}
 			}
 

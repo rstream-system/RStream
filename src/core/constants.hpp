@@ -8,6 +8,6 @@
 #ifndef CORE_CONSTANTS_HPP_
 #define CORE_CONSTANTS_HPP_
 
-const long BUFFER_SIZE = 20000;
+const long BUFFER_CAPACITY = 20000;
 
 #endif /* CORE_CONSTANTS_HPP_ */

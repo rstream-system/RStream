@@ -31,7 +31,9 @@ namespace RStream {
 		int num_exec_threads;
 
 		int num_partitions;
+
 		EdgeType edge_type;
+		// sizeof each edge
 		int edge_unit;
 
 		// io manager
@@ -73,7 +75,7 @@ namespace RStream {
 			task_queue(65536);
 		}
 
-		void scatter() {
+		void scatter(std::function<T(Edge&)> generate_one_update) {
 			buffer_mgr = new buffer_manager<T>(num_partitions);
 			// buffers for shuffling
 			global_buffers = buffer_mgr->get_global_buffers();
@@ -83,6 +85,23 @@ namespace RStream {
 				int fd = open((filename + "." + partition_id).c_str(), O_RDONLY);
 				task_queue.push(fd);
 			}
+
+			// exec threads will produce updates and push into shuffle buffers
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < num_exec_threads; i++)
+				exec_threads.push_back(std::thread(scatter_producer, generate_one_update));
+
+			// write threads will flush shuffle buffer to update out stream file as long as it's full
+			std::vector<std::thread> write_threads;
+			for(int i = 0; i < num_write_threads; i++)
+				write_threads.push_back(std::thread(scatter_consumer));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			for(auto &t : write_threads)
+				t.join();
 
 		}
 
@@ -109,8 +128,12 @@ namespace RStream {
 
 			// for each edge
 			for(long pos = 0; pos <= file_size; pos += edge_unit) {
+				// get an edge
 				Edge & e = *(Edge*)(buf + pos);
+				// gen one update
 				T * update_info = generate_one_update(e);
+
+				// insert into shuffle buffer accordingly
 				int index = get_buffer_index(update_info);
 				buffer<T> *b = buffer_mgr->get_global_buffer(index);
 				b->insert(update_info);
@@ -118,7 +141,7 @@ namespace RStream {
 			}
 		}
 
-		// each writer threads generates a scatter_consumer
+		// each writer thread generates a scatter_consumer
 		void scatter_consumer() {
 			while(true) {
 				for(int i = 0; i < num_partitions; i++) {
