@@ -45,7 +45,7 @@ namespace RStream {
 		// buffer manager
 		buffer_manager<T> *buffer_mgr;
 		// buffers for shuffling
-		T** global_buffers;
+		buffer<T>** global_buffers;
 
 		concurrent_queue<int> *task_queue;
 
@@ -75,10 +75,10 @@ namespace RStream {
 
 			io_mgr = new io_manager();
 			task_queue = new concurrent_queue<int>(65536);
+			buffer_mgr = new buffer_manager<T>(num_partitions);
 		}
 
-		void scatter(std::function<T(Edge&)> generate_one_update) {
-			buffer_mgr = new buffer_manager<T>(num_partitions);
+		void scatter(std::function<T*(Edge&)> generate_one_update) {
 			// buffers for shuffling
 			global_buffers = buffer_mgr->get_global_buffers();
 
@@ -99,8 +99,8 @@ namespace RStream {
 				write_threads.push_back(std::thread(scatter_consumer));
 
 			// join all threads
-			for(auto & t : exec_threads)
-				t.join();
+//			for(auto & t : exec_threads)
+//				t.join();
 
 			for(auto &t : write_threads)
 				t.join();
@@ -115,10 +115,10 @@ namespace RStream {
 
 		}
 
-	private:
+	protected:
 
 		// each exec thread generates a scatter_producer
-		void scatter_producer(std::function<T(Edge&)> generate_one_update) {
+		void scatter_producer(std::function<T*(Edge&)> generate_one_update) {
 
 			// pop from queue
 			int fd = task_queue->pop();
@@ -138,7 +138,7 @@ namespace RStream {
 
 				// insert into shuffle buffer accordingly
 				int index = get_global_buffer_index(update_info);
-				buffer<T> *b = buffer_mgr->get_global_buffer(index);
+				buffer<T>* b = buffer_mgr->get_global_buffer(index);
 				b->insert(update_info);
 
 			}
@@ -149,7 +149,7 @@ namespace RStream {
 			while(true) {
 				for(int i = 0; i < num_partitions; i++) {
 					int fd = open((filename + "." + std::to_string(i) + ".update_stream").c_str(), O_WRONLY);
-					buffer<T> * b = buffer_mgr->get_global_buffer(i);
+					buffer<T>* b = buffer_mgr->get_global_buffer(i);
 					b->flush(io_mgr, fd);
 				}
 			}
@@ -168,7 +168,8 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(T* update_info) {
-			return update_info->target;
+			return 0;
+//			return update_info->target;
 		}
 
 	};

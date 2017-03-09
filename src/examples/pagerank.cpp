@@ -9,15 +9,15 @@
 
 using namespace RStream;
 
-int generate_one_update(Edge & e)
+int* generate_one_update(Edge & e)
 {
-	return 0;
+	return nullptr;
 }
 
 int main(int argc, const char ** argv) {
 	engine<float, float, int> graph_engine("test.txt");
-	std::function<int(Edge&)> gen_update = generate_one_update;
-//	graph_engine.scatter(generate_one_update);
+	std::function<int*(Edge&)> gen_update = generate_one_update;
+	graph_engine.scatter(generate_one_update);
 }
 
 

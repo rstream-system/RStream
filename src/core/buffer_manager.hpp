@@ -8,7 +8,6 @@
 #ifndef CORE_BUFFER_MANAGER_HPP_
 #define CORE_BUFFER_MANAGER_HPP_
 
-#include <vector>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
@@ -20,21 +19,29 @@ namespace RStream {
 	// global buffer for shuffling, accessing by multithreads
 	template <typename T>
 	class buffer {
-		const size_t capacity;
-		std::vector<T> buf;
+	    size_t capacity;
+		T * buf;
+		size_t count;
 		std::mutex mutex;
 		std::condition_variable cond_full;
 		std::condition_variable cond_empty;
 
 	public:
-		buffer(const size_t _capacity) : capacity(_capacity) {}
+		buffer(size_t _capacity) : capacity{_capacity}, count(0) {
+			buf = new T [capacity];
+		}
+
+		~buffer() {
+			delete[] buf;
+		 }
 
 		void insert(T* item) {
 			std::unique_lock<std::mutex> lock(mutex);
 			cond_full.wait(lock, [&] {return !is_full();});
 
 			// insert item to buffer
-			buf.push_back(item);
+			buf[count++] = *item;
+
 			lock.unlock();
 			cond_empty.notify_one();
 		}
@@ -44,34 +51,33 @@ namespace RStream {
 			cond_empty.wait(lock, [&]{return is_full(); });
 
 			// flush buffer to update out stream
-			reinterpret_cast<char*>(buf.data());
-			io_mgr->write_to_file(fd, buf, BUFFER_CAPACITY * sizeof(T));
-			buf.clear();
+			char * output_buf = (char * ) buf;
+			io_mgr->write_to_file(fd, output_buf, BUFFER_CAPACITY * sizeof(T));
+			count = 0;
 			lock.unlock();
 			cond_full.notify_one();
 		}
 
 		bool is_full() {
-			return buf.size() == capacity;
+			return count == capacity;
 		}
 
 		bool is_empty() {
-			return buf.size() == 0;
+			return count == 0;
 		}
 	};
 
 	template <typename T>
 	class buffer_manager {
 		int num_partitions;
-		T** global_buffers;
+		buffer<T> ** global_buffers;
 
 	public:
 		buffer_manager(int _num_partitions) : num_partitions(_num_partitions), global_buffers(nullptr) {}
 
 		// global buffers for shuffling
-		T** get_global_buffers() {
+		buffer<T> ** get_global_buffers() {
 			if(global_buffers == nullptr) {
-				global_buffers = new T* [num_partitions];
 				for(int i = 0; i < num_partitions; i++) {
 					global_buffers[i] = new buffer<T>(BUFFER_CAPACITY);
 				}
@@ -80,7 +86,7 @@ namespace RStream {
 			return global_buffers;
 		}
 
-		T* get_global_buffer(int index) {
+		buffer<T>* get_global_buffer(int index) {
 			if(index >= 0 && index <num_partitions)
 				return global_buffers[index];
 			else
@@ -89,7 +95,7 @@ namespace RStream {
 
 		// thread local buffer
 		void get_local_buffer(char * buf, size_t file_size) {
-			buf = malloc(file_size);
+			buf = (char *)malloc(file_size);
 		}
 	};
 }
