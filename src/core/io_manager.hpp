@@ -31,7 +31,7 @@ namespace RStream {
 		void read_from_file(int fd, char * buf, size_t fsize) {
 			size_t n_read = 0;
 			while(n_read < fsize) {
-				ssize_t n_bytes = pread(fd, buf, fsize - n_read, n_read);
+				size_t n_bytes = pread(fd, buf, fsize - n_read, n_read);
 				if(n_bytes == size_t(-1)) {
 					std::cout << "Read error ! " << std::endl;
 					assert(false);

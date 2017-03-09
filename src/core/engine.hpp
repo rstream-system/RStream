@@ -14,6 +14,9 @@
 
 #include "io_manager.hpp"
 #include "buffer_manager.hpp"
+#include "concurrent_queue.hpp"
+#include "type.hpp"
+#include "constants.hpp"
 
 namespace RStream {
 	enum class EdgeType {
@@ -44,7 +47,7 @@ namespace RStream {
 		// buffers for shuffling
 		T** global_buffers;
 
-		concurrent_queue<int> task_queue;
+		concurrent_queue<int> *task_queue;
 
 	public:
 
@@ -57,7 +60,7 @@ namespace RStream {
 			// read meta file, contains num of partitions, etc.
 			FILE *meta_file = fopen((filename + ".meta").c_str(), "r");
 			if(!meta_file) {
-				std::cout("meta file does not exit!");
+				std::cout << "meta file does not exit!" << std::endl;
 				assert(false);
 			}
 
@@ -67,12 +70,11 @@ namespace RStream {
 			if(edge_type == EdgeType::NO_WEIGHT) {
 				edge_unit = sizeof(VertexId) * 2;
 			} else if(edge_type == EdgeType::WITH_WEIGHT) {
-				edge_unit == sizeof(VertexId) * 2 + sizeof(Weight);
+				edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
 			}
 
 			io_mgr = new io_manager();
-
-			task_queue(65536);
+			task_queue = new concurrent_queue<int>(65536);
 		}
 
 		void scatter(std::function<T(Edge&)> generate_one_update) {
@@ -82,8 +84,8 @@ namespace RStream {
 
 			// push task into concurrent queue
 			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
-				int fd = open((filename + "." + partition_id).c_str(), O_RDONLY);
-				task_queue.push(fd);
+				int fd = open((filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				task_queue->push(fd);
 			}
 
 			// exec threads will produce updates and push into shuffle buffers
@@ -119,11 +121,12 @@ namespace RStream {
 		void scatter_producer(std::function<T(Edge&)> generate_one_update) {
 
 			// pop from queue
-			int fd = task_queue.pop();
+			int fd = task_queue->pop();
 			// get file size
 			size_t file_size = io_mgr->get_filesize(fd);
 			// read from file
-			char * buf = malloc(file_size);
+			char * buf;
+			buffer_mgr->get_local_buffer(buf, file_size);
 			io_mgr->read_from_file(fd, buf, file_size);
 
 			// for each edge
@@ -134,7 +137,7 @@ namespace RStream {
 				T * update_info = generate_one_update(e);
 
 				// insert into shuffle buffer accordingly
-				int index = get_buffer_index(update_info);
+				int index = get_global_buffer_index(update_info);
 				buffer<T> *b = buffer_mgr->get_global_buffer(index);
 				b->insert(update_info);
 
@@ -145,7 +148,7 @@ namespace RStream {
 		void scatter_consumer() {
 			while(true) {
 				for(int i = 0; i < num_partitions; i++) {
-					int fd = open((filename + "." + i + ".update_stream").c_str(), O_WRONLY);
+					int fd = open((filename + "." + std::to_string(i) + ".update_stream").c_str(), O_WRONLY);
 					buffer<T> * b = buffer_mgr->get_global_buffer(i);
 					b->flush(io_mgr, fd);
 				}
@@ -164,7 +167,7 @@ namespace RStream {
 
 		}
 
-		int get_buffer_index(T* update_info) {
+		int get_global_buffer_index(T* update_info) {
 			return update_info->target;
 		}
 

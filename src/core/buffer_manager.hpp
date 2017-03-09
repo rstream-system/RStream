@@ -8,36 +8,33 @@
 #ifndef CORE_BUFFER_MANAGER_HPP_
 #define CORE_BUFFER_MANAGER_HPP_
 
+#include <vector>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+
+#include "constants.hpp"
+
 namespace RStream {
 
 	// global buffer for shuffling, accessing by multithreads
 	template <typename T>
 	class buffer {
 		const size_t capacity;
-		size_t count;
-		T * buf;
-		T * pos;
+		std::vector<T> buf;
 		std::mutex mutex;
 		std::condition_variable cond_full;
 		std::condition_variable cond_empty;
 
 	public:
-		buffer(const size_t _capacity) : capacity(_capacity), count(0), pos(nullptr) {
-			// new or malloc or memalign? which faster?
-			buf = new T[capacity];
-		}
-
-		~buffer() {
-			delete[] buf;
-		}
+		buffer(const size_t _capacity) : capacity(_capacity) {}
 
 		void insert(T* item) {
 			std::unique_lock<std::mutex> lock(mutex);
 			cond_full.wait(lock, [&] {return !is_full();});
 
 			// insert item to buffer
-
-			count++;
+			buf.push_back(item);
 			lock.unlock();
 			cond_empty.notify_one();
 		}
@@ -47,20 +44,19 @@ namespace RStream {
 			cond_empty.wait(lock, [&]{return is_full(); });
 
 			// flush buffer to update out stream
-			char * output_buf = (char * ) buf;
-			io_mgr->write_to_file(fd, output_buf, BUFFER_CAPACITY * sizeof(T));
-
-			count = 0;
+			reinterpret_cast<char*>(buf.data());
+			io_mgr->write_to_file(fd, buf, BUFFER_CAPACITY * sizeof(T));
+			buf.clear();
 			lock.unlock();
 			cond_full.notify_one();
 		}
 
 		bool is_full() {
-			return count == capacity;
+			return buf.size() == capacity;
 		}
 
 		bool is_empty() {
-			return count == 0;
+			return buf.size() == 0;
 		}
 	};
 
@@ -89,6 +85,11 @@ namespace RStream {
 				return global_buffers[index];
 			else
 				return nullptr;
+		}
+
+		// thread local buffer
+		void get_local_buffer(char * buf, size_t file_size) {
+			buf = malloc(file_size);
 		}
 	};
 }
