@@ -46,13 +46,13 @@ namespace RStream {
 			cond_empty.notify_one();
 		}
 
-		void flush(io_manager * io_mgr, int fd) {
+		void flush(int fd) {
 			std::unique_lock<std::mutex> lock(mutex);
 			cond_empty.wait(lock, [&]{return is_full(); });
 
 			// flush buffer to update out stream
 			char * output_buf = (char * ) buf;
-			io_mgr->write_to_file(fd, output_buf, BUFFER_CAPACITY * sizeof(T));
+			io_manager::write_to_file(fd, output_buf, BUFFER_CAPACITY * sizeof(T));
 			count = 0;
 			lock.unlock();
 			cond_full.notify_one();
@@ -69,26 +69,24 @@ namespace RStream {
 
 	template <typename T>
 	class buffer_manager {
-		int num_partitions;
-		global_buffer<T> ** global_buffers;
 
 	public:
-		buffer_manager(int _num_partitions) : num_partitions(_num_partitions), global_buffers(nullptr) {}
 
 		// global buffers for shuffling
-		global_buffer<T> ** get_global_buffers() {
-			if(global_buffers == nullptr) {
-				for(int i = 0; i < num_partitions; i++) {
-					global_buffers[i] = new global_buffer<T>(BUFFER_CAPACITY);
-				}
+		static global_buffer<T> **  get_global_buffers(int num_partitions) {
+			global_buffer<T> ** buffers = new global_buffer<T> * [num_partitions];
+
+			for(int i = 0; i < num_partitions; i++) {
+				buffers[i] = new global_buffer<T>(BUFFER_CAPACITY);
 			}
 
-			return global_buffers;
+			return buffers;
 		}
 
-		global_buffer<T>* get_global_buffer(int index) {
+		// get one global buffer according to the index
+		static global_buffer<T>* get_global_buffer(global_buffer<T> ** buffers, int num_partitions, int index) {
 			if(index >= 0 && index <num_partitions)
-				return global_buffers[index];
+				return buffers[index];
 			else
 				return nullptr;
 		}
