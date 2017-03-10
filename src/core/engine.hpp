@@ -45,13 +45,13 @@ namespace RStream {
 		// buffer manager
 		buffer_manager<T> *buffer_mgr;
 		// buffers for shuffling
-		buffer<T>** global_buffers;
+		global_buffer<T>** shuffle_buffers;
 
 		concurrent_queue<int> *task_queue;
 
 	public:
 
-		engine(std::string _filename) : filename(_filename), buffer_mgr(nullptr), global_buffers(nullptr) {
+		engine(std::string _filename) : filename(_filename), buffer_mgr(nullptr), shuffle_buffers(nullptr) {
 			num_threads = std::thread::hardware_concurrency();
 			// to be decided ?
 			num_write_threads = 2;
@@ -79,8 +79,8 @@ namespace RStream {
 		}
 
 		void scatter(std::function<T*(Edge&)> generate_one_update) {
-			// buffers for shuffling
-			global_buffers = buffer_mgr->get_global_buffers();
+			// allocate global buffers for shuffling
+			shuffle_buffers = buffer_mgr->get_global_buffers();
 
 			// push task into concurrent queue
 			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
@@ -91,16 +91,16 @@ namespace RStream {
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < num_exec_threads; i++)
-				exec_threads.push_back(std::thread(scatter_producer, generate_one_update));
+				exec_threads.push_back(std::thread(&engine::scatter_producer, this, generate_one_update));
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < num_write_threads; i++)
-				write_threads.push_back(std::thread(scatter_consumer));
+				write_threads.push_back(std::thread(&engine::scatter_consumer, this));
 
 			// join all threads
-//			for(auto & t : exec_threads)
-//				t.join();
+			for(auto & t : exec_threads)
+				t.join();
 
 			for(auto &t : write_threads)
 				t.join();
@@ -124,22 +124,22 @@ namespace RStream {
 			int fd = task_queue->pop();
 			// get file size
 			size_t file_size = io_mgr->get_filesize(fd);
-			// read from file
-			char * buf;
-			buffer_mgr->get_local_buffer(buf, file_size);
-			io_mgr->read_from_file(fd, buf, file_size);
+
+			// read from file to thread local buffer
+			char * local_buf = (char *)malloc(file_size);
+			io_mgr->read_from_file(fd, local_buf, file_size);
 
 			// for each edge
 			for(long pos = 0; pos <= file_size; pos += edge_unit) {
 				// get an edge
-				Edge & e = *(Edge*)(buf + pos);
+				Edge & e = *(Edge*)(local_buf + pos);
 				// gen one update
 				T * update_info = generate_one_update(e);
 
 				// insert into shuffle buffer accordingly
 				int index = get_global_buffer_index(update_info);
-				buffer<T>* b = buffer_mgr->get_global_buffer(index);
-				b->insert(update_info);
+				global_buffer<T>* global_buf = buffer_mgr->get_global_buffer(index);
+				global_buf->insert(update_info);
 
 			}
 		}
@@ -149,8 +149,8 @@ namespace RStream {
 			while(true) {
 				for(int i = 0; i < num_partitions; i++) {
 					int fd = open((filename + "." + std::to_string(i) + ".update_stream").c_str(), O_WRONLY);
-					buffer<T>* b = buffer_mgr->get_global_buffer(i);
-					b->flush(io_mgr, fd);
+					global_buffer<T>* g_buf = buffer_mgr->get_global_buffer(i);
+					g_buf->flush(io_mgr, fd);
 				}
 			}
 		}

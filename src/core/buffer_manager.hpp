@@ -18,7 +18,7 @@ namespace RStream {
 
 	// global buffer for shuffling, accessing by multithreads
 	template <typename T>
-	class buffer {
+	class global_buffer {
 	    size_t capacity;
 		T * buf;
 		size_t count;
@@ -27,11 +27,11 @@ namespace RStream {
 		std::condition_variable cond_empty;
 
 	public:
-		buffer(size_t _capacity) : capacity{_capacity}, count(0) {
+		global_buffer(size_t _capacity) : capacity{_capacity}, count(0) {
 			buf = new T [capacity];
 		}
 
-		~buffer() {
+		~global_buffer() {
 			delete[] buf;
 		 }
 
@@ -70,33 +70,29 @@ namespace RStream {
 	template <typename T>
 	class buffer_manager {
 		int num_partitions;
-		buffer<T> ** global_buffers;
+		global_buffer<T> ** global_buffers;
 
 	public:
 		buffer_manager(int _num_partitions) : num_partitions(_num_partitions), global_buffers(nullptr) {}
 
 		// global buffers for shuffling
-		buffer<T> ** get_global_buffers() {
+		global_buffer<T> ** get_global_buffers() {
 			if(global_buffers == nullptr) {
 				for(int i = 0; i < num_partitions; i++) {
-					global_buffers[i] = new buffer<T>(BUFFER_CAPACITY);
+					global_buffers[i] = new global_buffer<T>(BUFFER_CAPACITY);
 				}
 			}
 
 			return global_buffers;
 		}
 
-		buffer<T>* get_global_buffer(int index) {
+		global_buffer<T>* get_global_buffer(int index) {
 			if(index >= 0 && index <num_partitions)
 				return global_buffers[index];
 			else
 				return nullptr;
 		}
 
-		// thread local buffer
-		void get_local_buffer(char * buf, size_t file_size) {
-			buf = (char *)malloc(file_size);
-		}
 	};
 }
 

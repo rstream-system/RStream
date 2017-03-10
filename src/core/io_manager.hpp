@@ -28,7 +28,7 @@ namespace RStream {
 		}
 
 		// how to read efficiently?
-		void read_from_file(int fd, char * buf, size_t fsize) {
+		static void read_from_file(int fd, char * buf, size_t fsize) {
 			size_t n_read = 0;
 			while(n_read < fsize) {
 				size_t n_bytes = pread(fd, buf, fsize - n_read, n_read);
@@ -45,7 +45,7 @@ namespace RStream {
 		}
 
 		// how to write efficiently
-		void write_to_file(int fd, char * buf, size_t fsize) {
+		static void write_to_file(int fd, char * buf, size_t fsize) {
 			size_t n_write = 0;
 			assert(fd > 0);
 
