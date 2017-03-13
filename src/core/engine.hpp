@@ -67,7 +67,7 @@ namespace RStream {
 		}
 
 		void scatter(std::function<T*(Edge&)> generate_one_update) {
-			concurrent_queue<int> * task_queue = new concurrent_queue<int>(65536);
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(num_partitions);
 
 			// allocate global buffers for shuffling
 			global_buffer<T> ** buffers_for_shuffle = buffer_manager<T>::get_global_buffers(num_partitions);
@@ -97,8 +97,25 @@ namespace RStream {
 
 		}
 
-		void gather() {
+		void gather(std::function<void(Edge&)> apply_one_update) {
+			// a pair of <vertex, update_stream> for each partition
+			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(num_partitions);
 
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
+				int fd_vertex = open((filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDONLY);
+				int fd_update = open((filename + "." + std::to_string(partition_id) + ".update_stream").c_str(), O_RDONLY);
+				task_queue->push(std::make_pair(fd_vertex, fd_update));
+			}
+
+			// threads will load vertex and update, and apply update one by one
+			std::vector<std::thread> threads;
+			for(int i = 0; i < num_threads; i++)
+				threads.push_back(std::thread(&engine::gather_producer, this, apply_one_update, task_queue));
+
+			// join all threads
+			for(auto & t : threads)
+				t.join();
 		}
 
 		void join() {
@@ -117,7 +134,7 @@ namespace RStream {
 			size_t file_size = io_manager::get_filesize(fd);
 
 			// read from file to thread local buffer
-			char * local_buf = (char *)malloc(file_size);
+			char * local_buf = new char[file_size];
 			io_manager::read_from_file(fd, local_buf, file_size);
 
 			// for each edge
@@ -146,8 +163,37 @@ namespace RStream {
 			}
 		}
 
-		void gather_producer() {
+		void gather_producer(std::function<void(T&)> apply_one_update,
+				concurrent_queue<std::pair<int, int>> * task_queue) {
 
+			// pop from queue
+			std::pair<int, int> fd_pair = task_queue->pop();
+			int fd_vertex = fd_pair.first;
+			int fd_update = fd_pair.second;
+
+			// get file size
+			size_t vertex_file_size = io_manager::get_filesize(fd_vertex);
+			size_t update_file_size = io_manager::get_filesize(fd_update);
+
+			// read from files to thread local buffer
+			char * vertex_local_buf = new char[vertex_file_size];
+			io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
+			char * update_local_buf = new char[update_file_size];
+			io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
+
+			// for each update
+			for(long pos = 0; pos <= update_file_size; pos += sizeof(T)) {
+				// get an update
+				T & update = *(T*)(update_local_buf + pos);
+				apply_one_update(update, vertex_local_buf);
+			}
+
+			// write updated vertex value to disk
+			io_manager::write_to_file(fd_vertex, vertex_local_buf, vertex_file_size);
+
+			// delete
+			delete[] vertex_local_buf;
+			delete[] update_local_buf;
 		}
 
 		void join_producer() {
