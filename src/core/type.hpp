@@ -15,6 +15,13 @@ struct Edge {
 	VertexId src;
 	VertexId target;
 	Weight weight;
+
+
+};
+
+struct T {
+	VertexId target;
+
 };
 
 #endif /* CORE_TYPE_HPP_ */

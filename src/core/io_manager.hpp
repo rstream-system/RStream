@@ -12,6 +12,8 @@
 #include <assert.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 
 namespace RStream {
 	class io_manager {
@@ -23,7 +25,7 @@ namespace RStream {
 			}
 
 			off_t size = lseek(fd, 0, SEEK_END);
-			close(fd);
+//			close(fd);
 			return size;
 		}
 
@@ -31,11 +33,13 @@ namespace RStream {
 		static void read_from_file(int fd, char * buf, size_t fsize) {
 			size_t n_read = 0;
 			while(n_read < fsize) {
-				size_t n_bytes = pread(fd, buf, fsize - n_read, n_read);
-				if(n_bytes == size_t(-1)) {
+				ssize_t n_bytes = pread(fd, buf, fsize - n_read, n_read);
+				if(n_bytes == ssize_t(-1)) {
 					std::cout << "Read error ! " << std::endl;
+					std::cout << strerror(errno) << std::endl;
 					assert(false);
 				}
+				std::cout << n_bytes << std::endl;
 				assert(n_bytes > 0);
 				buf += n_bytes;
 				n_read += n_bytes;
@@ -50,8 +54,8 @@ namespace RStream {
 			assert(fd > 0);
 
 			while(n_write < fsize) {
-				size_t n_bytes = pwrite(fd, buf, fsize - n_write, n_write);
-				if(n_bytes == size_t(-1)) {
+				ssize_t n_bytes = pwrite(fd, buf, fsize - n_write, n_write);
+				if(n_bytes == ssize_t(-1)) {
 					std::cout << "Write error! " << std::endl;
 					assert(false);
 				}
