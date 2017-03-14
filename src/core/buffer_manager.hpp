@@ -8,9 +8,7 @@
 #ifndef CORE_BUFFER_MANAGER_HPP_
 #define CORE_BUFFER_MANAGER_HPP_
 
-#include <queue>
-#include <mutex>
-#include <condition_variable>
+#include "../common/RStreamCommon.hpp"
 
 #include "constants.hpp"
 
@@ -23,8 +21,8 @@ namespace RStream {
 		T * buf;
 		size_t count;
 		std::mutex mutex;
-		std::condition_variable cond_full;
-		std::condition_variable cond_empty;
+		std::condition_variable cond_nonfull;
+		std::condition_variable cond_nonempty;
 
 	public:
 		global_buffer(size_t _capacity) : capacity{_capacity}, count(0) {
@@ -37,25 +35,25 @@ namespace RStream {
 
 		void insert(T* item) {
 			std::unique_lock<std::mutex> lock(mutex);
-			cond_full.wait(lock, [&] {return !is_full();});
+			cond_nonfull.wait(lock, [&] {return !is_full();});
 
 			// insert item to buffer
 			buf[count++] = *item;
 
 			lock.unlock();
-			cond_empty.notify_one();
+			cond_nonempty.notify_one();
 		}
 
 		void flush(int fd) {
 			std::unique_lock<std::mutex> lock(mutex);
-			cond_empty.wait(lock, [&]{return is_full(); });
+			cond_nonempty.wait(lock, [&]{return is_full(); });
 
 			// flush buffer to update out stream
 			char * output_buf = (char * ) buf;
 			io_manager::write_to_file(fd, output_buf, BUFFER_CAPACITY * sizeof(T));
 			count = 0;
 			lock.unlock();
-			cond_full.notify_one();
+			cond_nonfull.notify_one();
 		}
 
 		bool is_full() {

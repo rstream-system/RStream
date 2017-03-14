@@ -8,9 +8,7 @@
 #ifndef CORE_ENGINE_HPP_
 #define CORE_ENGINE_HPP_
 
-#include <string>
-#include <thread>
-#include <fcntl.h>
+//#include "../common/RStreamCommon.hpp"
 
 #include "io_manager.hpp"
 #include "buffer_manager.hpp"
@@ -87,6 +85,9 @@ namespace RStream {
 			}
 
 			scatter_producer(generate_one_update, buffers_for_shuffle, task_queue);
+
+			std::cout << "scatter done!" << std::endl;
+
 			scatter_consumer(buffers_for_shuffle);
 
 //			// exec threads will produce updates and push into shuffle buffers
@@ -105,6 +106,8 @@ namespace RStream {
 //
 //			for(auto &t : write_threads)
 //				t.join();
+
+
 
 		}
 
@@ -155,9 +158,9 @@ namespace RStream {
 			// for each edge
 			for(size_t pos = 0; pos <= file_size; pos += edge_unit) {
 				// get an edge
-				Edge & e = *(Edge*)(local_buf + pos);
+				Edge e = *(Edge*)(local_buf + pos);
 
-				std::cout << pos << ": " << e.src << ", " << e.target << ", " << e.weight << std::endl;
+				std::cout << e << std::endl;
 
 				// gen one update
 				T * update_info = generate_one_update(e);
@@ -174,47 +177,52 @@ namespace RStream {
 
 		// each writer thread generates a scatter_consumer
 		void scatter_consumer(global_buffer<T> ** buffers_for_shuffle) {
+			int perms = O_WRONLY | O_APPEND;
 			while(true) {
 				for(int i = 0; i < num_partitions; i++) {
-					int fd = open((filename + "." + std::to_string(i) + ".update_stream").c_str(), O_WRONLY);
+					const char * file_name = (filename + "." + std::to_string(i) + ".update_stream").c_str();
+					int fd = open(file_name, perms);
+					if(fd < 0){
+						fd = creat(file_name, perms);
+					}
 					global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
 					g_buf->flush(fd);
 				}
 			}
 		}
 
-		void gather_producer(std::function<void(T&)> apply_one_update,
-				concurrent_queue<std::pair<int, int>> * task_queue) {
-
-			// pop from queue
-			std::pair<int, int> fd_pair = task_queue->pop();
-			int fd_vertex = fd_pair.first;
-			int fd_update = fd_pair.second;
-
-			// get file size
-			size_t vertex_file_size = io_manager::get_filesize(fd_vertex);
-			size_t update_file_size = io_manager::get_filesize(fd_update);
-
-			// read from files to thread local buffer
-			char * vertex_local_buf = new char[vertex_file_size];
-			io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
-			char * update_local_buf = new char[update_file_size];
-			io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
-
-			// for each update
-			for(long pos = 0; pos <= update_file_size; pos += sizeof(T)) {
-				// get an update
-				T & update = *(T*)(update_local_buf + pos);
-//				apply_one_update(update, vertex_local_buf);
-			}
-
-			// write updated vertex value to disk
-			io_manager::write_to_file(fd_vertex, vertex_local_buf, vertex_file_size);
-
-			// delete
-			delete[] vertex_local_buf;
-			delete[] update_local_buf;
-		}
+//		void gather_producer(std::function<void(T&)> apply_one_update,
+//				concurrent_queue<std::pair<int, int>> * task_queue) {
+//
+//			// pop from queue
+//			std::pair<int, int> fd_pair = task_queue->pop();
+//			int fd_vertex = fd_pair.first;
+//			int fd_update = fd_pair.second;
+//
+//			// get file size
+//			size_t vertex_file_size = io_manager::get_filesize(fd_vertex);
+//			size_t update_file_size = io_manager::get_filesize(fd_update);
+//
+//			// read from files to thread local buffer
+//			char * vertex_local_buf = new char[vertex_file_size];
+//			io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
+//			char * update_local_buf = new char[update_file_size];
+//			io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
+//
+//			// for each update
+//			for(long pos = 0; pos <= update_file_size; pos += sizeof(T)) {
+//				// get an update
+//				T & update = *(T*)(update_local_buf + pos);
+////				apply_one_update(update, vertex_local_buf);
+//			}
+//
+//			// write updated vertex value to disk
+//			io_manager::write_to_file(fd_vertex, vertex_local_buf, vertex_file_size);
+//
+//			// delete
+//			delete[] vertex_local_buf;
+//			delete[] update_local_buf;
+//		}
 
 		void join_producer() {
 

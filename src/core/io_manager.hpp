@@ -8,12 +8,7 @@
 #ifndef CORE_IO_MANAGER_HPP_
 #define CORE_IO_MANAGER_HPP_
 
-#include <iostream>
-#include <assert.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
+#include "../common/RStreamCommon.hpp"
 
 namespace RStream {
 	class io_manager {
@@ -25,7 +20,6 @@ namespace RStream {
 			}
 
 			off_t size = lseek(fd, 0, SEEK_END);
-//			close(fd);
 			return size;
 		}
 

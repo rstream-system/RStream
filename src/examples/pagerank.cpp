@@ -18,10 +18,9 @@ struct Update : T {
 	}
 };
 
-T* generate_one_update(Edge & e)
+Update* generate_one_update(Edge & e)
 {
-	T* update = new Update(e.target, 0);
-//	std::cout << update->target << std::endl;
+	Update* update = new Update(e.target, 0);
 	return update;
 }
 

@@ -8,6 +8,8 @@
 #ifndef CORE_TYPE_HPP_
 #define CORE_TYPE_HPP_
 
+#include "../common/RStreamCommon.hpp"
+
 typedef int VertexId;
 typedef float Weight;
 
@@ -16,8 +18,13 @@ struct Edge {
 	VertexId target;
 	Weight weight;
 
-
 };
+
+inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
+	strm << "(" << edge.src << ", " << edge.target << ", " << edge.weight << ")";
+	return strm;
+}
+
 
 struct T {
 	VertexId target;
