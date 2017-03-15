@@ -19,6 +19,10 @@ namespace RStream {
 	public:
 		concurrent_queue(const size_t _capacity) {}
 
+		inline bool isEmpty(){
+			return queue.empty();
+		}
+
 		void push(const T & item) {
 			queue.push(item);
 		}

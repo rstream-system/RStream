@@ -38,9 +38,15 @@ namespace RStream {
 		int edge_unit;
 
 
+		std::atomic<int> atomic_num_producers;
+
+		std::atomic<int> atomic_partition_id;
+
+		std::atomic<int> atomic_partition_number;
+
 	public:
 
-		engine(std::string _filename) : filename(_filename) {
+		engine(std::string _filename) : filename(_filename), atomic_num_producers(0), atomic_partition_id(0) {
 //			num_threads = std::thread::hardware_concurrency();
 			num_threads = 1;
 
@@ -70,6 +76,8 @@ namespace RStream {
 			}
 
 			std::cout << edge_unit << std::endl;
+
+			atomic_partition_number = num_partitions - 1;
 		}
 
 		void scatter(std::function<T*(Edge&)> generate_one_update) {
@@ -107,8 +115,6 @@ namespace RStream {
 //			for(auto &t : write_threads)
 //				t.join();
 
-
-
 		}
 
 //		void gather(std::function<void(Edge&)> apply_one_update) {
@@ -141,53 +147,65 @@ namespace RStream {
 		// each exec thread generates a scatter_producer
 		void scatter_producer(std::function<T*(Edge&)> generate_one_update,
 				global_buffer<T> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+			atomic_num_producers++;
+			while(!task_queue->isEmpty()){
 
-			// pop from queue
-			int fd = task_queue->pop();
-			// get file size
-			size_t file_size = io_manager::get_filesize(fd);
+				// pop from queue
+				int fd = task_queue->pop();
+				// get file size
+				size_t file_size = io_manager::get_filesize(fd);
 
-			std::cout << file_size << std::endl;
+				std::cout << file_size << std::endl;
 
-			// read from file to thread local buffer
-			char * local_buf = new char[file_size];
-			io_manager::read_from_file(fd, local_buf, file_size);
+				// read from file to thread local buffer
+				char * local_buf = new char[file_size];
+				io_manager::read_from_file(fd, local_buf, file_size);
 
-			std::cout << file_size << std::endl;
+				std::cout << file_size << std::endl;
 
-			// for each edge
-			for(size_t pos = 0; pos <= file_size; pos += edge_unit) {
-				// get an edge
-				Edge e = *(Edge*)(local_buf + pos);
+				// for each edge
+				for(size_t pos = 0; pos <= file_size; pos += edge_unit) {
+					// get an edge
+					Edge e = *(Edge*)(local_buf + pos);
 
-				std::cout << e << std::endl;
+					std::cout << e << std::endl;
 
-				// gen one update
-				T * update_info = generate_one_update(e);
-				std::cout << update_info->target << std::endl;
+					// gen one update
+					T * update_info = generate_one_update(e);
+					std::cout << update_info->target << std::endl;
 
 
-				// insert into shuffle buffer accordingly
-				int index = get_global_buffer_index(update_info);
-				global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, index);
-				global_buf->insert(update_info);
+					// insert into shuffle buffer accordingly
+					int index = get_global_buffer_index(update_info);
+					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, index);
+					global_buf->insert(update_info);
+				}
 
 			}
+			atomic_num_producers--;
+
 		}
 
 		// each writer thread generates a scatter_consumer
 		void scatter_consumer(global_buffer<T> ** buffers_for_shuffle) {
-			int perms = O_WRONLY | O_APPEND;
-			while(true) {
-				for(int i = 0; i < num_partitions; i++) {
-					const char * file_name = (filename + "." + std::to_string(i) + ".update_stream").c_str();
-					int fd = open(file_name, perms);
-					if(fd < 0){
-						fd = creat(file_name, perms);
-					}
-					global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
-					g_buf->flush(fd);
-				}
+			while(atomic_num_producers != 0) {
+				int i = (atomic_partition_id++) % num_partitions ;
+
+				const char * file_name = (filename + "." + std::to_string(i) + ".update_stream").c_str();
+
+				global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
+				g_buf->flush(file_name);
+
+			}
+
+			//the last run - deal with all remaining content in buffers
+			int i = atomic_partition_number--;
+			if(i >= 0){
+				const char * file_name = (filename + "." + std::to_string(i) + ".update_stream").c_str();
+				global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
+				g_buf->flush_end(file_name);
+
+				delete g_buf;
 			}
 		}
 

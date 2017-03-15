@@ -21,8 +21,7 @@ namespace RStream {
 		T * buf;
 		size_t count;
 		std::mutex mutex;
-		std::condition_variable cond_nonfull;
-		std::condition_variable cond_nonempty;
+		std::condition_variable not_full;
 
 	public:
 		global_buffer(size_t _capacity) : capacity{_capacity}, count(0) {
@@ -35,25 +34,44 @@ namespace RStream {
 
 		void insert(T* item) {
 			std::unique_lock<std::mutex> lock(mutex);
-			cond_nonfull.wait(lock, [&] {return !is_full();});
+			not_full.wait(lock, [&] {return !is_full();});
 
 			// insert item to buffer
 			buf[count++] = *item;
 
-			lock.unlock();
-			cond_nonempty.notify_one();
+//			if(is_full()){
+//				not_empty.notify_one();
+//			}
 		}
 
-		void flush(int fd) {
+		void flush(const char * file_name) {
 			std::unique_lock<std::mutex> lock(mutex);
-			cond_nonempty.wait(lock, [&]{return is_full(); });
 
+			if(is_full()){
+				int perms = O_WRONLY | O_APPEND;
+				int fd = open(file_name, perms);
+				if(fd < 0){
+					fd = creat(file_name, perms);
+				}
+				// flush buffer to update out stream
+				char * b = (char *) buf;
+				io_manager::write_to_file(fd, b, BUFFER_CAPACITY * sizeof(T));
+				count = 0;
+				not_full.notify_one();
+			}
+
+		}
+
+		void flush_end(const char * file_name) {
+			std::unique_lock<std::mutex> lock(mutex);
+			int perms = O_WRONLY | O_APPEND;
+			int fd = open(file_name, perms);
+			if(fd < 0){
+				fd = creat(file_name, perms);
+			}
 			// flush buffer to update out stream
-			char * output_buf = (char * ) buf;
-			io_manager::write_to_file(fd, output_buf, BUFFER_CAPACITY * sizeof(T));
-			count = 0;
-			lock.unlock();
-			cond_nonfull.notify_one();
+			char * b = (char *) buf;
+			io_manager::write_to_file(fd, b, count * sizeof(T));
 		}
 
 		bool is_full() {

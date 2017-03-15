@@ -8,6 +8,8 @@
 #ifndef SRC_COMMON_RSTREAMCOMMON_HPP_
 #define SRC_COMMON_RSTREAMCOMMON_HPP_
 
+#include <atomic>
+
 #include <iostream>
 #include <assert.h>
 #include <sys/types.h>
