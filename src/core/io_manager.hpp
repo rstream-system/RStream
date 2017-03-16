@@ -33,7 +33,7 @@ namespace RStream {
 					std::cout << strerror(errno) << std::endl;
 					assert(false);
 				}
-				std::cout << n_bytes << std::endl;
+//				std::cout << n_bytes << std::endl;
 				assert(n_bytes > 0);
 				buf += n_bytes;
 				n_read += n_bytes;
@@ -51,6 +51,7 @@ namespace RStream {
 				ssize_t n_bytes = pwrite(fd, buf, fsize - n_write, n_write);
 				if(n_bytes == ssize_t(-1)) {
 					std::cout << "Write error! " << std::endl;
+					std::cout << strerror(errno) << std::endl;
 					assert(false);
 				}
 				assert(n_bytes > 0);

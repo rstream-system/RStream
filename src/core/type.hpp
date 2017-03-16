@@ -29,6 +29,16 @@ inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
 struct T {
 	VertexId target;
 
+
+	std::string toString(){
+		return std::to_string(target);
+	}
 };
+
+inline std::ostream & operator<<(std::ostream & strm, const T& up){
+	strm << "(" << up.target << ")";
+	return strm;
+}
+
 
 #endif /* CORE_TYPE_HPP_ */

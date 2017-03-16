@@ -32,46 +32,66 @@ namespace RStream {
 			delete[] buf;
 		 }
 
-		void insert(T* item) {
+		void insert(T* item, const int index) {
 			std::unique_lock<std::mutex> lock(mutex);
 			not_full.wait(lock, [&] {return !is_full();});
 
 			// insert item to buffer
 			buf[count++] = *item;
 
-//			if(is_full()){
-//				not_empty.notify_one();
-//			}
+			//debugging info
+			print_thread_info_locked("inserting an item: " + item->toString() + " to buffer[" + std::to_string(index) + "]\n");
 		}
 
-		void flush(const char * file_name) {
+		void flush(const char * file_name, const int i) {
 			std::unique_lock<std::mutex> lock(mutex);
 
 			if(is_full()){
 				int perms = O_WRONLY | O_APPEND;
-				int fd = open(file_name, perms);
+				int fd = open(file_name, perms, S_IRWXU);
 				if(fd < 0){
-					fd = creat(file_name, perms);
+					fd = creat(file_name, S_IRWXU);
 				}
 				// flush buffer to update out stream
 				char * b = (char *) buf;
-				io_manager::write_to_file(fd, b, BUFFER_CAPACITY * sizeof(T));
+				io_manager::write_to_file(fd, b, capacity * sizeof(T));
+				close(fd);
+
 				count = 0;
 				not_full.notify_one();
 			}
 
+			//debugging info
+			if(is_full()){
+				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+			}
+			else{
+				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+			}
 		}
 
-		void flush_end(const char * file_name) {
+		void flush_end(const char * file_name, const int i) {
 			std::unique_lock<std::mutex> lock(mutex);
-			int perms = O_WRONLY | O_APPEND;
-			int fd = open(file_name, perms);
-			if(fd < 0){
-				fd = creat(file_name, perms);
+			if(!is_empty()){
+				int perms = O_WRONLY | O_APPEND;
+				int fd = open(file_name, perms, S_IRWXU);
+				if(fd < 0){
+					fd = creat(file_name, S_IRWXU);
+				}
+
+				// flush buffer to update out stream
+				char * b = (char *) buf;
+				io_manager::write_to_file(fd, b, count * sizeof(T));
+				close(fd);
 			}
-			// flush buffer to update out stream
-			char * b = (char *) buf;
-			io_manager::write_to_file(fd, b, count * sizeof(T));
+
+			//debugging info
+			if(!is_empty()){
+				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+			}
+			else{
+				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+			}
 		}
 
 		bool is_full() {

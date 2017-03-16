@@ -9,7 +9,7 @@
 #define SRC_COMMON_RSTREAMCOMMON_HPP_
 
 #include <atomic>
-
+#include <sys/syscall.h>
 #include <iostream>
 #include <assert.h>
 #include <sys/types.h>
@@ -56,6 +56,8 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
+
+#include "../utility/Printer.hpp"
 
 
 

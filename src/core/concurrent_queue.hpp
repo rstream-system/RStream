@@ -19,20 +19,31 @@ namespace RStream {
 	public:
 		concurrent_queue(const size_t _capacity) {}
 
-		inline bool isEmpty(){
-			return queue.empty();
-		}
+//		inline bool isEmpty(){
+//			return queue.empty();
+//		}
 
 		void push(const T & item) {
 			queue.push(item);
 		}
 
-		T pop() {
+//		T pop() {
+//			std::unique_lock<std::mutex> lock(mutex);
+//			auto item = queue.front();
+//			queue.pop();
+//			return item;
+//		}
+
+		bool test_pop_atomic(T& item){
 			std::unique_lock<std::mutex> lock(mutex);
-			auto item = queue.front();
-			queue.pop();
-			lock.unlock();
-			return item;
+			if(queue.empty()){
+				return false;
+			}
+			else{
+				item = queue.front();
+				queue.pop();
+				return true;
+			}
 		}
 
 	};

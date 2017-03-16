@@ -18,6 +18,11 @@ struct Update : T {
 	}
 };
 
+inline std::ostream & operator<<(std::ostream & strm, const Update& update){
+	strm << "(" << update.target << ", " << update.sum << ")";
+	return strm;
+}
+
 Update* generate_one_update(Edge & e)
 {
 	Update* update = new Update(e.target, 0);

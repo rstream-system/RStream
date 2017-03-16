@@ -47,8 +47,8 @@ namespace RStream {
 	public:
 
 		engine(std::string _filename) : filename(_filename), atomic_num_producers(0), atomic_partition_id(0) {
-//			num_threads = std::thread::hardware_concurrency();
-			num_threads = 1;
+			num_threads = std::thread::hardware_concurrency();
+//			num_threads = 4;
 
 			// to be decided ?
 			num_write_threads = num_threads > 2 ? 2 : 1;
@@ -63,8 +63,6 @@ namespace RStream {
 
 			fscanf(meta_file, "%d %d", &num_partitions, &edge_type);
 
-			std::cout << num_partitions << std::endl;
-//			std::cout << edge_type << std::endl;
 
 			fclose(meta_file);
 
@@ -75,7 +73,9 @@ namespace RStream {
 				edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
 			}
 
-			std::cout << edge_unit << std::endl;
+			std::cout << "Number of partitions: " << num_partitions << std::endl;
+//			std::cout << edge_type << std::endl;
+			std::cout << "Number of bytes per edge: " << edge_unit << std::endl << std::endl;
 
 			atomic_partition_number = num_partitions - 1;
 		}
@@ -92,29 +92,29 @@ namespace RStream {
 				task_queue->push(fd);
 			}
 
-			scatter_producer(generate_one_update, buffers_for_shuffle, task_queue);
+//			//for debugging only
+//			scatter_producer(generate_one_update, buffers_for_shuffle, task_queue);
+//			std::cout << "scatter done!" << std::endl;
+//			scatter_consumer(buffers_for_shuffle);
 
-			std::cout << "scatter done!" << std::endl;
+			// exec threads will produce updates and push into shuffle buffers
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < num_exec_threads; i++)
+				exec_threads.push_back(std::thread(&engine::scatter_producer, this, generate_one_update, buffers_for_shuffle, task_queue));
 
-			scatter_consumer(buffers_for_shuffle);
+			// write threads will flush shuffle buffer to update out stream file as long as it's full
+			std::vector<std::thread> write_threads;
+			for(int i = 0; i < num_write_threads; i++)
+				write_threads.push_back(std::thread(&engine::scatter_consumer, this, buffers_for_shuffle));
 
-//			// exec threads will produce updates and push into shuffle buffers
-//			std::vector<std::thread> exec_threads;
-//			for(int i = 0; i < num_exec_threads; i++)
-//				exec_threads.push_back(std::thread(&engine::scatter_producer, this, generate_one_update, buffers_for_shuffle, task_queue));
-//
-//			// write threads will flush shuffle buffer to update out stream file as long as it's full
-//			std::vector<std::thread> write_threads;
-//			for(int i = 0; i < num_write_threads; i++)
-//				write_threads.push_back(std::thread(&engine::scatter_consumer, this, buffers_for_shuffle));
-//
-//			// join all threads
-//			for(auto & t : exec_threads)
-//				t.join();
-//
-//			for(auto &t : write_threads)
-//				t.join();
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
 
+			for(auto &t : write_threads)
+				t.join();
+
+			delete[] buffers_for_shuffle;
 		}
 
 //		void gather(std::function<void(Edge&)> apply_one_update) {
@@ -148,38 +148,38 @@ namespace RStream {
 		void scatter_producer(std::function<T*(Edge&)> generate_one_update,
 				global_buffer<T> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
-			while(!task_queue->isEmpty()){
+			int fd = -1;
+			// pop from queue
+			while(task_queue->test_pop_atomic(fd)){
+				assert(fd > 0);
 
-				// pop from queue
-				int fd = task_queue->pop();
 				// get file size
 				size_t file_size = io_manager::get_filesize(fd);
-
-				std::cout << file_size << std::endl;
+				print_thread_info_locked("as a producer dealing with " + std::to_string(fd) + " of size " + std::to_string(file_size) + "\n");
 
 				// read from file to thread local buffer
 				char * local_buf = new char[file_size];
 				io_manager::read_from_file(fd, local_buf, file_size);
 
-				std::cout << file_size << std::endl;
-
 				// for each edge
-				for(size_t pos = 0; pos <= file_size; pos += edge_unit) {
+				for(size_t pos = 0; pos < file_size; pos += edge_unit) {
 					// get an edge
 					Edge e = *(Edge*)(local_buf + pos);
-
-					std::cout << e << std::endl;
+//					std::cout << e << std::endl;
 
 					// gen one update
 					T * update_info = generate_one_update(e);
-					std::cout << update_info->target << std::endl;
+//					std::cout << update_info->target << std::endl;
 
 
 					// insert into shuffle buffer accordingly
 					int index = get_global_buffer_index(update_info);
 					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, index);
-					global_buf->insert(update_info);
+					global_buf->insert(update_info, index);
 				}
+
+//				std::cout << std::endl;
+				close(fd);
 
 			}
 			atomic_num_producers--;
@@ -191,21 +191,31 @@ namespace RStream {
 			while(atomic_num_producers != 0) {
 				int i = (atomic_partition_id++) % num_partitions ;
 
+//				//debugging info
+//				print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
+
 				const char * file_name = (filename + "." + std::to_string(i) + ".update_stream").c_str();
-
 				global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
-				g_buf->flush(file_name);
-
+				g_buf->flush(file_name, i);
 			}
 
 			//the last run - deal with all remaining content in buffers
-			int i = atomic_partition_number--;
-			if(i >= 0){
-				const char * file_name = (filename + "." + std::to_string(i) + ".update_stream").c_str();
-				global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
-				g_buf->flush_end(file_name);
+			while(true){
+				int i = atomic_partition_number--;
+//				std::cout << i << std::endl;
+				if(i >= 0){
+//					//debugging info
+//					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-				delete g_buf;
+					const char * file_name = (filename + "." + std::to_string(i) + ".update_stream").c_str();
+					global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
+					g_buf->flush_end(file_name, i);
+
+					delete g_buf;
+				}
+				else{
+					break;
+				}
 			}
 		}
 
