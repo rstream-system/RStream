@@ -48,14 +48,14 @@
 #include <exception>
 
 //#include <boost/date_time/posix_time/posix_time_types.hpp>
-#include <boost/algorithm/string.hpp>
+//#include <boost/algorithm/string.hpp>
 #include <algorithm>
 #include <climits>
 #include <memory>
 
-#include <boost/asio/io_service.hpp>
-#include <boost/bind.hpp>
-#include <boost/thread/thread.hpp>
+//#include <boost/asio/io_service.hpp>
+//#include <boost/bind.hpp>
+//#include <boost/thread/thread.hpp>
 
 #include "../utility/Printer.hpp"
 

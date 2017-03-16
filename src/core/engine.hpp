@@ -81,7 +81,7 @@ namespace RStream {
 		}
 
 		/* scatter with vertex data (for graph computation use)*/
-		void scatter(std::function<T*(Edge&, char*)> generate_one_update) {
+		void scatter_with_vertex(std::function<T*(Edge&, char*)> generate_one_update) {
 			// a pair of <vertex, edge_stream> for each partition
 			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(num_partitions);
 
@@ -99,7 +99,7 @@ namespace RStream {
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < num_exec_threads; i++)
-				exec_threads.push_back( std::thread([=] { this->scatter_producer(generate_one_update, buffers_for_shuffle, task_queue); } ));
+				exec_threads.push_back( std::thread([=] { this->scatter_producer_with_vertex(generate_one_update, buffers_for_shuffle, task_queue); } ));
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
@@ -117,7 +117,7 @@ namespace RStream {
 		}
 
 		/* scatter without vertex data (for relational algebra use)*/
-		void scatter(std::function<T*(Edge&)> generate_one_update) {
+		void scatter_no_vertex(std::function<T*(Edge&)> generate_one_update) {
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(num_partitions);
 
 			// allocate global buffers for shuffling
@@ -138,7 +138,7 @@ namespace RStream {
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < num_exec_threads; i++)
-				exec_threads.push_back(std::thread([=] { this->scatter_producer(generate_one_update, buffers_for_shuffle, task_queue); }));
+				exec_threads.push_back(std::thread([=] { this->scatter_producer_no_vertex(generate_one_update, buffers_for_shuffle, task_queue); }));
 
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
@@ -186,7 +186,7 @@ namespace RStream {
 
 		/* scatter producer with vertex data*/
 		//each exec thread generates a scatter_producer
-		void scatter_producer(std::function<T*(Edge&, char*)> generate_one_update,
+		void scatter_producer_with_vertex(std::function<T*(Edge&, char*)> generate_one_update,
 				global_buffer<T> ** buffers_for_shuffle, concurrent_queue<std::pair<int, int>> * task_queue) {
 			atomic_num_producers++;
 			std::pair<int, int> fd_pair(-1, -1);
@@ -234,7 +234,7 @@ namespace RStream {
 
 		/* scatter producer without vertex data*/
 		// each exec thread generates a scatter_producer
-		void scatter_producer(std::function<T*(Edge&)> generate_one_update,
+		void scatter_producer_no_vertex(std::function<T*(Edge&)> generate_one_update,
 				global_buffer<T> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
 			int fd = -1;
