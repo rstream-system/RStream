@@ -18,6 +18,19 @@ struct Update : T {
 	}
 };
 
+struct Vertex {
+	int degree;
+	float rank;
+	float sum;
+};
+
+void init(char* vertices) {
+	struct Vertex* v= (struct Vertex*) vertices;
+	v->degree = 0;
+	v->rank = 1.0;
+	v->sum = 0.0;
+}
+
 inline std::ostream & operator<<(std::ostream & strm, const Update& update){
 	strm << "(" << update.target << ", " << update.sum << ")";
 	return strm;
@@ -34,9 +47,11 @@ void apply_one_update(T & update, char * vertex) {
 }
 
 int main(int argc, const char ** argv) {
-	engine graph_engine("/home/icuzzq/Workspace/git/RStream/input/input");
+	engine<Vertex> graph_engine("/home/icuzzq/Workspace/git/RStream/input/input");
+	std::function<void(char*)> initialize = init;
+	graph_engine.init_vertex(init);
 	std::function<T*(Edge&)> gen_update = generate_one_update;
-//	graph_engine.scatter(generate_one_update);
+	graph_engine.scatter_no_vertex(generate_one_update);
 
 }
 

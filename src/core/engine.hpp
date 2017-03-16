@@ -22,7 +22,7 @@ namespace RStream {
 		WITH_WEIGHT,
 	};
 
-//	template <typename VertexDataType, typename EdgeDataType, typename T>
+	template <typename VertexDataType>
 
 	class engine {
 
@@ -32,6 +32,7 @@ namespace RStream {
 		int num_exec_threads;
 
 		int num_partitions;
+		std::vector<int> num_vertices;
 
 		EdgeType edge_type;
 		// sizeof each edge
@@ -63,7 +64,7 @@ namespace RStream {
 
 			fscanf(meta_file, "%d %d", &num_partitions, &edge_type);
 
-
+			// TODO: init vector<int> num_vertices here!!!
 			fclose(meta_file);
 
 			// size of each edge
@@ -78,6 +79,32 @@ namespace RStream {
 			std::cout << "Number of bytes per edge: " << edge_unit << std::endl << std::endl;
 
 			atomic_partition_number = num_partitions - 1;
+		}
+
+		/* init vertex data*/
+		void init_vertex(std::function<void(char*)> init) {
+			// a pair of <vertex_file, num_vertices>
+			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(num_partitions);
+
+			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
+				int perms = O_WRONLY;
+				std::string vertex_file = filename + "." + std::to_string(partition_id) + ".vertex";
+				int fd = open(vertex_file.c_str(), perms, S_IRWXU);
+				if(fd < 0) {
+					fd = creat(vertex_file.c_str(), S_IRWXU);
+				}
+				task_queue->push(std::make_pair(fd, num_vertices[partition_id]));
+
+			}
+
+			// threads will load vertex and update, and apply update one by one
+			std::vector<std::thread> threads;
+			for(int i = 0; i < num_threads; i++)
+				threads.push_back(std::thread(&engine::init_produer, this, init, task_queue));
+
+			// join all threads
+			for(auto & t : threads)
+				t.join();
 		}
 
 		/* scatter with vertex data (for graph computation use)*/
@@ -184,6 +211,29 @@ namespace RStream {
 
 	protected:
 
+		void init_produer(std::function<void(char*)> init, concurrent_queue<std::pair<int, int>> * task_queue) {
+			std::pair<int, int> pair(-1, -1);
+			while(task_queue->test_pop_atomic(pair)) {
+				int fd = pair.first;
+				int num_vertex = pair.second;
+				assert(fd > 0 && num_vertex > 0 );
+
+				// size_t ok??
+				size_t vertex_file_size = num_vertex * sizeof(VertexDataType);
+				char * vertex_local_buf = new char[vertex_file_size];
+
+				// for each vertex
+				for(size_t pos = 0; pos < vertex_file_size; pos += sizeof(VertexDataType)) {
+					init(vertex_local_buf + pos);
+				}
+
+				io_manager::write_to_file(fd, vertex_local_buf, vertex_file_size);
+
+				delete[] vertex_local_buf;
+				close(fd);
+			}
+		}
+
 		/* scatter producer with vertex data*/
 		//each exec thread generates a scatter_producer
 		void scatter_producer_with_vertex(std::function<T*(Edge&, char*)> generate_one_update,
@@ -224,6 +274,10 @@ namespace RStream {
 				}
 
 //				std::cout << std::endl;
+
+				// delete
+				delete[] vertex_local_buf;
+				delete[] edge_local_buf;
 				close(fd_vertex);
 				close(fd_edge);
 
@@ -268,6 +322,7 @@ namespace RStream {
 				}
 
 //				std::cout << std::endl;
+				delete[] local_buf;
 				close(fd);
 
 			}
