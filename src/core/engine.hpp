@@ -22,9 +22,9 @@ namespace RStream {
 		WITH_WEIGHT,
 	};
 
-	template <typename VertexDataType, typename UpdateType>
+//	template <typename VertexDataType, typename UpdateType>
 
-	class engine {
+	class Engine {
 	public:
 		std::string filename;
 		int num_threads;
@@ -39,15 +39,15 @@ namespace RStream {
 		int edge_unit;
 
 
-		std::atomic<int> atomic_num_producers;
-
-		std::atomic<int> atomic_partition_id;
-
-		std::atomic<int> atomic_partition_number;
+//		std::atomic<int> atomic_num_producers;
+//
+//		std::atomic<int> atomic_partition_id;
+//
+//		std::atomic<int> atomic_partition_number;
 
 //	public:
 
-		engine(std::string _filename) : filename(_filename), atomic_num_producers(0), atomic_partition_id(0) {
+		Engine(std::string _filename) : filename(_filename) {
 			num_threads = std::thread::hardware_concurrency();
 //			num_threads = 4;
 

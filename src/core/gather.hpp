@@ -18,11 +18,16 @@
 namespace RStream {
 	template <typename VertexDataType, typename UpdateType>
 	class Gather {
-		engine<VertexDataType, UpdateType>& context;
+		static_assert(
+					std::is_base_of<BaseUpdate, UpdateType>::value,
+					"UpdateType must be a subclass of BaseUpdate."
+		);
+
+		const Engine & context;
 
 	public:
 
-		Gather(engine<VertexDataType, UpdateType> & e) : context(e) {};
+		Gather(Engine& e) : context(e) {};
 
 		void gather(std::function<void(UpdateType&, char*)> apply_one_update) {
 			// a pair of <vertex, update_stream> for each partition

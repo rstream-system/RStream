@@ -11,7 +11,7 @@
 
 using namespace RStream;
 
-struct Update {
+struct Update : BaseUpdate{
 	int target;
 	float sum;
 
@@ -56,7 +56,7 @@ int main(int argc, const char ** argv) {
 //	std::function<T*(Edge&)> gen_update = generate_one_update;
 //	graph_engine.scatter_no_vertex(generate_one_update);
 
-	engine<Vertex, Update> e("/home/icuzzq/Workspace/git/RStream/input/input");
+	Engine e("/home/icuzzq/Workspace/git/RStream/input/input");
 	Scatter<Vertex, Update> scatter_phase(e);
 	scatter_phase.scatter_with_vertex(generate_one_update);
 	Gather<Vertex, Update> gather_phase(e);

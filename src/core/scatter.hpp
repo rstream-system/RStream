@@ -16,8 +16,14 @@
 
 namespace RStream {
 	template <typename VertexDataType, typename UpdateType>
+
 	class Scatter {
-		const engine<VertexDataType, UpdateType>& context;
+		static_assert(
+			std::is_base_of<BaseUpdate, UpdateType>::value,
+			"UpdateType must be a subclass of BaseUpdate."
+		);
+
+		const Engine& context;
 
 		std::atomic<int> atomic_num_producers;
 		std::atomic<int> atomic_partition_id;
@@ -25,7 +31,7 @@ namespace RStream {
 
 	public:
 
-		Scatter(engine<VertexDataType, UpdateType> & e) : context(e) {};
+		Scatter(Engine & e) : context(e) {};
 
 		/* scatter with vertex data (for graph computation use)*/
 		void scatter_with_vertex(std::function<UpdateType*(Edge&, char*)> generate_one_update) {
@@ -235,8 +241,8 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(UpdateType* update_info) {
-//			return update_info->target;
-			return 0;
+			return update_info->target;
+//			return 0;
 		}
 
 	};
