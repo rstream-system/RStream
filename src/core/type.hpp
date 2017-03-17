@@ -26,7 +26,7 @@ inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
 }
 
 
-struct T {
+struct BaseUpdate {
 	VertexId target;
 
 
@@ -35,7 +35,7 @@ struct T {
 	}
 };
 
-inline std::ostream & operator<<(std::ostream & strm, const T& up){
+inline std::ostream & operator<<(std::ostream & strm, const BaseUpdate& up){
 	strm << "(" << up.target << ")";
 	return strm;
 }

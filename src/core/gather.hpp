@@ -24,7 +24,7 @@ namespace RStream {
 
 		Gather(engine<VertexDataType, UpdateType> & e) : context(e) {};
 
-		void gather(std::function<void(T&, char*)> apply_one_update) {
+		void gather(std::function<void(UpdateType&, char*)> apply_one_update) {
 			// a pair of <vertex, update_stream> for each partition
 			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(context.num_partitions);
 
@@ -47,7 +47,7 @@ namespace RStream {
 		}
 
 	private:
-		void gather_producer(std::function<void(T&, char*)> apply_one_update,
+		void gather_producer(std::function<void(UpdateType&, char*)> apply_one_update,
 						concurrent_queue<std::pair<int, int>> * task_queue) {
 
 			std::pair<int, int> fd_pair(-1, -1);
@@ -68,9 +68,9 @@ namespace RStream {
 
 				// for each update
 				// size_t is unsigend int, too small for file size?
-				for(size_t pos = 0; pos < update_file_size; pos += sizeof(T)) {
+				for(size_t pos = 0; pos < update_file_size; pos += sizeof(UpdateType)) {
 					// get an update
-					T & update = *(T*)(update_local_buf + pos);
+					UpdateType & update = *(UpdateType*)(update_local_buf + pos);
 					apply_one_update(update, vertex_local_buf);
 				}
 

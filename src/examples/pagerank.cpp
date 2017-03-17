@@ -11,13 +11,16 @@
 
 using namespace RStream;
 
-struct Update : T {
+struct Update {
+	int target;
 	float sum;
 
 	Update(int t, float s) {
 		target = t;
 		sum = s;
 	}
+
+	Update() : target(0), sum(0.0) {}
 };
 
 struct Vertex {
@@ -42,7 +45,7 @@ Update* generate_one_update(Edge & e, char* vertices)
 	return update;
 }
 
-void apply_one_update(T & update, char * vertex) {
+void apply_one_update(Update & update, char * vertex) {
 
 }
 

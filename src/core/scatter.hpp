@@ -28,7 +28,7 @@ namespace RStream {
 		Scatter(engine<VertexDataType, UpdateType> & e) : context(e) {};
 
 		/* scatter with vertex data (for graph computation use)*/
-		void scatter_with_vertex(std::function<T*(Edge&, char*)> generate_one_update) {
+		void scatter_with_vertex(std::function<UpdateType*(Edge&, char*)> generate_one_update) {
 			// a pair of <vertex, edge_stream> for each partition
 			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(context.num_partitions);
 
@@ -41,7 +41,7 @@ namespace RStream {
 			}
 
 			// allocate global buffers for shuffling
-			global_buffer<T> ** buffers_for_shuffle = buffer_manager<T>::get_global_buffers(context.num_partitions);
+			global_buffer<UpdateType> ** buffers_for_shuffle = buffer_manager<UpdateType>::get_global_buffers(context.num_partitions);
 
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
@@ -64,11 +64,11 @@ namespace RStream {
 		}
 
 		/* scatter without vertex data (for relational algebra use)*/
-		void scatter_no_vertex(std::function<T*(Edge&)> generate_one_update) {
+		void scatter_no_vertex(std::function<UpdateType*(Edge&)> generate_one_update) {
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
 			// allocate global buffers for shuffling
-			global_buffer<T> ** buffers_for_shuffle = buffer_manager<T>::get_global_buffers(context.num_partitions);
+			global_buffer<UpdateType> ** buffers_for_shuffle = buffer_manager<UpdateType>::get_global_buffers(context.num_partitions);
 
 			// push task into concurrent queue
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
@@ -106,8 +106,8 @@ namespace RStream {
 	private:
 		/* scatter producer with vertex data*/
 		//each exec thread generates a scatter_producer
-		void scatter_producer_with_vertex(std::function<T*(Edge&, char*)> generate_one_update,
-				global_buffer<T> ** buffers_for_shuffle, concurrent_queue<std::pair<int, int>> * task_queue) {
+		void scatter_producer_with_vertex(std::function<UpdateType*(Edge&, char*)> generate_one_update,
+				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<std::pair<int, int>> * task_queue) {
 
 			atomic_num_producers++;
 			std::pair<int, int> fd_pair(-1, -1);
@@ -134,13 +134,13 @@ namespace RStream {
 //					std::cout << e << std::endl;
 
 					// gen one update
-					T * update_info = generate_one_update(e, vertex_local_buf);
+					UpdateType * update_info = generate_one_update(e, vertex_local_buf);
 //					std::cout << update_info->target << std::endl;
 
 
 					// insert into shuffle buffer accordingly
 					int index = get_global_buffer_index(update_info);
-					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+					global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
 					global_buf->insert(update_info, index);
 				}
 
@@ -159,8 +159,8 @@ namespace RStream {
 
 		/* scatter producer without vertex data*/
 		// each exec thread generates a scatter_producer
-		void scatter_producer_no_vertex(std::function<T*(Edge&)> generate_one_update,
-				global_buffer<T> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+		void scatter_producer_no_vertex(std::function<UpdateType*(Edge&)> generate_one_update,
+				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
 			int fd = -1;
 			// pop from queue
@@ -182,13 +182,13 @@ namespace RStream {
 //					std::cout << e << std::endl;
 
 					// gen one update
-					T * update_info = generate_one_update(e);
+					UpdateType * update_info = generate_one_update(e);
 //					std::cout << update_info->target << std::endl;
 
 
 					// insert into shuffle buffer accordingly
 					int index = get_global_buffer_index(update_info);
-					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+					global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
 					global_buf->insert(update_info, index);
 				}
 
@@ -202,7 +202,7 @@ namespace RStream {
 		}
 
 		// each writer thread generates a scatter_consumer
-		void scatter_consumer(global_buffer<T> ** buffers_for_shuffle) {
+		void scatter_consumer(global_buffer<UpdateType> ** buffers_for_shuffle) {
 			while(atomic_num_producers != 0) {
 				int i = (atomic_partition_id++) % context.num_partitions ;
 
@@ -210,7 +210,7 @@ namespace RStream {
 //				print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
 				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream").c_str();
-				global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
+				global_buffer<UpdateType>* g_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
 			}
 
@@ -223,7 +223,7 @@ namespace RStream {
 //					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
 					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream").c_str();
-					global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
+					global_buffer<UpdateType>* g_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
 
 					delete g_buf;
@@ -234,7 +234,7 @@ namespace RStream {
 			}
 		}
 
-		int get_global_buffer_index(T* update_info) {
+		int get_global_buffer_index(UpdateType* update_info) {
 //			return update_info->target;
 			return 0;
 		}
