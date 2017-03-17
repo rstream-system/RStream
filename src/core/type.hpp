@@ -33,6 +33,10 @@ struct BaseUpdate {
 	std::string toString(){
 		return std::to_string(target);
 	}
+
+//	int getPartitionIndex(std::array<unsigned,>){
+//
+//	}
 };
 
 inline std::ostream & operator<<(std::ostream & strm, const BaseUpdate& up){

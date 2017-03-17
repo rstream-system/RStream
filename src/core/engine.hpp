@@ -8,8 +8,6 @@
 #ifndef CORE_ENGINE_HPP_
 #define CORE_ENGINE_HPP_
 
-//#include "../common/RStreamCommon.hpp"
-
 #include "io_manager.hpp"
 #include "buffer_manager.hpp"
 #include "concurrent_queue.hpp"
@@ -18,40 +16,47 @@
 
 namespace RStream {
 	enum class EdgeType {
-		NO_WEIGHT,
-		WITH_WEIGHT,
+		NO_WEIGHT = 0,
+		WITH_WEIGHT = 1,
 	};
+
+	std::ostream& operator<<(std::ostream& o, EdgeType c)
+	{
+	    if(c == EdgeType::NO_WEIGHT){
+	    	o << "NO_WEIGHT";
+	    }
+	    else if(c == EdgeType::WITH_WEIGHT){
+	    	o << "WITH_WEIGHT";
+	    }
+	    else{
+	    	std::cout << "wrong edge type!!!" << std::endl;
+	    	throw std::exception();
+	    }
+	    return o;
+	}
 
 //	template <typename VertexDataType, typename UpdateType>
 
 	class Engine {
 	public:
-		std::string filename;
 		int num_threads;
 		int num_write_threads;
 		int num_exec_threads;
 
+		std::string filename;
 		int num_partitions;
-		std::vector<int> num_vertices;
+//		std::vector<int> num_vertices;
 
 		EdgeType edge_type;
 		// sizeof each edge
 		int edge_unit;
 
+		int* vertex_intervals;
 
-//		std::atomic<int> atomic_num_producers;
-//
-//		std::atomic<int> atomic_partition_id;
-//
-//		std::atomic<int> atomic_partition_number;
-
-//	public:
 
 		Engine(std::string _filename) : filename(_filename) {
-			num_threads = std::thread::hardware_concurrency();
-//			num_threads = 4;
-
-			// to be decided ?
+//			num_threads = std::thread::hardware_concurrency();
+			num_threads = 4;
 			num_write_threads = num_threads > 2 ? 2 : 1;
 			num_exec_threads = num_threads > 2 ? num_threads - 2 : 1;
 
@@ -62,23 +67,43 @@ namespace RStream {
 				assert(false);
 			}
 
-			fscanf(meta_file, "%d %d", &num_partitions, &edge_type);
-
-			// TODO: init vector<int> num_vertices here!!!
+			int edge_t;
+			fscanf(meta_file, "%d %d", &num_partitions, &edge_t);
+			edge_type = static_cast<EdgeType>(edge_t);
 			fclose(meta_file);
 
 			// size of each edge
 			if(edge_type == EdgeType::NO_WEIGHT) {
 				edge_unit = sizeof(VertexId) * 2;
-			} else if(edge_type == EdgeType::WITH_WEIGHT) {
+			}
+			else if(edge_type == EdgeType::WITH_WEIGHT) {
 				edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
 			}
 
-			std::cout << "Number of partitions: " << num_partitions << std::endl;
-//			std::cout << edge_type << std::endl;
-			std::cout << "Number of bytes per edge: " << edge_unit << std::endl << std::endl;
+			//
+			preprocess();
 
-//			atomic_partition_number = num_partitions - 1;
+
+			std::cout << "Number of partitions: " << num_partitions << std::endl;
+			std::cout << "Edge type: " << edge_type << std::endl;
+			std::cout << "Number of bytes per edge: " << edge_unit << std::endl;
+			std::cout << "Number of exec threads: " << num_exec_threads << std::endl;
+			std::cout << "Number of write threads: " << num_write_threads << std::endl;
+			std::cout << std::endl;
+		}
+
+		~Engine(){
+			delete[] vertex_intervals;
+		}
+
+		void preprocess(){
+			//TODO
+
+			vertex_intervals = new int[num_partitions];
+			for(int i = 0; i < num_partitions; ++i){
+				vertex_intervals[i] = (i + 1) * 2;
+			}
+
 		}
 
 		/* init vertex data*/

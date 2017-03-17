@@ -40,7 +40,7 @@ namespace RStream {
 			buf[count++] = *item;
 
 			//debugging info
-//			print_thread_info_locked("inserting an item: " + item->toString() + " to buffer[" + std::to_string(index) + "]\n");
+			print_thread_info_locked("inserting an item: " + item->toString() + " to buffer[" + std::to_string(index) + "]\n");
 		}
 
 		void flush(const char * file_name, const int i) {
@@ -121,7 +121,7 @@ namespace RStream {
 
 		// get one global buffer according to the index
 		static global_buffer<T>* get_global_buffer(global_buffer<T> ** buffers, int num_partitions, int index) {
-			if(index >= 0 && index <num_partitions)
+			if(index >= 0 && index < num_partitions)
 				return buffers[index];
 			else
 				return nullptr;

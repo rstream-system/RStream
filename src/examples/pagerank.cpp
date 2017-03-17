@@ -21,6 +21,10 @@ struct Update : BaseUpdate{
 	}
 
 	Update() : target(0), sum(0.0) {}
+
+	std::string toString(){
+		return "(" + std::to_string(target) + ", " + std::to_string(sum) + ")";
+	}
 };
 
 struct Vertex {
@@ -39,11 +43,18 @@ inline std::ostream & operator<<(std::ostream & strm, const Update& update){
 	return strm;
 }
 
-Update* generate_one_update(Edge & e, char* vertices)
+//Update* generate_one_update(Edge & e, char* vertices)
+//{
+//	Update* update = new Update(e.target, 0);
+//	return update;
+//}
+
+Update* generate_one_update(Edge & e)
 {
 	Update* update = new Update(e.target, 0);
 	return update;
 }
+
 
 void apply_one_update(Update & update, char * vertex) {
 
@@ -58,9 +69,9 @@ int main(int argc, const char ** argv) {
 
 	Engine e("/home/icuzzq/Workspace/git/RStream/input/input");
 	Scatter<Vertex, Update> scatter_phase(e);
-	scatter_phase.scatter_with_vertex(generate_one_update);
-	Gather<Vertex, Update> gather_phase(e);
-	gather_phase.gather(apply_one_update);
+	scatter_phase.scatter_no_vertex(generate_one_update);
+//	Gather<Vertex, Update> gather_phase(e);
+//	gather_phase.gather(apply_one_update);
 }
 
 

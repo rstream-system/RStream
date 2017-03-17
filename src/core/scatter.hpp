@@ -31,7 +31,11 @@ namespace RStream {
 
 	public:
 
-		Scatter(Engine & e) : context(e) {};
+		Scatter(Engine & e) : context(e) {
+			atomic_num_producers = 0;
+			atomic_partition_id = 0;
+			atomic_partition_number = context.num_partitions;
+		};
 
 		/* scatter with vertex data (for graph computation use)*/
 		void scatter_with_vertex(std::function<UpdateType*(Edge&, char*)> generate_one_update) {
@@ -92,7 +96,6 @@ namespace RStream {
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < context.num_exec_threads; i++)
 				exec_threads.push_back(std::thread([=] { this->scatter_producer_no_vertex(generate_one_update, buffers_for_shuffle, task_queue); }));
-
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
@@ -185,11 +188,11 @@ namespace RStream {
 				for(size_t pos = 0; pos < file_size; pos += context.edge_unit) {
 					// get an edge
 					Edge e = *(Edge*)(local_buf + pos);
-//					std::cout << e << std::endl;
+					std::cout << e << std::endl;
 
 					// gen one update
 					UpdateType * update_info = generate_one_update(e);
-//					std::cout << update_info->target << std::endl;
+					std::cout << *update_info << std::endl;
 
 
 					// insert into shuffle buffer accordingly
@@ -222,7 +225,7 @@ namespace RStream {
 
 			//the last run - deal with all remaining content in buffers
 			while(true){
-				int i = atomic_partition_number--;
+				int i = --atomic_partition_number;
 //				std::cout << i << std::endl;
 				if(i >= 0){
 //					//debugging info
@@ -241,8 +244,28 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(UpdateType* update_info) {
-			return update_info->target;
-//			return 0;
+			int target = update_info->target;
+
+			int lb = 0, ub = context.num_partitions;
+			int i = (lb + ub) / 2;
+
+			while(true){
+				int c = context.vertex_intervals[i];
+				if(i == 0){
+					return 0;
+				}
+				int p = context.vertex_intervals[i - 1];
+				if(c >= target && p <= target){
+					return i;
+				}
+				else if(c > target){
+					ub = i;
+				}
+				else if(c < target){
+					lb = i;
+				}
+				i = (lb + ub) / 2;
+			}
 		}
 
 	};
