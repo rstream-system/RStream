@@ -38,7 +38,7 @@ namespace RStream {
 		};
 
 		/* scatter with vertex data (for graph computation use)*/
-		void scatter_with_vertex(std::function<UpdateType*(Edge&, std::unordered_map<VertexId, VertexDataType*>)> generate_one_update) {
+		void scatter_with_vertex(std::function<UpdateType*(Edge&, VertexDataType*)> generate_one_update) {
 			// a pair of <vertex, edge_stream> for each partition
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
@@ -68,6 +68,7 @@ namespace RStream {
 				t.join();
 
 			delete[] buffers_for_shuffle;
+			delete task_queue;
 		}
 
 		/* scatter without vertex data (for relational algebra use)*/
@@ -105,18 +106,20 @@ namespace RStream {
 				t.join();
 
 			delete[] buffers_for_shuffle;
+			delete task_queue;
 		}
+
 
 	private:
-		void build_vertex_hashMap(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
+
+
+		static void load_vertices_hashMap(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
 
 		}
-
-
 
 		/* scatter producer with vertex data*/
 		//each exec thread generates a scatter_producer
-		void scatter_producer_with_vertex(std::function<UpdateType*(Edge&, std::unordered_map<VertexId, VertexDataType*>)> generate_one_update,
+		void scatter_producer_with_vertex(std::function<UpdateType*(Edge&, VertexDataType*)> generate_one_update,
 				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 
 			atomic_num_producers++;
@@ -137,7 +140,7 @@ namespace RStream {
 				char * vertex_local_buf = new char[vertex_file_size];
 				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
 				std::unordered_map<VertexId, VertexDataType*> vertex_map;
-				build_vertex_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
+				load_vertices_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
 
 				char * edge_local_buf = new char[edge_file_size];
 				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size);
@@ -149,7 +152,9 @@ namespace RStream {
 //					std::cout << e << std::endl;
 
 					// gen one update
-					UpdateType * update_info = generate_one_update(e, vertex_map);
+					assert(vertex_map.find(e.src) != vertex_map.end());
+					VertexDataType * src_vertex = vertex_map.find(e.src)->second;
+					UpdateType * update_info = generate_one_update(e, src_vertex);
 //					std::cout << update_info->target << std::endl;
 
 					// insert into shuffle buffer accordingly
@@ -166,7 +171,7 @@ namespace RStream {
 
 				//clear vertex_map
 				for(auto it = vertex_map.cbegin(); it != vertex_map.cend(); ++it){
-					delete (*it).second;
+					delete it->second;
 				}
 
 				close(fd_vertex);

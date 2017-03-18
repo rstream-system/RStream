@@ -44,7 +44,7 @@ inline std::ostream & operator<<(std::ostream & strm, const Update& update){
 	return strm;
 }
 
-Update* generate_one_update(Edge & e, std::unordered_map<VertexId, Vertex*> vertex_map)
+Update* generate_one_update(Edge & e, Vertex* src_vertex)
 {
 
 	Update* update = new Update(e.target, e.src);
@@ -58,7 +58,7 @@ Update* generate_one_update(Edge & e, std::unordered_map<VertexId, Vertex*> vert
 //}
 
 
-void apply_one_update(Update & update, char * vertex) {
+void apply_one_update(Update & update, Vertex* dst_vertex) {
 
 }
 
@@ -72,8 +72,8 @@ int main(int argc, const char ** argv) {
 	Engine e("/home/icuzzq/Workspace/git/RStream/input/input");
 	Scatter<Vertex, Update> scatter_phase(e);
 	scatter_phase.scatter_with_vertex(generate_one_update);
-//	Gather<Vertex, Update> gather_phase(e);
-//	gather_phase.gather(apply_one_update);
+	Gather<Vertex, Update> gather_phase(e);
+	gather_phase.gather(apply_one_update);
 }
 
 
