@@ -29,14 +29,14 @@ inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
 struct BaseUpdate {
 	VertexId target;
 
-
 	std::string toString(){
 		return std::to_string(target);
 	}
 
-//	int getPartitionIndex(std::array<unsigned,>){
-//
-//	}
+};
+
+struct BaseVertex {
+	VertexId id;
 };
 
 inline std::ostream & operator<<(std::ostream & strm, const BaseUpdate& up){

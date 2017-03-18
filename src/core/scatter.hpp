@@ -38,16 +38,13 @@ namespace RStream {
 		};
 
 		/* scatter with vertex data (for graph computation use)*/
-		void scatter_with_vertex(std::function<UpdateType*(Edge&, char*)> generate_one_update) {
+		void scatter_with_vertex(std::function<UpdateType*(Edge&, std::unordered_map<VertexId, VertexDataType*>)> generate_one_update) {
 			// a pair of <vertex, edge_stream> for each partition
-			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(context.num_partitions);
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
 			// push task into concurrent queue
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
-				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDONLY);
-				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
-				assert(fd_vertex > 0 && fd_edge > 0);
-				task_queue->push(std::make_pair(fd_vertex, fd_edge));
+				task_queue->push(partition_id);
 			}
 
 			// allocate global buffers for shuffling
@@ -82,9 +79,7 @@ namespace RStream {
 
 			// push task into concurrent queue
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
-				int fd = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
-				assert(fd > 0);
-				task_queue->push(fd);
+				task_queue->push(partition_id);
 			}
 
 //			//for debugging only
@@ -113,26 +108,37 @@ namespace RStream {
 		}
 
 	private:
+		void build_vertex_hashMap(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
+
+		}
+
+
+
 		/* scatter producer with vertex data*/
 		//each exec thread generates a scatter_producer
-		void scatter_producer_with_vertex(std::function<UpdateType*(Edge&, char*)> generate_one_update,
-				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<std::pair<int, int>> * task_queue) {
+		void scatter_producer_with_vertex(std::function<UpdateType*(Edge&, std::unordered_map<VertexId, VertexDataType*>)> generate_one_update,
+				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 
 			atomic_num_producers++;
-			std::pair<int, int> fd_pair(-1, -1);
+			int partition_id = -1;
 			// pop from queue
-			while(task_queue->test_pop_atomic(fd_pair)){
-				int fd_vertex = fd_pair.first;
-				int fd_edge = fd_pair.second;
+			while(task_queue->test_pop_atomic(partition_id)){
+				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDONLY);
+				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_vertex > 0 && fd_edge > 0 );
 
 				// get file size
 				size_t vertex_file_size = io_manager::get_filesize(fd_vertex);
 				size_t edge_file_size = io_manager::get_filesize(fd_edge);
 
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(edge_file_size) + "\n");
+
 				// read from files to thread local buffer
 				char * vertex_local_buf = new char[vertex_file_size];
 				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
+				std::unordered_map<VertexId, VertexDataType*> vertex_map;
+				build_vertex_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
+
 				char * edge_local_buf = new char[edge_file_size];
 				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size);
 
@@ -143,9 +149,8 @@ namespace RStream {
 //					std::cout << e << std::endl;
 
 					// gen one update
-					UpdateType * update_info = generate_one_update(e, vertex_local_buf);
+					UpdateType * update_info = generate_one_update(e, vertex_map);
 //					std::cout << update_info->target << std::endl;
-
 
 					// insert into shuffle buffer accordingly
 					int index = get_global_buffer_index(update_info);
@@ -158,6 +163,12 @@ namespace RStream {
 				// delete
 				delete[] vertex_local_buf;
 				delete[] edge_local_buf;
+
+				//clear vertex_map
+				for(auto it = vertex_map.cbegin(); it != vertex_map.cend(); ++it){
+					delete (*it).second;
+				}
+
 				close(fd_vertex);
 				close(fd_edge);
 
@@ -171,14 +182,15 @@ namespace RStream {
 		void scatter_producer_no_vertex(std::function<UpdateType*(Edge&)> generate_one_update,
 				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
-			int fd = -1;
+			int partition_id = -1;
 			// pop from queue
-			while(task_queue->test_pop_atomic(fd)){
+			while(task_queue->test_pop_atomic(partition_id)){
+				int fd = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd > 0);
 
 				// get file size
 				size_t file_size = io_manager::get_filesize(fd);
-				print_thread_info_locked("as a producer dealing with " + std::to_string(fd) + " of size " + std::to_string(file_size) + "\n");
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(file_size) + "\n");
 
 				// read from file to thread local buffer
 				char * local_buf = new char[file_size];
@@ -188,11 +200,11 @@ namespace RStream {
 				for(size_t pos = 0; pos < file_size; pos += context.edge_unit) {
 					// get an edge
 					Edge e = *(Edge*)(local_buf + pos);
-					std::cout << e << std::endl;
+//					std::cout << e << std::endl;
 
 					// gen one update
 					UpdateType * update_info = generate_one_update(e);
-					std::cout << *update_info << std::endl;
+//					std::cout << *update_info << std::endl;
 
 
 					// insert into shuffle buffer accordingly
@@ -255,7 +267,7 @@ namespace RStream {
 					return 0;
 				}
 				int p = context.vertex_intervals[i - 1];
-				if(c >= target && p <= target){
+				if(c >= target && p < target){
 					return i;
 				}
 				else if(c > target){

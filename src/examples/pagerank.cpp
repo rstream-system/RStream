@@ -27,15 +27,16 @@ struct Update : BaseUpdate{
 	}
 };
 
-struct Vertex {
+struct Vertex : BaseVertex {
 	int degree;
-	int vertexId;
+	float pr_value;
+//	int vertexId;
 };
 
 void init(char* vertices) {
 	struct Vertex* v= (struct Vertex*) vertices;
 	v->degree = 0;
-	v->vertexId = 0;
+//	v->vertexId = 0;
 }
 
 inline std::ostream & operator<<(std::ostream & strm, const Update& update){
@@ -43,17 +44,18 @@ inline std::ostream & operator<<(std::ostream & strm, const Update& update){
 	return strm;
 }
 
-//Update* generate_one_update(Edge & e, char* vertices)
+Update* generate_one_update(Edge & e, std::unordered_map<VertexId, Vertex*> vertex_map)
+{
+
+	Update* update = new Update(e.target, e.src);
+	return update;
+}
+
+//Update* generate_one_update(Edge & e)
 //{
 //	Update* update = new Update(e.target, 0);
 //	return update;
 //}
-
-Update* generate_one_update(Edge & e)
-{
-	Update* update = new Update(e.target, 0);
-	return update;
-}
 
 
 void apply_one_update(Update & update, char * vertex) {
@@ -69,7 +71,7 @@ int main(int argc, const char ** argv) {
 
 	Engine e("/home/icuzzq/Workspace/git/RStream/input/input");
 	Scatter<Vertex, Update> scatter_phase(e);
-	scatter_phase.scatter_no_vertex(generate_one_update);
+	scatter_phase.scatter_with_vertex(generate_one_update);
 //	Gather<Vertex, Update> gather_phase(e);
 //	gather_phase.gather(apply_one_update);
 }

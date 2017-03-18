@@ -27,8 +27,8 @@ for line in infile:
     else:
         vector = line.strip().split(" ")
         vector = list(map(int, vector))
-        vector[0] = vector[0] - 1
-        vector[1] = vector[1] - 1
+        vector[0] = vector[0] 
+        vector[1] = vector[1] 
 #        vector.append(random.random()) # Edge weight
         if vector[0] > vertices:
             vertices = vector[0]
