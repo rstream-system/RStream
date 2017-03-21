@@ -51,6 +51,8 @@ namespace RStream {
 		// sizeof each edge
 		int edge_unit;
 
+		int vertex_unit;
+
 		int* vertex_intervals;
 
 
@@ -82,7 +84,7 @@ namespace RStream {
 
 			//
 			preprocess();
-
+			vertex_unit = 12;
 
 			std::cout << "Number of partitions: " << num_partitions << std::endl;
 			std::cout << "Edge type: " << edge_type << std::endl;

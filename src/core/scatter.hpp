@@ -19,6 +19,11 @@ namespace RStream {
 
 	class Scatter {
 		static_assert(
+			std::is_base_of<BaseVertex, VertexDataType>::value,
+			"VertexDataType must be a subclass of BaseVertex."
+		);
+
+		static_assert(
 			std::is_base_of<BaseUpdate, UpdateType>::value,
 			"UpdateType must be a subclass of BaseUpdate."
 		);
@@ -113,8 +118,11 @@ namespace RStream {
 	private:
 
 
-		static void load_vertices_hashMap(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
-
+		void load_vertices_hashMap(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
+			for(size_t off = 0; off < vertex_file_size; off += context.vertex_unit){
+				VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
+				vertex_map[v->id] = v;
+			}
 		}
 
 		/* scatter producer with vertex data*/
@@ -169,10 +177,10 @@ namespace RStream {
 				delete[] vertex_local_buf;
 				delete[] edge_local_buf;
 
-				//clear vertex_map
-				for(auto it = vertex_map.cbegin(); it != vertex_map.cend(); ++it){
-					delete it->second;
-				}
+//				//clear vertex_map
+//				for(auto it = vertex_map.cbegin(); it != vertex_map.cend(); ++it){
+//					delete it->second;
+//				}
 
 				close(fd_vertex);
 				close(fd_edge);

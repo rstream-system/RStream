@@ -20,8 +20,13 @@ namespace RStream {
 	template <typename VertexDataType, typename UpdateType>
 	class Gather {
 		static_assert(
-					std::is_base_of<BaseUpdate, UpdateType>::value,
-					"UpdateType must be a subclass of BaseUpdate."
+			std::is_base_of<BaseVertex, VertexDataType>::value,
+			"VertexDataType must be a subclass of BaseVertex."
+		);
+
+		static_assert(
+			std::is_base_of<BaseUpdate, UpdateType>::value,
+			"UpdateType must be a subclass of BaseUpdate."
 		);
 
 		const Engine & context;
@@ -52,17 +57,15 @@ namespace RStream {
 		}
 
 	private:
-		static void load_vertices(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
-
-		}
-
-		static void store_updatedvertices(std::unordered_map<VertexId, VertexDataType*> & vertex_map, char* vertex_local_buf, const int vertex_file_size){
-
+		void load_vertices_hashMap(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
+			for(size_t off = 0; off < vertex_file_size; off += context.vertex_unit){
+				VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
+				vertex_map[v->id] = v;
+			}
 		}
 
 		void gather_producer(std::function<void(UpdateType&, VertexDataType*)> apply_one_update,
 						concurrent_queue<int> * task_queue) {
-
 			int partition_id = -1;
 			while(task_queue->test_pop_atomic(partition_id)) {
 				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDONLY);
@@ -79,7 +82,7 @@ namespace RStream {
 				char * vertex_local_buf = new char[vertex_file_size];
 				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
 				std::unordered_map<VertexId, VertexDataType*> vertex_map;
-				load_vertices(vertex_local_buf, vertex_file_size, vertex_map);
+				load_vertices_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
 
 				char * update_local_buf = new char[update_file_size];
 				io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
@@ -95,17 +98,17 @@ namespace RStream {
 				}
 
 				// write updated vertex value to disk
-				store_updatedvertices(vertex_map, vertex_local_buf, vertex_file_size);
+//				store_updatedvertices(vertex_map, vertex_local_buf, vertex_file_size);
 				io_manager::write_to_file(fd_vertex, vertex_local_buf, vertex_file_size);
 
 				// delete
 				delete[] vertex_local_buf;
 				delete[] update_local_buf;
 
-				//clear vertex_map
-				for(auto it = vertex_map.cbegin(); it != vertex_map.cend(); ++it){
-					delete it->second;
-				}
+//				//clear vertex_map
+//				for(auto it = vertex_map.cbegin(); it != vertex_map.cend(); ++it){
+//					delete it->second;
+//				}
 
 				close(fd_vertex);
 				close(fd_update);
