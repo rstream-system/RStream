@@ -20,6 +20,11 @@ struct Edge {
 
 };
 
+struct Vertex_Interval {
+	VertexId start;
+	VertexId end;
+};
+
 inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
 	strm << "(" << edge.src << ", " << edge.target << ", " << edge.weight << ")";
 	return strm;
@@ -37,6 +42,10 @@ struct BaseUpdate {
 
 struct BaseVertex {
 	VertexId id;
+};
+
+struct Update_Stream {
+	std::string update_filename;
 };
 
 inline std::ostream & operator<<(std::ostream & strm, const BaseUpdate& up){

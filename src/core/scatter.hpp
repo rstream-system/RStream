@@ -275,11 +275,13 @@ namespace RStream {
 			int i = (lb + ub) / 2;
 
 			while(true){
-				int c = context.vertex_intervals[i];
+//				int c = context.vertex_intervals[i];
+				int c = context.vertex_intervals[i].end - context.vertex_intervals[i].start + 1;
 				if(i == 0){
 					return 0;
 				}
-				int p = context.vertex_intervals[i - 1];
+//				int p = context.vertex_intervals[i - 1];
+				int p = context.vertex_intervals[i - 1].end - context.vertex_intervals[i - 1].start + 1;
 				if(c >= target && p < target){
 					return i;
 				}

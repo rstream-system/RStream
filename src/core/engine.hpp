@@ -53,7 +53,9 @@ namespace RStream {
 
 		int vertex_unit;
 
-		int* vertex_intervals;
+//		int* vertex_intervals;
+
+		struct Vertex_Interval * vertex_intervals;
 
 
 		Engine(std::string _filename) : filename(_filename) {
@@ -101,9 +103,14 @@ namespace RStream {
 		void preprocess(){
 			//TODO
 
-			vertex_intervals = new int[num_partitions];
-			for(int i = 0; i < num_partitions; ++i){
-				vertex_intervals[i] = (i + 1) * 2;
+//			vertex_intervals = new int[num_partitions];
+//			for(int i = 0; i < num_partitions; ++i){
+//				vertex_intervals[i] = (i + 1) * 2;
+//			}
+
+			vertex_intervals = new struct Vertex_Interval[num_partitions];
+			for(int i = 0; i < num_partitions; ++i) {
+				vertex_intervals[i] = {0, 1};
 			}
 
 		}
