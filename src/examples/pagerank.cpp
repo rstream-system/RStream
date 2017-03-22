@@ -27,39 +27,36 @@ struct Update : BaseUpdate{
 	}
 };
 
-struct Vertex : BaseVertex {
-	int degree;
-	float pr_value;
-//	int vertexId;
-};
-
-void init(char* vertices) {
-	struct Vertex* v= (struct Vertex*) vertices;
-	v->degree = 0;
-//	v->vertexId = 0;
-}
-
 inline std::ostream & operator<<(std::ostream & strm, const Update& update){
 	strm << "(" << update.target << ", " << update.sum << ")";
 	return strm;
 }
 
-Update* generate_one_update(Edge & e, Vertex* src_vertex)
-{
+struct Vertex : BaseVertex {
+	int degree;
+//	float pr_value;
+};
 
-	Update* update = new Update(e.target, e.src);
-	return update;
+inline std::ostream & operator<<(std::ostream & strm, const Vertex& vertex){
+	strm << "[" << vertex.id << "," << vertex.degree << "]";
+	return strm;
 }
 
-//Update* generate_one_update(Edge & e)
-//{
-//	Update* update = new Update(e.target, 0);
-//	return update;
+//void init(char* vertices) {
+//	struct Vertex* v= (struct Vertex*) vertices;
+//	v->degree = 0;
+////	v->vertexId = 0;
 //}
 
 
-void apply_one_update(Update & update, Vertex* dst_vertex) {
+Update* generate_one_update(Edge & e, Vertex* src_vertex)
+{
+	Update* update = new Update(e.target, 1.0);
+	return update;
+}
 
+void apply_one_update(Update & update, Vertex* dst_vertex) {
+	dst_vertex->degree += update.sum;
 }
 
 int main(int argc, const char ** argv) {

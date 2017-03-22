@@ -84,7 +84,7 @@ namespace RStream {
 
 			//
 			preprocess();
-			vertex_unit = 12;
+			vertex_unit = 8;
 
 			std::cout << "Number of partitions: " << num_partitions << std::endl;
 			std::cout << "Edge type: " << edge_type << std::endl;

@@ -68,7 +68,7 @@ namespace RStream {
 						concurrent_queue<int> * task_queue) {
 			int partition_id = -1;
 			while(task_queue->test_pop_atomic(partition_id)) {
-				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDONLY);
+				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDWR);
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream").c_str(), O_RDONLY);
 //				int fd_vertex = fd_pair.first;
 //				int fd_update = fd_pair.second;
@@ -88,13 +88,19 @@ namespace RStream {
 				io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
 
 				// for each update
-				// size_t is unsigend int, too small for file size?
+				// size_t is unsigned int, too small for file size?
 				for(size_t pos = 0; pos < update_file_size; pos += sizeof(UpdateType)) {
 					// get an update
 					UpdateType & update = *(UpdateType*)(update_local_buf + pos);
 					assert(vertex_map.find(update.target) != vertex_map.end());
 					VertexDataType * dst_vertex = vertex_map.find(update.target)->second;
 					apply_one_update(update, dst_vertex);
+				}
+
+				//for debugging
+				for(size_t off = 0; off < vertex_file_size; off += context.vertex_unit){
+					VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
+					std::cout << *v << std::endl;
 				}
 
 				// write updated vertex value to disk
