@@ -8,6 +8,7 @@
 #include "../core/engine.hpp"
 #include "../core/scatter.hpp"
 #include "../core/gather.hpp"
+#include "../core/relation_phase.hpp"
 
 using namespace RStream;
 
@@ -59,6 +60,19 @@ void apply_one_update(Update & update, Vertex* dst_vertex) {
 	dst_vertex->degree += update.sum;
 }
 
+class R1 : public RPhase<Update> {
+public:
+	R1(Engine & e) : RPhase(e) {};
+
+	bool filter(Update & update, VertexId edge_src, VertexId edge_target) {
+		return false;
+	}
+
+	void project_columns(NewUpdateType * new_update) {
+
+	}
+};
+
 int main(int argc, const char ** argv) {
 //	engine<Vertex> graph_engine("/home/icuzzq/Workspace/git/RStream/input/input");
 //	std::function<void(char*)> initialize = init;
@@ -71,6 +85,10 @@ int main(int argc, const char ** argv) {
 	scatter_phase.scatter_with_vertex(generate_one_update);
 	Gather<Vertex, Update> gather_phase(e);
 	gather_phase.gather(apply_one_update);
+	R1 r1(e);
+	struct Update_Stream in_stream = {"update0"};
+	struct Update_Stream out_stream = {"update1"};
+	r1.join(in_stream, out_stream);
 }
 
 
