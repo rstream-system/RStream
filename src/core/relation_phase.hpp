@@ -11,11 +11,16 @@
 #include "scatter.hpp"
 
 namespace RStream {
-	template<typename UpdateType>
+	template<typename InUpdateType, typename OutUpdateType>
 	class RPhase {
 		static_assert(
-			std::is_base_of<BaseUpdate, UpdateType>::value,
-			"UpdateType must be a subclass of BaseUpdate."
+			std::is_base_of<BaseUpdate, InUpdateType>::value,
+			"OldUpdateType must be a subclass of BaseUpdate."
+		);
+
+		static_assert(
+			std::is_base_of<BaseUpdate, OutUpdateType>::value,
+			"NewUpdateType must be a subclass of BaseUpdate."
 		);
 
 		const Engine & context;
@@ -24,16 +29,16 @@ namespace RStream {
 		std::atomic<int> atomic_partition_number;
 
 	public:
-		struct NewUpdateType {
-			UpdateType old_update;
+		struct JoinResultType {
+			InUpdateType old_update;
 			VertexId target;
 
-			NewUpdateType() : target(0) {};
-			NewUpdateType(UpdateType u, VertexId t) : old_update(u), target(t) {};
+			JoinResultType() : target(0) {};
+			JoinResultType(InUpdateType u, VertexId t) : old_update(u), target(t) {};
 		};
 
-		virtual bool filter(UpdateType & update, VertexId edge_src, VertexId edge_targets);
-		virtual void project_columns(NewUpdateType * new_update);
+		virtual bool filter(InUpdateType & update, VertexId edge_src, VertexId edge_targets);
+		virtual void project_columns(char* join_result, OutUpdateType * new_update);
 //		virtual int new_key();
 
 		RPhase(Engine & e) : context(e) {
@@ -42,6 +47,10 @@ namespace RStream {
 			atomic_partition_number = context.num_partitions;
 		};
 
+		/* join update stream with edge stream
+		 * @param in_update_stream -input file for update stream
+		 * @param out_update_stream -output file for update stream
+		 * */
 		void join(Update_Stream in_update_stream, Update_Stream out_update_stream) {
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
@@ -51,7 +60,7 @@ namespace RStream {
 			}
 
 			// allocate global buffers for shuffling
-			global_buffer<NewUpdateType> ** buffers_for_shuffle = buffer_manager<NewUpdateType>::get_global_buffers(context.num_partitions);
+			global_buffer<OutUpdateType> ** buffers_for_shuffle = buffer_manager<OutUpdateType>::get_global_buffers(context.num_partitions);
 
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
@@ -76,7 +85,7 @@ namespace RStream {
 
 	private:
 		// each exec thread generates a join producer
-		void join_producer(Update_Stream in_update_stream, global_buffer<NewUpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+		void join_producer(Update_Stream in_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
 			int partition_id = -1;
 
@@ -108,20 +117,24 @@ namespace RStream {
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, start_vertex);
 
 				// streaming updates in, do hash join
-				for(size_t pos = 0; pos < update_file_size; pos += sizeof(UpdateType)) {
+				for(size_t pos = 0; pos < update_file_size; pos += sizeof(InUpdateType)) {
 					// get an update
-					UpdateType & update = *(UpdateType*)(update_local_buf + pos);
+					InUpdateType & update = *(InUpdateType*)(update_local_buf + pos);
 
 					// update.target is edge.src, the key to index edge_hashmap
 					for(VertexId target : edge_hashmap[update.target - start_vertex]) {
 						if(!filter(update, update.target, target)) {
-							NewUpdateType * new_update = new NewUpdateType(update, target);
-							project_columns(new_update);
+//							NewUpdateType * new_update = new NewUpdateType(update, target);
+
+							//TODO: generate join result
+							char* join_result = reinterpret_cast<char*>(&update);
+							OutUpdateType * out_update = nullptr;
+							project_columns(join_result, out_update);
 
 							// insert into shuffle buffer accordingly
-							int index = get_global_buffer_index(new_update);
-							global_buffer<NewUpdateType>* global_buf = buffer_manager<NewUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
-							global_buf->insert(new_update, index);
+							int index = get_global_buffer_index(out_update);
+							global_buffer<OutUpdateType>* global_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+							global_buf->insert(out_update, index);
 
 						}
 					}
@@ -139,12 +152,12 @@ namespace RStream {
 		}
 
 		// each writer thread generates a join_consumer
-		void join_consumer(Update_Stream out_update_stream, global_buffer<NewUpdateType> ** buffers_for_shuffle) {
+		void join_consumer(Update_Stream out_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle) {
 			while(atomic_num_producers != 0) {
 				int i = (atomic_partition_id++) % context.num_partitions ;
 
 				const char * file_name = (context.filename + "." + std::to_string(i) + "." + out_update_stream.update_filename).c_str();
-				global_buffer<NewUpdateType>* g_buf = buffer_manager<NewUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
+				global_buffer<OutUpdateType>* g_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
 			}
 
@@ -157,7 +170,7 @@ namespace RStream {
 //					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
 					const char * file_name = (context.filename + "." + std::to_string(i) + "." + out_update_stream.update_filename).c_str();
-					global_buffer<NewUpdateType>* g_buf = buffer_manager<NewUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
+					global_buffer<OutUpdateType>* g_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
 
 					delete g_buf;
@@ -179,7 +192,7 @@ namespace RStream {
 			}
 		}
 
-		int get_global_buffer_index(NewUpdateType* new_update) {
+		int get_global_buffer_index(OutUpdateType* new_update) {
 			int target = new_update->target;
 
 			int lb = 0, ub = context.num_partitions;
