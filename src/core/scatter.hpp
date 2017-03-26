@@ -8,6 +8,7 @@
 #ifndef CORE_SCATTER_HPP_
 #define CORE_SCATTER_HPP_
 
+#include <malloc.h>
 #include "io_manager.hpp"
 #include "buffer_manager.hpp"
 #include "concurrent_queue.hpp"
@@ -139,37 +140,74 @@ namespace RStream {
 				assert(fd_vertex > 0 && fd_edge > 0 );
 
 				// get file size
-				size_t vertex_file_size = io_manager::get_filesize(fd_vertex);
-				size_t edge_file_size = io_manager::get_filesize(fd_edge);
+				long vertex_file_size = io_manager::get_filesize(fd_vertex);
+				long edge_file_size = io_manager::get_filesize(fd_edge);
 
 				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(edge_file_size) + "\n");
 
-				// read from files to thread local buffer
+				// vertex data fully loaded into memory
 				char * vertex_local_buf = new char[vertex_file_size];
 				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
 				std::unordered_map<VertexId, VertexDataType*> vertex_map;
 				load_vertices_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
 
-				char * edge_local_buf = new char[edge_file_size];
-				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size);
+//				char * edge_local_buf = new char[edge_file_size];
+//				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size);
+
+				// streaming edges
+				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = edge_file_size / IO_SIZE + 1;
+
+				long valid_io_size = 0;
+
+				// for all streaming
+				for(int counter = 0; counter < streaming_counter; counter++) {
+
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = edge_file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
+
+					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size);
+
+					// for each streaming
+					for(long pos = 0; pos < valid_io_size; pos += context.edge_unit) {
+						// get an edge
+						Edge e = *(Edge*)(edge_local_buf + pos);
+	//					std::cout << e << std::endl;
+
+						// gen one update
+						assert(vertex_map.find(e.src) != vertex_map.end());
+						VertexDataType * src_vertex = vertex_map.find(e.src)->second;
+						UpdateType * update_info = generate_one_update(e, src_vertex);
+	//					std::cout << update_info->target << std::endl;
+
+						// insert into shuffle buffer accordingly
+						int index = get_global_buffer_index(update_info);
+						global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+						global_buf->insert(update_info, index);
+					}
+				}
 
 				// for each edge
-				for(size_t pos = 0; pos < edge_file_size; pos += context.edge_unit) {
-					// get an edge
-					Edge e = *(Edge*)(edge_local_buf + pos);
-//					std::cout << e << std::endl;
-
-					// gen one update
-					assert(vertex_map.find(e.src) != vertex_map.end());
-					VertexDataType * src_vertex = vertex_map.find(e.src)->second;
-					UpdateType * update_info = generate_one_update(e, src_vertex);
-//					std::cout << update_info->target << std::endl;
-
-					// insert into shuffle buffer accordingly
-					int index = get_global_buffer_index(update_info);
-					global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
-					global_buf->insert(update_info, index);
-				}
+//				for(size_t pos = 0; pos < edge_file_size; pos += context.edge_unit) {
+//					// get an edge
+//					Edge e = *(Edge*)(edge_local_buf + pos);
+////					std::cout << e << std::endl;
+//
+//					// gen one update
+//					assert(vertex_map.find(e.src) != vertex_map.end());
+//					VertexDataType * src_vertex = vertex_map.find(e.src)->second;
+//					UpdateType * update_info = generate_one_update(e, src_vertex);
+////					std::cout << update_info->target << std::endl;
+//
+//					// insert into shuffle buffer accordingly
+//					int index = get_global_buffer_index(update_info);
+//					global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+//					global_buf->insert(update_info, index);
+//				}
 
 //				std::cout << std::endl;
 
@@ -202,29 +240,64 @@ namespace RStream {
 				assert(fd > 0);
 
 				// get file size
-				size_t file_size = io_manager::get_filesize(fd);
+				long file_size = io_manager::get_filesize(fd);
 				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(file_size) + "\n");
 
 				// read from file to thread local buffer
-				char * local_buf = new char[file_size];
-				io_manager::read_from_file(fd, local_buf, file_size);
+//				char * local_buf = new char[file_size];
+//				io_manager::read_from_file(fd, local_buf, file_size);
+
+				// streaming edges
+				char * local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = file_size / IO_SIZE + 1;
+
+				long valid_io_size = 0;
+
+				// for all streaming
+				for(int counter = 0; counter < streaming_counter; counter++) {
+
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
+
+					io_manager::read_from_file(fd, local_buf, valid_io_size);
+
+					// for each streaming
+					for(long pos = 0; pos < valid_io_size; pos += context.edge_unit) {
+						// get an edge
+						Edge e = *(Edge*)(local_buf + pos);
+	//					std::cout << e << std::endl;
+
+						// gen one update
+						UpdateType * update_info = generate_one_update(e);
+	//					std::cout << update_info->target << std::endl;
+
+						// insert into shuffle buffer accordingly
+						int index = get_global_buffer_index(update_info);
+						global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+						global_buf->insert(update_info, index);
+					}
+				}
 
 				// for each edge
-				for(size_t pos = 0; pos < file_size; pos += context.edge_unit) {
-					// get an edge
-					Edge e = *(Edge*)(local_buf + pos);
-//					std::cout << e << std::endl;
-
-					// gen one update
-					UpdateType * update_info = generate_one_update(e);
-//					std::cout << *update_info << std::endl;
-
-
-					// insert into shuffle buffer accordingly
-					int index = get_global_buffer_index(update_info);
-					global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
-					global_buf->insert(update_info, index);
-				}
+//				for(size_t pos = 0; pos < file_size; pos += context.edge_unit) {
+//					// get an edge
+//					Edge e = *(Edge*)(local_buf + pos);
+////					std::cout << e << std::endl;
+//
+//					// gen one update
+//					UpdateType * update_info = generate_one_update(e);
+////					std::cout << *update_info << std::endl;
+//
+//
+//					// insert into shuffle buffer accordingly
+//					int index = get_global_buffer_index(update_info);
+//					global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+//					global_buf->insert(update_info, index);
+//				}
 
 //				std::cout << std::endl;
 				delete[] local_buf;

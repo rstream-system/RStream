@@ -75,26 +75,54 @@ namespace RStream {
 				assert(fd_vertex > 0 && fd_update > 0 );
 
 				// get file size
-				size_t vertex_file_size = io_manager::get_filesize(fd_vertex);
-				size_t update_file_size = io_manager::get_filesize(fd_update);
+				long vertex_file_size = io_manager::get_filesize(fd_vertex);
+				long update_file_size = io_manager::get_filesize(fd_update);
 
-				// read from files to thread local buffer
+				// vertex data fully loaded into memory
 				char * vertex_local_buf = new char[vertex_file_size];
 				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
 				std::unordered_map<VertexId, VertexDataType*> vertex_map;
 				load_vertices_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
 
-				char * update_local_buf = new char[update_file_size];
-				io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
+//				char * update_local_buf = new char[update_file_size];
+//				io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
+
+				// streaming updates
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = update_file_size / IO_SIZE + 1;
+
+				long valid_io_size = 0;
 
 				// for each update
 				// size_t is unsigned int, too small for file size?
-				for(size_t pos = 0; pos < update_file_size; pos += sizeof(UpdateType)) {
-					// get an update
-					UpdateType & update = *(UpdateType*)(update_local_buf + pos);
-					assert(vertex_map.find(update.target) != vertex_map.end());
-					VertexDataType * dst_vertex = vertex_map.find(update.target)->second;
-					apply_one_update(update, dst_vertex);
+//				for(size_t pos = 0; pos < update_file_size; pos += sizeof(UpdateType)) {
+//					// get an update
+//					UpdateType & update = *(UpdateType*)(update_local_buf + pos);
+//					assert(vertex_map.find(update.target) != vertex_map.end());
+//					VertexDataType * dst_vertex = vertex_map.find(update.target)->second;
+//					apply_one_update(update, dst_vertex);
+//				}
+
+				// for all streaming
+				for(int counter = 0; counter < streaming_counter; counter++) {
+
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
+
+					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size);
+
+					for(long pos = 0; pos < valid_io_size; pos += sizeof(UpdateType)) {
+						// get an update
+						UpdateType & update = *(UpdateType*)(update_local_buf + pos);
+						assert(vertex_map.find(update.target) != vertex_map.end());
+						VertexDataType * dst_vertex = vertex_map.find(update.target)->second;
+						apply_one_update(update, dst_vertex);
+					}
+
 				}
 
 				//for debugging

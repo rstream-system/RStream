@@ -96,12 +96,18 @@ namespace RStream {
 				assert(fd_update > 0 && fd_edge > 0 );
 
 				// get file size
-				size_t update_file_size = io_manager::get_filesize(fd_update);
-				size_t edge_file_size = io_manager::get_filesize(fd_edge);
+				long update_file_size = io_manager::get_filesize(fd_update);
+				long edge_file_size = io_manager::get_filesize(fd_edge);
 
 				// read from files to thread local buffer
-				char * update_local_buf = new char[update_file_size];
-				io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
+//				char * update_local_buf = new char[update_file_size];
+//				io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
+
+				// streaming updates
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = update_file_size / IO_SIZE + 1;
+
+				long valid_io_size = 0;
 
 				// edges are fully loaded into memory
 				char * edge_local_buf = new char[edge_file_size];
@@ -116,30 +122,69 @@ namespace RStream {
 				std::vector<VertexId> edge_hashmap[num_vertices];
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, start_vertex);
 
-				// streaming updates in, do hash join
-				for(size_t pos = 0; pos < update_file_size; pos += sizeof(InUpdateType)) {
-					// get an update
-					InUpdateType & update = *(InUpdateType*)(update_local_buf + pos);
+				// for all streaming updates
+				for(int counter = 0; counter < streaming_counter; counter++) {
 
-					// update.target is edge.src, the key to index edge_hashmap
-					for(VertexId target : edge_hashmap[update.target - start_vertex]) {
-						if(!filter(update, update.target, target)) {
-//							NewUpdateType * new_update = new NewUpdateType(update, target);
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
 
-							//TODO: generate join result
-							char* join_result = reinterpret_cast<char*>(&update);
-							OutUpdateType * out_update = nullptr;
-							project_columns(join_result, out_update);
+					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size);
 
-							// insert into shuffle buffer accordingly
-							int index = get_global_buffer_index(out_update);
-							global_buffer<OutUpdateType>* global_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
-							global_buf->insert(out_update, index);
+					// streaming updates in, do hash join
+					for(long pos = 0; pos < valid_io_size; pos += sizeof(InUpdateType)) {
+						// get an update
+						InUpdateType & update = *(InUpdateType*)(update_local_buf + pos);
 
+						// update.target is edge.src, the key to index edge_hashmap
+						for(VertexId target : edge_hashmap[update.target - start_vertex]) {
+							if(!filter(update, update.target, target)) {
+	//							NewUpdateType * new_update = new NewUpdateType(update, target);
+
+								//TODO: generate join result
+								char* join_result = reinterpret_cast<char*>(&update);
+								OutUpdateType * out_update = nullptr;
+								project_columns(join_result, out_update);
+
+								// insert into shuffle buffer accordingly
+								int index = get_global_buffer_index(out_update);
+								global_buffer<OutUpdateType>* global_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+								global_buf->insert(out_update, index);
+
+							}
 						}
+
 					}
 
 				}
+
+				// streaming updates in, do hash join
+//				for(size_t pos = 0; pos < update_file_size; pos += sizeof(InUpdateType)) {
+//					// get an update
+//					InUpdateType & update = *(InUpdateType*)(update_local_buf + pos);
+//
+//					// update.target is edge.src, the key to index edge_hashmap
+//					for(VertexId target : edge_hashmap[update.target - start_vertex]) {
+//						if(!filter(update, update.target, target)) {
+////							NewUpdateType * new_update = new NewUpdateType(update, target);
+//
+//							//TODO: generate join result
+//							char* join_result = reinterpret_cast<char*>(&update);
+//							OutUpdateType * out_update = nullptr;
+//							project_columns(join_result, out_update);
+//
+//							// insert into shuffle buffer accordingly
+//							int index = get_global_buffer_index(out_update);
+//							global_buffer<OutUpdateType>* global_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
+//							global_buf->insert(out_update, index);
+//
+//						}
+//					}
+//
+//				}
 
 				delete[] update_local_buf;
 				delete[] edge_local_buf;

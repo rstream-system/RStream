@@ -103,10 +103,10 @@ int main(int argc, const char ** argv) {
 	Gather<Vertex, Update> gather_phase(e);
 	gather_phase.gather(apply_one_update);
 
-	R1 r1(e);
-	struct Update_Stream in_stream = {"update0"};
-	struct Update_Stream out_stream = {"update1"};
-	r1.join(in_stream, out_stream);
+//	R1 r1(e);
+//	struct Update_Stream in_stream = {"update0"};
+//	struct Update_Stream out_stream = {"update1"};
+//	r1.join(in_stream, out_stream);
 }
 
 
