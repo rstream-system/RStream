@@ -114,6 +114,8 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
+					assert(valid_io_size % sizeof(UpdateType) == 0);
+
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 

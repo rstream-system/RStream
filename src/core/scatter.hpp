@@ -170,6 +170,8 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
+					assert(valid_io_size % context.edge_unit == 0);
+
 //					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size);
 					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
@@ -265,6 +267,8 @@ namespace RStream {
 						valid_io_size = file_size - IO_SIZE * (streaming_counter - 1);
 					else
 						valid_io_size = IO_SIZE;
+
+					assert(valid_io_size % context.edge_unit == 0);
 
 					io_manager::read_from_file(fd, local_buf, valid_io_size, offset);
 					offset += valid_io_size;
