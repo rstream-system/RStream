@@ -147,7 +147,7 @@ namespace RStream {
 
 				// vertex data fully loaded into memory
 				char * vertex_local_buf = new char[vertex_file_size];
-				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
+				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size, 0);
 				std::unordered_map<VertexId, VertexDataType*> vertex_map;
 				load_vertices_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
 
@@ -159,7 +159,7 @@ namespace RStream {
 				int streaming_counter = edge_file_size / IO_SIZE + 1;
 
 				long valid_io_size = 0;
-
+				long offset = 0;
 				// for all streaming
 				for(int counter = 0; counter < streaming_counter; counter++) {
 
@@ -170,7 +170,9 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
-					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size);
+//					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size);
+					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
 
 					// for each streaming
 					for(long pos = 0; pos < valid_io_size; pos += context.edge_unit) {
@@ -252,6 +254,7 @@ namespace RStream {
 				int streaming_counter = file_size / IO_SIZE + 1;
 
 				long valid_io_size = 0;
+				long offset = 0;
 
 				// for all streaming
 				for(int counter = 0; counter < streaming_counter; counter++) {
@@ -263,7 +266,8 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
-					io_manager::read_from_file(fd, local_buf, valid_io_size);
+					io_manager::read_from_file(fd, local_buf, valid_io_size, offset);
+					offset += valid_io_size;
 
 					// for each streaming
 					for(long pos = 0; pos < valid_io_size; pos += context.edge_unit) {

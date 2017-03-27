@@ -107,11 +107,9 @@ namespace RStream {
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 				int streaming_counter = update_file_size / IO_SIZE + 1;
 
-				long valid_io_size = 0;
-
 				// edges are fully loaded into memory
 				char * edge_local_buf = new char[edge_file_size];
-				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size);
+				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size, 0);
 
 				// build edge hashmap
 				const int num_vertices = context.vertex_intervals[partition_id].end - context.vertex_intervals[partition_id].start + 1;
@@ -121,6 +119,9 @@ namespace RStream {
 //				std::array<std::vector<VertexId>, num_vertices> edge_hashmap;
 				std::vector<VertexId> edge_hashmap[num_vertices];
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, start_vertex);
+
+				long valid_io_size = 0;
+				long offset = 0;
 
 				// for all streaming updates
 				for(int counter = 0; counter < streaming_counter; counter++) {
@@ -132,7 +133,8 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
-					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size);
+					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
 
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof(InUpdateType)) {

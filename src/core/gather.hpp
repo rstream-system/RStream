@@ -80,7 +80,7 @@ namespace RStream {
 
 				// vertex data fully loaded into memory
 				char * vertex_local_buf = new char[vertex_file_size];
-				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size);
+				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size, 0);
 				std::unordered_map<VertexId, VertexDataType*> vertex_map;
 				load_vertices_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
 
@@ -90,8 +90,6 @@ namespace RStream {
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 				int streaming_counter = update_file_size / IO_SIZE + 1;
-
-				long valid_io_size = 0;
 
 				// for each update
 				// size_t is unsigned int, too small for file size?
@@ -103,6 +101,9 @@ namespace RStream {
 //					apply_one_update(update, dst_vertex);
 //				}
 
+				long valid_io_size = 0;
+				long offset = 0;
+
 				// for all streaming
 				for(int counter = 0; counter < streaming_counter; counter++) {
 
@@ -113,7 +114,8 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
-					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size);
+					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
 
 					for(long pos = 0; pos < valid_io_size; pos += sizeof(UpdateType)) {
 						// get an update

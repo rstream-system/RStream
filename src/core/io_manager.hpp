@@ -24,10 +24,28 @@ namespace RStream {
 		}
 
 		// how to read efficiently?
-		static void read_from_file(int fd, char * buf, size_t fsize) {
+//		static void read_from_file(int fd, char * buf, size_t fsize) {
+//			size_t n_read = 0;
+//			while(n_read < fsize) {
+//				ssize_t n_bytes = pread(fd, buf, fsize - n_read, n_read);
+//				if(n_bytes == ssize_t(-1)) {
+//					std::cout << "Read error ! " << std::endl;
+//					std::cout << strerror(errno) << std::endl;
+//					assert(false);
+//				}
+////				std::cout << n_bytes << std::endl;
+//				assert(n_bytes > 0);
+//				buf += n_bytes;
+//				n_read += n_bytes;
+//			}
+//
+//			assert(n_read <= fsize);
+//		}
+
+		static void read_from_file(int fd, char * buf, size_t fsize, size_t offset) {
 			size_t n_read = 0;
 			while(n_read < fsize) {
-				ssize_t n_bytes = pread(fd, buf, fsize - n_read, n_read);
+				ssize_t n_bytes = pread(fd, buf, fsize - n_read, offset + n_read);
 				if(n_bytes == ssize_t(-1)) {
 					std::cout << "Read error ! " << std::endl;
 					std::cout << strerror(errno) << std::endl;
