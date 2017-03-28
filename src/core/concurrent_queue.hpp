@@ -46,6 +46,7 @@ namespace RStream {
 			}
 		}
 
+		int size() { return queue.size();}
 	};
 }
 

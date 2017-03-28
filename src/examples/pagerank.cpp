@@ -9,6 +9,7 @@
 #include "../core/scatter.hpp"
 #include "../core/gather.hpp"
 #include "../core/relation_phase.hpp"
+#include "../utility/preprocessing.hpp"
 
 using namespace RStream;
 
@@ -90,23 +91,59 @@ public:
 	}
 };
 
-int main(int argc, const char ** argv) {
+//int main(int argc, const char ** argv) {
 //	engine<Vertex> graph_engine("/home/icuzzq/Workspace/git/RStream/input/input");
 //	std::function<void(char*)> initialize = init;
 //	graph_engine.init_vertex(init);
 //	std::function<T*(Edge&)> gen_update = generate_one_update;
 //	graph_engine.scatter_no_vertex(generate_one_update);
 
-	Engine e("/home/icuzzq/Workspace/git/RStream/input/input");
-	Scatter<Vertex, Update> scatter_phase(e);
-	scatter_phase.scatter_with_vertex(generate_one_update);
-	Gather<Vertex, Update> gather_phase(e);
-	gather_phase.gather(apply_one_update);
+//	Engine e("/home/icuzzq/Workspace/git/RStream/input/input");
+//	Scatter<Vertex, Update> scatter_phase(e);
+//	scatter_phase.scatter_with_vertex(generate_one_update);
+//	Gather<Vertex, Update> gather_phase(e);
+//	gather_phase.gather(apply_one_update);
 
 //	R1 r1(e);
 //	struct Update_Stream in_stream = {"update0"};
 //	struct Update_Stream out_stream = {"update1"};
 //	r1.join(in_stream, out_stream);
-}
+//}
 
+
+int main(int argc, char ** argv) {
+		int opt;
+		std::string input = "";
+		std::string output = "";
+		VertexId vertices = -1;
+		int partitions = -1;
+		int edge_type = 0;
+
+		while ((opt = getopt(argc, argv, "i:o:v:p:t:")) != -1) {
+			switch (opt) {
+			case 'i':
+				input = optarg;
+				break;
+			case 'o':
+				output = optarg;
+				break;
+			case 'v':
+				vertices = atoi(optarg);
+				break;
+			case 'p':
+				partitions = atoi(optarg);
+				break;
+			case 't':
+				edge_type = atoi(optarg);
+				break;
+			}
+		}
+		if (input=="" || output=="" || vertices==-1) {
+			fprintf(stderr, "usage: %s -i [input path] -o [output path] -v [vertices] -p [partitions] -t [edge type: 0=unweighted, 1=weighted]\n", argv[0]);
+			exit(-1);
+		}
+
+		Preprocessing proc(input, output, partitions, vertices, edge_type);
+		proc.generate_partitions();
+}
 

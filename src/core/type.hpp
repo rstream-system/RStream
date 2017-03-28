@@ -18,6 +18,8 @@ struct Edge {
 	VertexId target;
 	Weight weight;
 
+	Edge(VertexId _src, VertexId _target, Weight _weight) : src(_src), target(_target), weight(_weight) {}
+	Edge() : src(0), target(0), weight(0.0f) {}
 };
 
 struct Vertex_Interval {

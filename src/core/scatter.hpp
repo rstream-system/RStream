@@ -58,7 +58,7 @@ namespace RStream {
 
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
-			for(int i = 0; i < context.num_partitions; i++)
+			for(int i = 0; i < context.num_exec_threads; i++)
 				exec_threads.push_back( std::thread([=] { this->scatter_producer_with_vertex(generate_one_update, buffers_for_shuffle, task_queue); } ));
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
