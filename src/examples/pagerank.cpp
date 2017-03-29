@@ -117,9 +117,8 @@ int main(int argc, char ** argv) {
 		std::string output = "";
 		VertexId vertices = -1;
 		int partitions = -1;
-		int edge_type = 0;
 
-		while ((opt = getopt(argc, argv, "i:o:v:p:t:")) != -1) {
+		while ((opt = getopt(argc, argv, "i:o:v:p:")) != -1) {
 			switch (opt) {
 			case 'i':
 				input = optarg;
@@ -133,21 +132,13 @@ int main(int argc, char ** argv) {
 			case 'p':
 				partitions = atoi(optarg);
 				break;
-			case 't':
-				edge_type = atoi(optarg);
-				break;
 			}
 		}
 		if (input=="" || output=="" || vertices==-1) {
-			fprintf(stderr, "usage: %s -i [input path] -o [output path] -v [vertices] -p [partitions] -t [edge type: 0=unweighted, 1=weighted]\n", argv[0]);
+			fprintf(stderr, "usage: %s -i [input path] -o [output path] -v [vertices] -p [partitions] \n", argv[0]);
 			exit(-1);
 		}
 
-		Preprocessing proc(input, output, partitions, vertices, edge_type);
-
-		for(int i = 0; i < partitions; i++) {
-			std::cout << "===============Printing Partition " << i << "================" << std::endl;
-			Preprocessing::dump(output + "." + std::to_string(i));
-		}
+		Preprocessing proc(input, output, partitions, vertices);
 }
 

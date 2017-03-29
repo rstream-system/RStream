@@ -8,6 +8,7 @@
 #ifndef UTILITY_PREPROCESSING_HPP_
 #define UTILITY_PREPROCESSING_HPP_
 
+#include <cstring>
 #include "../core/engine.hpp"
 
 namespace RStream {
@@ -19,35 +20,108 @@ namespace RStream {
 		std::string output;
 		int num_partitions;
 		int num_vertices;
-		int edge_type;
 		int vertices_per_partition;
 		int edge_unit;
+		int edge_type;
 
 	public:
-		Preprocessing(std::string _input, std::string _output, int _num_partitions, int _num_vertices, int _edge_type) :
-			input(_input), output(_output), num_partitions(_num_partitions), num_vertices(_num_vertices), edge_type(_edge_type)
+		Preprocessing(std::string _input, std::string _output, int _num_partitions, int _num_vertices) :
+			input(_input), output(_output), num_partitions(_num_partitions), num_vertices(_num_vertices)
 		{
 			atomic_num_producers = 0;
 			atomic_chunk_id = 0;
 			atomic_partition_number = num_partitions;
 			vertices_per_partition = num_vertices / num_partitions;
 
-			EdgeType e_type = static_cast<EdgeType>(edge_type);
+			convert_edgelist();
 
-			// size of each edge
-			if(e_type == EdgeType::NO_WEIGHT) {
-				edge_unit = sizeof(VertexId) * 2;
-			}
-			else if(e_type == EdgeType::WITH_WEIGHT) {
-				edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
-			}
-
-			if(e_type == EdgeType::NO_WEIGHT) {
+			if(edge_type == 0) {
 				generate_partitions<Edge>();
 			}
-			else if(e_type == EdgeType::WITH_WEIGHT) {
+			else if(edge_type == 1) {
 				generate_partitions<WeightedEdge>();
 			}
+
+			for(int i = 0; i < num_partitions; i++) {
+				std::cout << "===============Printing Partition " << i << "================" << std::endl;
+				dump(output + "." + std::to_string(i));
+			}
+		}
+
+		void convert_edgelist() {
+			FILE * fd = fopen(input.c_str(), "r");
+			assert(fd != NULL );
+
+			char * buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+			long pos = 0;
+
+			long counter = 0;
+			char s[1024];
+			while(fgets(s, 1024, fd) != NULL) {
+				FIXLINE(s);
+
+				if (s[0] == '#') continue; // Comment
+				if (s[0] == '%') continue; // Comment
+
+				counter++;
+
+				char delims[] = "\t, ";
+				char * t;
+				t = strtok(s, delims);
+				assert(t != NULL);
+
+				VertexId from = atoi(t);
+				t = strtok(NULL, delims);
+				assert(t != NULL);
+				VertexId to = atoi(t);
+
+				if(from == to) continue;
+
+				void * data = nullptr;
+
+				Weight val;
+				/* Check if has value */
+				t = strtok(NULL, delims);
+				if(t != NULL) {
+					val = atof(t);
+					data = new WeightedEdge(from, to, val);
+					edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
+					std::memcpy(buf + pos, data, edge_unit);
+					pos += edge_unit;
+					edge_type = 1;
+				} else {
+					data = new Edge(from, to);
+					edge_unit =  sizeof(VertexId) * 2;
+					std::memcpy(buf + pos, data, edge_unit);
+					pos += edge_unit;
+					edge_type = 0;
+				}
+
+//				std::cout << "src: " << from << " , target: " << to  << " , weight : " << val << std::endl;
+				assert(IO_SIZE % edge_unit == 0);
+
+				if(pos >= IO_SIZE) {
+					int perms = O_WRONLY | O_APPEND;
+					int fout = open((input + ".binary").c_str(), perms, S_IRWXU);
+					if(fout < 0){
+						fout = creat((input + ".binary").c_str(), S_IRWXU);
+					}
+					io_manager::write_to_file(fout, buf, IO_SIZE);
+					counter -= IO_SIZE / edge_unit;
+					close(fout);
+					pos = 0;
+				}
+
+			}
+
+			int perms = O_WRONLY | O_APPEND;
+			int fout = open((input + ".binary").c_str(), perms, S_IRWXU);
+			if(fout < 0){
+				fout = creat((input + ".binary").c_str(), S_IRWXU);
+			}
+			io_manager::write_to_file(fout, buf, counter * edge_unit);
+			close(fout);
+
 		}
 
 		template<typename T>
@@ -58,7 +132,7 @@ namespace RStream {
 			int num_write_threads = num_threads > 2 ? 2 : 1;
 			int num_exec_threads = num_threads > 2 ? num_threads - 2 : 1;
 
-			int fd = open(input.c_str(), O_RDONLY);
+			int fd = open((input + ".binary").c_str(), O_RDONLY);
 			assert(fd > 0 );
 
 			// get file size
@@ -194,12 +268,15 @@ namespace RStream {
 			return partition_id < (num_partitions - 1) ? partition_id : (num_partitions - 1);
 		}
 
-		static void dump(std::string input) {
+		// Removes \n from the end of line
+		void FIXLINE(char * s) {
+			int len = (int) strlen(s)-1;
+			if(s[len] == '\n') s[len] = 0;
+		}
+
+		void dump(std::string input) {
 			int fd = open(input.c_str(), O_RDONLY);
 			assert(fd > 0 );
-
-//			int edge_unit = sizeof(VertexId) * 2;
-			int edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
 
 			// get file size
 			long file_size = io_manager::get_filesize(fd);
@@ -211,10 +288,18 @@ namespace RStream {
 			for(long pos = 0; pos < file_size; pos += edge_unit) {
 				src = *(VertexId*)(buf + pos);
 				dst = *(VertexId*)(buf + pos + sizeof(VertexId));
-				weight = *(Weight*)(buf + pos + sizeof(VertexId) * 2);
+
+				if(edge_type == 1)
+					weight = *(Weight*)(buf + pos + sizeof(VertexId) * 2);
+
 				assert(src >= 0 && dst >= 0);
 
-				std::cout << std::to_string(src) << " " <<  std::to_string(dst) << " " << std::to_string(weight) << std::endl;
+				if(edge_type == 0)
+					std::cout << std::to_string(src) << " " <<  std::to_string(dst) << std::endl;
+				else if(edge_type == 1)
+					std::cout << std::to_string(src) << " " <<  std::to_string(dst) << " " << std::to_string(weight) << std::endl;
+				else
+					assert(false);
 			}
 
 			close(fd);
