@@ -39,8 +39,8 @@ namespace RStream {
 			// insert item to buffer
 			buf[count++] = *item;
 
-			//debugging info
-//			print_thread_info_locked("inserting an item: " + item->toString() + " to buffer[" + std::to_string(index) + "]\n");
+//			debugging info
+			print_thread_info_locked("inserting an item: " + item->toString() + " to buffer[" + std::to_string(index) + "]\n");
 		}
 
 		void flush(const char * file_name, const int i) {
@@ -65,9 +65,9 @@ namespace RStream {
 			if(is_full()){
 				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
 			}
-			else{
-				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
-			}
+//			else{
+//				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+//			}
 		}
 
 		void flush_end(const char * file_name, const int i) {
@@ -87,11 +87,11 @@ namespace RStream {
 
 			//debugging info
 			if(!is_empty()){
-				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+				print_thread_info_locked("flushed end buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
 			}
-			else{
-				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
-			}
+//			else{
+//				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+//			}
 		}
 
 		bool is_full() {

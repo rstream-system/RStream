@@ -16,10 +16,26 @@ typedef float Weight;
 struct Edge {
 	VertexId src;
 	VertexId target;
+
+	Edge(VertexId _src, VertexId _target) : src(_src), target(_target) {}
+	Edge() : src(0), target(0) {}
+
+	std::string toString(){
+		return "(" + std::to_string(src) + ", " + std::to_string(target) + ")";
+	}
+};
+
+struct WeightedEdge {
+	VertexId src;
+	VertexId target;
 	Weight weight;
 
-	Edge(VertexId _src, VertexId _target, Weight _weight) : src(_src), target(_target), weight(_weight) {}
-	Edge() : src(0), target(0), weight(0.0f) {}
+	WeightedEdge(VertexId _src, VertexId _target, Weight _weight) : src(_src), target(_target), weight(_weight) {}
+	WeightedEdge() : src(0), target(0), weight(0.0f) {}
+
+	std::string toString(){
+		return "(" + std::to_string(src) + ", " + std::to_string(target) + std::to_string(weight) + ")";
+	}
 };
 
 struct Vertex_Interval {
@@ -27,8 +43,13 @@ struct Vertex_Interval {
 	VertexId end;
 };
 
-inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
+inline std::ostream & operator<<(std::ostream & strm, const WeightedEdge& edge){
 	strm << "(" << edge.src << ", " << edge.target << ", " << edge.weight << ")";
+	return strm;
+}
+
+inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
+	strm << "(" << edge.src << ", " << edge.target  << ")";
 	return strm;
 }
 

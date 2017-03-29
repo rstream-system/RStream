@@ -144,6 +144,10 @@ int main(int argc, char ** argv) {
 		}
 
 		Preprocessing proc(input, output, partitions, vertices, edge_type);
-		proc.generate_partitions();
+
+		for(int i = 0; i < partitions; i++) {
+			std::cout << "===============Printing Partition " << i << "================" << std::endl;
+			Preprocessing::dump(output + "." + std::to_string(i));
+		}
 }
 

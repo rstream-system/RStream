@@ -41,11 +41,20 @@ namespace RStream {
 			else if(e_type == EdgeType::WITH_WEIGHT) {
 				edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
 			}
+
+			if(e_type == EdgeType::NO_WEIGHT) {
+				generate_partitions<Edge>();
+			}
+			else if(e_type == EdgeType::WITH_WEIGHT) {
+				generate_partitions<WeightedEdge>();
+			}
 		}
 
+		template<typename T>
 		void generate_partitions() {
 
-			int num_threads = std::thread::hardware_concurrency();
+//			int num_threads = std::thread::hardware_concurrency();
+			int num_threads = 8;
 			int num_write_threads = num_threads > 2 ? 2 : 1;
 			int num_exec_threads = num_threads > 2 ? num_threads - 2 : 1;
 
@@ -71,18 +80,22 @@ namespace RStream {
 				offset += valid_io_size;
 			}
 
+//			print_thread_info_locked("task queue size is: " + std::to_string(task_queue->size()) + "\n");
+			const int queue_size = task_queue->size();
 			// allocate global buffers for shuffling
 			// TODO: Edge?
-			global_buffer<Edge> ** buffers_for_shuffle = buffer_manager<Edge>::get_global_buffers(num_partitions);
+			global_buffer<T> ** buffers_for_shuffle = buffer_manager<T>::get_global_buffers(num_partitions);
 
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < num_exec_threads; i++)
-				exec_threads.push_back( std::thread([=] { this->producer(buffers_for_shuffle, task_queue); } ));
+				exec_threads.push_back( std::thread([=] { this->producer<T>(buffers_for_shuffle, task_queue); } ));
 
-			// write threads will flush shuffle buffer to update out stream file as long as it's full
+//			print_thread_info_locked("In main thread ........\n");
+
+			// write threads will flush shuffle buffer to file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < num_write_threads; i++)
-				write_threads.push_back(std::thread(&Preprocessing::consumer, this, buffers_for_shuffle, task_queue->size()));
+				write_threads.push_back(std::thread(&Preprocessing::consumer<T>, this, buffers_for_shuffle, queue_size));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -93,10 +106,12 @@ namespace RStream {
 
 			delete[] buffers_for_shuffle;
 			delete task_queue;
+			close(fd);
 
 		}
 
-		void producer(global_buffer<Edge> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long> > * task_queue) {
+		template<typename T>
+		void producer(global_buffer<T> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long> > * task_queue) {
 			atomic_num_producers++;
 
 			int fd = -1;
@@ -121,16 +136,19 @@ namespace RStream {
 					dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
 					assert(src >= 0 && src < num_vertices && dst >= 0 && dst < num_vertices);
 
-					if(edge_type == 1)
-						weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
-					assert(weight >= 0.0f);
-
-					// TODO: with weight and w/o weight?
-					Edge * e = new Edge(src, dst, weight);
 					// insert into shuffle buffer accordingly
+					void * data = nullptr;
+					if(typeid(T) == typeid(Edge)) {
+						data = new Edge(src, dst);
+					} else if(typeid(T) == typeid(WeightedEdge)) {
+						weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
+						data = new WeightedEdge(src, dst, weight);
+					}
+
 					int index = get_global_buffer_index(src);
-					global_buffer<Edge>* global_buf = buffer_manager<Edge>::get_global_buffer(buffers_for_shuffle, num_partitions, index);
-					global_buf->insert(e, index);
+
+					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, index);
+					global_buf->insert((T*)data, index);
 				}
 			}
 
@@ -138,28 +156,28 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
-		void consumer(global_buffer<Edge> ** buffers_for_shuffle, int num_chunks) {
+		template<typename T>
+		void consumer(global_buffer<T> ** buffers_for_shuffle, const int num_chunks) {
 			while(atomic_num_producers != 0) {
 				int i = (atomic_chunk_id++) % num_chunks ;
 
-//				//debugging info
-//				print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
+				//debugging info
+//				print_thread_info_locked("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
 				const char * file_name = (output + "." + std::to_string(i)).c_str();
-				global_buffer<Edge>* g_buf = buffer_manager<Edge>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
+				global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
 				g_buf->flush(file_name, i);
 			}
 
 			//the last run - deal with all remaining content in buffers
 			while(true){
 				int i = --atomic_partition_number;
-//				std::cout << i << std::endl;
 				if(i >= 0){
 //					//debugging info
 //					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
 					const char * file_name = (output + "." + std::to_string(i)).c_str();
-					global_buffer<Edge>* g_buf = buffer_manager<Edge>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
+					global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
 					g_buf->flush_end(file_name, i);
 
 					delete g_buf;
@@ -171,8 +189,35 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(int src) {
+
 			int partition_id = src/ vertices_per_partition;
 			return partition_id < (num_partitions - 1) ? partition_id : (num_partitions - 1);
+		}
+
+		static void dump(std::string input) {
+			int fd = open(input.c_str(), O_RDONLY);
+			assert(fd > 0 );
+
+//			int edge_unit = sizeof(VertexId) * 2;
+			int edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
+
+			// get file size
+			long file_size = io_manager::get_filesize(fd);
+			char * buf = (char *)malloc(file_size);
+			io_manager::read_from_file(fd, buf, file_size, 0);
+
+			VertexId src = -1, dst = -1;
+			Weight weight = 0.0f;
+			for(long pos = 0; pos < file_size; pos += edge_unit) {
+				src = *(VertexId*)(buf + pos);
+				dst = *(VertexId*)(buf + pos + sizeof(VertexId));
+				weight = *(Weight*)(buf + pos + sizeof(VertexId) * 2);
+				assert(src >= 0 && dst >= 0);
+
+				std::cout << std::to_string(src) << " " <<  std::to_string(dst) << " " << std::to_string(weight) << std::endl;
+			}
+
+			close(fd);
 		}
 	};
 
