@@ -88,6 +88,10 @@ inline std::ostream & operator<<(std::ostream & strm, const Vertex& vertex){
 ////	v->vertexId = 0;
 //}
 
+void init(char* data) {
+	struct Vertex * v = (struct Vertex*)data;
+	v->degree = 0;
+}
 
 RInUpdate* generate_one_update(Edge * e)
 {

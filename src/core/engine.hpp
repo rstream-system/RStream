@@ -54,18 +54,20 @@ namespace RStream {
 
 		int vertex_unit;
 
+		int num_vertices;
 		int num_vertices_per_part;
 
 //		int* vertex_intervals;
 
 		static unsigned update_count;
 
-		Engine(std::string _filename, int num_parts, int num_vertices) : filename(_filename) {
+		Engine(std::string _filename, int num_parts, int _num_vertices) : filename(_filename) {
 //			num_threads = std::thread::hardware_concurrency();
 			num_threads = 4;
 			num_write_threads = num_threads > 2 ? 2 : 1;
 			num_exec_threads = num_threads > 2 ? num_threads - 2 : 1;
 
+			num_vertices = _num_vertices;
 			Preprocessing proc(_filename, num_parts, num_vertices);
 
 			num_partitions = num_parts;
@@ -102,57 +104,59 @@ namespace RStream {
 //		}
 
 		/* init vertex data*/
-//		void init_vertex(std::function<void(char*)> init) {
-//			// a pair of <vertex_file, num_vertices>
-//			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(num_partitions);
-//
-//			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
-//				int perms = O_WRONLY;
-//				std::string vertex_file = filename + "." + std::to_string(partition_id) + ".vertex";
-//				int fd = open(vertex_file.c_str(), perms, S_IRWXU);
-//				if(fd < 0) {
-//					fd = creat(vertex_file.c_str(), S_IRWXU);
-//				}
-//				task_queue->push(std::make_pair(fd, num_vertices[partition_id]));
-//
-//			}
-//
-//			// threads will load vertex and update, and apply update one by one
-//			std::vector<std::thread> threads;
-//			for(int i = 0; i < num_threads; i++)
-//				threads.push_back(std::thread(&engine::init_produer, this, init, task_queue));
-//
-//			// join all threads
-//			for(auto & t : threads)
-//				t.join();
-//		}
+		template <typename VertexDataType>
+		void init_vertex(std::function<void(char*)> init) {
+			// a pair of <vertex_file, num_vertices>
+			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(num_partitions);
+
+			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
+				int perms = O_WRONLY;
+				std::string vertex_file = filename + "." + std::to_string(partition_id) + ".vertex";
+				int fd = open(vertex_file.c_str(), perms, S_IRWXU);
+				if(fd < 0) {
+					fd = creat(vertex_file.c_str(), S_IRWXU);
+				}
+				task_queue->push(std::make_pair(fd, num_vertices_per_part));
+
+			}
+
+			// threads will load vertex and update, and apply update one by one
+			std::vector<std::thread> threads;
+			for(int i = 0; i < num_threads; i++)
+				threads.push_back(std::thread(&Engine::init_produer<VertexDataType>, this, init, task_queue));
+
+			// join all threads
+			for(auto & t : threads)
+				t.join();
+		}
 
 
 
 	protected:
 
-//		void init_produer(std::function<void(char*)> init, concurrent_queue<std::pair<int, int>> * task_queue) {
-//			std::pair<int, int> pair(-1, -1);
-//			while(task_queue->test_pop_atomic(pair)) {
-//				int fd = pair.first;
-//				int num_vertex = pair.second;
-//				assert(fd > 0 && num_vertex > 0 );
-//
-//				// size_t ok??
-//				size_t vertex_file_size = num_vertex * sizeof(VertexDataType);
-//				char * vertex_local_buf = new char[vertex_file_size];
-//
-//				// for each vertex
-//				for(size_t pos = 0; pos < vertex_file_size; pos += sizeof(int)) {
-//					init(vertex_local_buf + pos);
-//				}
-//
-//				io_manager::write_to_file(fd, vertex_local_buf, vertex_file_size);
-//
-//				delete[] vertex_local_buf;
-//				close(fd);
-//			}
-//		}
+		template <typename VertexDataType>
+		void init_produer(std::function<void(char*)> init, concurrent_queue<std::pair<int, int>> * task_queue) {
+			std::pair<int, int> pair(-1, -1);
+			while(task_queue->test_pop_atomic(pair)) {
+				int fd = pair.first;
+				int num_vertex = pair.second;
+				assert(fd > 0 && num_vertex > 0 );
+
+				// size_t ok??
+				size_t vertex_file_size = num_vertex * sizeof(VertexDataType);
+				char * vertex_local_buf = new char[vertex_file_size];
+
+				// for each vertex
+				for(size_t pos = 0; pos < vertex_file_size; pos += sizeof(int)) {
+					init(vertex_local_buf + pos);
+				}
+
+				io_manager::write_to_file(fd, vertex_local_buf, vertex_file_size);
+
+				delete[] vertex_local_buf;
+				close(fd);
+			}
+		}
 
 	};
 

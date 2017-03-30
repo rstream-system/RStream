@@ -258,7 +258,10 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(OutUpdateType* new_update) {
-			return new_update->target / context.num_vertices_per_part;
+//			return new_update->target / context.num_vertices_per_part;
+			int partition_id = new_update->target / context.num_vertices_per_part;
+			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
+
 //			int target = new_update->target;
 //
 //			int lb = 0, ub = context.num_partitions;
