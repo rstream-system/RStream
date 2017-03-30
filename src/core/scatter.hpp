@@ -8,7 +8,7 @@
 #ifndef CORE_SCATTER_HPP_
 #define CORE_SCATTER_HPP_
 
-#include <malloc.h>
+
 #include "io_manager.hpp"
 #include "buffer_manager.hpp"
 #include "concurrent_queue.hpp"
@@ -44,7 +44,9 @@ namespace RStream {
 		};
 
 		/* scatter with vertex data (for graph computation use)*/
-		void scatter_with_vertex(std::function<UpdateType*(Edge&, VertexDataType*)> generate_one_update) {
+		Update_Stream scatter_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update) {
+			Update_Stream update_c = Engine::update_count++;
+
 			// a pair of <vertex, edge_stream> for each partition
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
@@ -64,7 +66,7 @@ namespace RStream {
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < context.num_write_threads; i++)
-				write_threads.push_back(std::thread(&Scatter::scatter_consumer, this, buffers_for_shuffle));
+				write_threads.push_back(std::thread(&Scatter::scatter_consumer, this, buffers_for_shuffle, update_c));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -75,10 +77,14 @@ namespace RStream {
 
 			delete[] buffers_for_shuffle;
 			delete task_queue;
+
+			return update_c;
 		}
 
 		/* scatter without vertex data (for relational algebra use)*/
-		void scatter_no_vertex(std::function<UpdateType*(Edge&)> generate_one_update) {
+		Update_Stream scatter_no_vertex(std::function<UpdateType*(Edge*)> generate_one_update) {
+			Update_Stream update_c = Engine::update_count++;
+
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
 			// allocate global buffers for shuffling
@@ -102,7 +108,7 @@ namespace RStream {
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < context.num_write_threads; i++)
-				write_threads.push_back(std::thread(&Scatter::scatter_consumer, this, buffers_for_shuffle));
+				write_threads.push_back(std::thread(&Scatter::scatter_consumer, this, buffers_for_shuffle, update_c));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -113,6 +119,8 @@ namespace RStream {
 
 			delete[] buffers_for_shuffle;
 			delete task_queue;
+
+			return update_c;
 		}
 
 
@@ -128,7 +136,7 @@ namespace RStream {
 
 		/* scatter producer with vertex data*/
 		//each exec thread generates a scatter_producer
-		void scatter_producer_with_vertex(std::function<UpdateType*(Edge&, VertexDataType*)> generate_one_update,
+		void scatter_producer_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update,
 				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 
 			atomic_num_producers++;
@@ -179,12 +187,12 @@ namespace RStream {
 					// for each streaming
 					for(long pos = 0; pos < valid_io_size; pos += context.edge_unit) {
 						// get an edge
-						Edge e = *(Edge*)(edge_local_buf + pos);
+						Edge * e = (Edge*)(edge_local_buf + pos);
 	//					std::cout << e << std::endl;
 
 						// gen one update
-						assert(vertex_map.find(e.src) != vertex_map.end());
-						VertexDataType * src_vertex = vertex_map.find(e.src)->second;
+						assert(vertex_map.find(e->src) != vertex_map.end());
+						VertexDataType * src_vertex = vertex_map.find(e->src)->second;
 						UpdateType * update_info = generate_one_update(e, src_vertex);
 	//					std::cout << update_info->target << std::endl;
 
@@ -234,7 +242,7 @@ namespace RStream {
 
 		/* scatter producer without vertex data*/
 		// each exec thread generates a scatter_producer
-		void scatter_producer_no_vertex(std::function<UpdateType*(Edge&)> generate_one_update,
+		void scatter_producer_no_vertex(std::function<UpdateType*(Edge*)> generate_one_update,
 				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
 			int partition_id = -1;
@@ -276,7 +284,7 @@ namespace RStream {
 					// for each streaming
 					for(long pos = 0; pos < valid_io_size; pos += context.edge_unit) {
 						// get an edge
-						Edge e = *(Edge*)(local_buf + pos);
+						Edge * e = (Edge*)(local_buf + pos);
 	//					std::cout << e << std::endl;
 
 						// gen one update
@@ -317,14 +325,14 @@ namespace RStream {
 		}
 
 		// each writer thread generates a scatter_consumer
-		void scatter_consumer(global_buffer<UpdateType> ** buffers_for_shuffle) {
+		void scatter_consumer(global_buffer<UpdateType> ** buffers_for_shuffle, Update_Stream update_count) {
 			while(atomic_num_producers != 0) {
 				int i = (atomic_partition_id++) % context.num_partitions ;
 
 //				//debugging info
 //				print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream").c_str();
+				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count)).c_str();
 				global_buffer<UpdateType>* g_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
 			}
@@ -337,7 +345,7 @@ namespace RStream {
 //					//debugging info
 //					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream").c_str();
+					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count)).c_str();
 					global_buffer<UpdateType>* g_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
 
@@ -350,30 +358,30 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(UpdateType* update_info) {
-			int target = update_info->target;
+			return update_info->target / context.num_vertices_per_part;
 
-			int lb = 0, ub = context.num_partitions;
-			int i = (lb + ub) / 2;
-
-			while(true){
-//				int c = context.vertex_intervals[i];
-				int c = context.vertex_intervals[i].end - context.vertex_intervals[i].start + 1;
-				if(i == 0){
-					return 0;
-				}
-//				int p = context.vertex_intervals[i - 1];
-				int p = context.vertex_intervals[i - 1].end - context.vertex_intervals[i - 1].start + 1;
-				if(c >= target && p < target){
-					return i;
-				}
-				else if(c > target){
-					ub = i;
-				}
-				else if(c < target){
-					lb = i;
-				}
-				i = (lb + ub) / 2;
-			}
+//			int target = update_info->target;
+//
+//			int lb = 0, ub = context.num_partitions;
+//			int i = (lb + ub) / 2;
+//
+//			while(true){
+////				int c = context.vertex_intervals[i];
+//				if(i == 0){
+//					return 0;
+//				}
+////				int p = context.vertex_intervals[i - 1];
+//				if(c >= target && p < target){
+//					return i;
+//				}
+//				else if(c > target){
+//					ub = i;
+//				}
+//				else if(c < target){
+//					lb = i;
+//				}
+//				i = (lb + ub) / 2;
+//			}
 		}
 
 	};

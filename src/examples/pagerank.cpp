@@ -10,44 +10,65 @@
 #include "../core/gather.hpp"
 #include "../core/relation_phase.hpp"
 #include "../utility/preprocessing.hpp"
+//#include "../core/io_manager.hpp"
 
 using namespace RStream;
 
-struct Update : BaseUpdate{
-	int target;
-	float sum;
-
-	Update(int t, float s) {
-		target = t;
-		sum = s;
-	}
-
-	Update() : target(0), sum(0.0) {}
-
-	std::string toString(){
-		return "(" + std::to_string(target) + ", " + std::to_string(sum) + ")";
-	}
-};
+//struct Update : BaseUpdate{
+//	int target;
+//	float sum;
+//
+//	Update(int t, float s) {
+//		target = t;
+//		sum = s;
+//	}
+//
+//	Update() : target(0), sum(0.0) {}
+//
+//	std::string toString(){
+//		return "(" + std::to_string(target) + ", " + std::to_string(sum) + ")";
+//	}
+//};
 
 struct RInUpdate : BaseUpdate {
-	int src;
-	int target;
+	VertexId src;
+//	int target;
 
-	RInUpdate(int s, int t) : src(s), target(t) {}
-	RInUpdate() : src(0), target(0) {}
+	RInUpdate(VertexId t, VertexId s){
+		target = t;
+		src = s;
+	}
+
+	RInUpdate() {
+//		target = 0;
+//		src = 0;
+	}
 };
+
+inline std::ostream & operator<<(std::ostream & strm, const RInUpdate& update){
+	strm << "(" << update.target << ", " << update.src << ")";
+	return strm;
+}
 
 struct ROutUpdate : BaseUpdate {
-	int src1;
-	int src2;
-	int target;
+	VertexId src1;
+	VertexId src2;
+//	int target;
 
-	ROutUpdate(int s1, int s2,  int t) : src1(s1), src2(s2), target(t) {}
-	ROutUpdate() : src1(0), src2(0), target(0) {}
+	ROutUpdate(VertexId t, VertexId s1, VertexId s2) {
+		target = t;
+		src1 = s1;
+		src2 = s2;
+	}
+	ROutUpdate() {
+//		target = 0;
+//		src1 = 0;
+//		src2 = 0;
+	}
 };
 
-inline std::ostream & operator<<(std::ostream & strm, const Update& update){
-	strm << "(" << update.target << ", " << update.sum << ")";
+inline std::ostream & operator<<(std::ostream & strm, const ROutUpdate& update){
+	strm << "(" << update.target << ", " << update.src1 << ", " << update.src2 << ")";
 	return strm;
 }
 
@@ -68,77 +89,91 @@ inline std::ostream & operator<<(std::ostream & strm, const Vertex& vertex){
 //}
 
 
-Update* generate_one_update(Edge & e, Vertex* src_vertex)
+RInUpdate* generate_one_update(Edge * e)
 {
-	Update* update = new Update(e.target, 1.0);
+	RInUpdate* update = new RInUpdate(e->target, e->src);
 	return update;
 }
 
-void apply_one_update(Update & update, Vertex* dst_vertex) {
-	dst_vertex->degree += update.sum;
-}
+//void apply_one_update(Update * update, Vertex* dst_vertex) {
+//	dst_vertex->degree += update->sum;
+//}
 
 class R1 : public RPhase<RInUpdate, ROutUpdate> {
 public:
 	R1(Engine & e) : RPhase(e) {};
 
-	bool filter(RInUpdate & update, VertexId edge_src, VertexId edge_target) {
+	bool filter(RInUpdate * update, Edge * edge) {
 		return false;
 	}
 
-	void project_columns(char * join_result, ROutUpdate * new_update) {
-
+	ROutUpdate * project_columns(RInUpdate * in_update, Edge * edge) {
+//		std::cout << *edge << std::endl;
+		ROutUpdate * new_update = new ROutUpdate(edge->target, in_update->src, in_update->target);
+		return new_update;
 	}
 };
 
-//int main(int argc, const char ** argv) {
-//	engine<Vertex> graph_engine("/home/icuzzq/Workspace/git/RStream/input/input");
-//	std::function<void(char*)> initialize = init;
-//	graph_engine.init_vertex(init);
-//	std::function<T*(Edge&)> gen_update = generate_one_update;
-//	graph_engine.scatter_no_vertex(generate_one_update);
 
-//	Engine e("/home/icuzzq/Workspace/git/RStream/input/input");
-//	Scatter<Vertex, Update> scatter_phase(e);
-//	scatter_phase.scatter_with_vertex(generate_one_update);
-//	Gather<Vertex, Update> gather_phase(e);
-//	gather_phase.gather(apply_one_update);
+template<typename T>
+void printUpdateStream(int num_partitions, std::string fileName, Update_Stream in_stream){
+	for(int i = 0; i < num_partitions; i++) {
+		std::cout << "--------------------" + (fileName + "." + std::to_string(i) + ".update_stream_" + std::to_string(in_stream)) + "---------------------\n";
+		int fd_update = open((fileName + "." + std::to_string(i) + ".update_stream_" + std::to_string(in_stream)).c_str(), O_RDONLY);
+		assert(fd_update > 0 );
 
-//	R1 r1(e);
-//	struct Update_Stream in_stream = {"update0"};
-//	struct Update_Stream out_stream = {"update1"};
-//	r1.join(in_stream, out_stream);
-//}
+		// get file size
+		long update_file_size = io_manager::get_filesize(fd_update);
 
+		char * update_local_buf = new char[update_file_size];
+		io_manager::read_from_file(fd_update, update_local_buf, update_file_size, 0);
+
+		// for each update
+		for(size_t pos = 0; pos < update_file_size; pos += sizeof(T)) {
+			// get an update
+			T & update = *(T*)(update_local_buf + pos);
+			std::cout << update << std::endl;
+		}
+	}
+}
 
 int main(int argc, char ** argv) {
-		int opt;
-		std::string input = "";
-		std::string output = "";
-		VertexId vertices = -1;
-		int partitions = -1;
+//		int opt;
+//		std::string input = "";
+//		std::string output = "";
+//		VertexId vertices = -1;
+//		int partitions = -1;
+//
+//		while ((opt = getopt(argc, argv, "i:o:v:p:")) != -1) {
+//			switch (opt) {
+//			case 'i':
+//				input = optarg;
+//				break;
+//			case 'o':
+//				output = optarg;
+//				break;
+//			case 'v':
+//				vertices = atoi(optarg);
+//				break;
+//			case 'p':
+//				partitions = atoi(optarg);
+//				break;
+//			}
+//		}
+//		if (input=="" || output=="" || vertices==-1) {
+//			fprintf(stderr, "usage: %s -i [input path] -o [output path] -v [vertices] -p [partitions] \n", argv[0]);
+//			exit(-1);
+//		}
 
-		while ((opt = getopt(argc, argv, "i:o:v:p:")) != -1) {
-			switch (opt) {
-			case 'i':
-				input = optarg;
-				break;
-			case 'o':
-				output = optarg;
-				break;
-			case 'v':
-				vertices = atoi(optarg);
-				break;
-			case 'p':
-				partitions = atoi(optarg);
-				break;
-			}
-		}
-		if (input=="" || output=="" || vertices==-1) {
-			fprintf(stderr, "usage: %s -i [input path] -o [output path] -v [vertices] -p [partitions] \n", argv[0]);
-			exit(-1);
-		}
+		Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
+		Scatter<Vertex, RInUpdate> scatter_phase(e);
+		Update_Stream in_stream = scatter_phase.scatter_no_vertex(generate_one_update);
+		printUpdateStream<RInUpdate>(e.num_partitions, e.filename, in_stream);
 
-		Preprocessing proc(input, output, partitions, vertices);
+		R1 r1(e);
+		Update_Stream out_stream = r1.join(in_stream);
+		printUpdateStream<ROutUpdate>(e.num_partitions, e.filename, out_stream);
 }
+
+
 

@@ -29,16 +29,16 @@ namespace RStream {
 		std::atomic<int> atomic_partition_number;
 
 	public:
-		struct JoinResultType {
-			InUpdateType old_update;
-			VertexId target;
+//		struct JoinResultType {
+//			InUpdateType old_update;
+//			VertexId target;
+//
+//			JoinResultType() : target(0) {};
+//			JoinResultType(InUpdateType u, VertexId t) : old_update(u), target(t) {};
+//		};
 
-			JoinResultType() : target(0) {};
-			JoinResultType(InUpdateType u, VertexId t) : old_update(u), target(t) {};
-		};
-
-		virtual bool filter(InUpdateType & update, VertexId edge_src, VertexId edge_targets);
-		virtual void project_columns(char* join_result, OutUpdateType * new_update);
+		virtual bool filter(InUpdateType * update, Edge * edge) = 0;
+		virtual OutUpdateType * project_columns(InUpdateType * in_update, Edge * edge) = 0;
 //		virtual int new_key();
 
 		RPhase(Engine & e) : context(e) {
@@ -51,26 +51,31 @@ namespace RStream {
 		 * @param in_update_stream -input file for update stream
 		 * @param out_update_stream -output file for update stream
 		 * */
-		void join(Update_Stream in_update_stream, Update_Stream out_update_stream) {
+		Update_Stream join(Update_Stream in_update_stream) {
+			Update_Stream update_c = Engine::update_count++;
+
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
 			// push task into concurrent queue
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
 				task_queue->push(partition_id);
+//				std::cout << partition_id << std::endl;
 			}
 
 			// allocate global buffers for shuffling
 			global_buffer<OutUpdateType> ** buffers_for_shuffle = buffer_manager<OutUpdateType>::get_global_buffers(context.num_partitions);
 
+//			std::cout << "67" << std::endl;
+
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
-			for(int i = 0; i < context.num_partitions; i++)
+			for(int i = 0; i < context.num_exec_threads; i++)
 				exec_threads.push_back( std::thread([=] { this->join_producer(in_update_stream, buffers_for_shuffle, task_queue); } ));
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < context.num_write_threads; i++)
-				write_threads.push_back(std::thread(&RPhase::join_consumer, this, out_update_stream, buffers_for_shuffle));
+				write_threads.push_back(std::thread(&RPhase::join_consumer, this, update_c, buffers_for_shuffle));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -81,6 +86,8 @@ namespace RStream {
 
 			delete[] buffers_for_shuffle;
 			delete task_queue;
+
+			return update_c;
 		}
 
 	private:
@@ -91,13 +98,17 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				int fd_update = open((context.filename + "." + std::to_string(partition_id) + "." + in_update_stream.update_filename).c_str(), O_RDONLY);
+				std::cout << partition_id << std::endl;
+
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_update > 0 && fd_edge > 0 );
 
 				// get file size
 				long update_file_size = io_manager::get_filesize(fd_update);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
+
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				// read from files to thread local buffer
 //				char * update_local_buf = new char[update_file_size];
@@ -106,14 +117,15 @@ namespace RStream {
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 				int streaming_counter = update_file_size / IO_SIZE + 1;
+//				std::cout << streaming_counter;
 
 				// edges are fully loaded into memory
 				char * edge_local_buf = new char[edge_file_size];
 				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size, 0);
 
 				// build edge hashmap
-				const int num_vertices = context.vertex_intervals[partition_id].end - context.vertex_intervals[partition_id].start + 1;
-				int start_vertex = context.vertex_intervals[partition_id].start;
+				const int num_vertices = context.num_vertices_per_part;
+				int start_vertex = partition_id * num_vertices;
 				assert(num_vertices > 0 && start_vertex >= 0);
 
 //				std::array<std::vector<VertexId>, num_vertices> edge_hashmap;
@@ -141,17 +153,20 @@ namespace RStream {
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof(InUpdateType)) {
 						// get an update
-						InUpdateType & update = *(InUpdateType*)(update_local_buf + pos);
+						InUpdateType * update = (InUpdateType*)(update_local_buf + pos);
 
 						// update.target is edge.src, the key to index edge_hashmap
-						for(VertexId target : edge_hashmap[update.target - start_vertex]) {
-							if(!filter(update, update.target, target)) {
+						for(VertexId target : edge_hashmap[update->target - start_vertex]) {
+							Edge * e = new Edge(update->target, target);
+							if(!filter(update, e)) {
 	//							NewUpdateType * new_update = new NewUpdateType(update, target);
 
 								//TODO: generate join result
-								char* join_result = reinterpret_cast<char*>(&update);
-								OutUpdateType * out_update = nullptr;
-								project_columns(join_result, out_update);
+//								char* join_result = reinterpret_cast<char*>(&update);
+								OutUpdateType * out_update = project_columns(update, e);
+								std::cout << *e << std::endl;
+								std::cout << *update << std::endl;
+								std::cout << *out_update << std::endl;
 
 								// insert into shuffle buffer accordingly
 								int index = get_global_buffer_index(out_update);
@@ -159,6 +174,7 @@ namespace RStream {
 								global_buf->insert(out_update, index);
 
 							}
+							delete e;
 						}
 
 					}
@@ -205,7 +221,7 @@ namespace RStream {
 			while(atomic_num_producers != 0) {
 				int i = (atomic_partition_id++) % context.num_partitions ;
 
-				const char * file_name = (context.filename + "." + std::to_string(i) + "." + out_update_stream.update_filename).c_str();
+				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
 				global_buffer<OutUpdateType>* g_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
 			}
@@ -218,7 +234,7 @@ namespace RStream {
 //					//debugging info
 //					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-					const char * file_name = (context.filename + "." + std::to_string(i) + "." + out_update_stream.update_filename).c_str();
+					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
 					global_buffer<OutUpdateType>* g_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
 
@@ -242,30 +258,29 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(OutUpdateType* new_update) {
-			int target = new_update->target;
-
-			int lb = 0, ub = context.num_partitions;
-			int i = (lb + ub) / 2;
-
-			while(true){
-//				int c = context.vertex_intervals[i];
-				int c = context.vertex_intervals[i].end - context.vertex_intervals[i].start + 1;
-				if(i == 0){
-					return 0;
-				}
-//				int p = context.vertex_intervals[i - 1];
-				int p = context.vertex_intervals[i - 1].end - context.vertex_intervals[i - 1].start + 1;
-				if(c >= target && p < target){
-					return i;
-				}
-				else if(c > target){
-					ub = i;
-				}
-				else if(c < target){
-					lb = i;
-				}
-				i = (lb + ub) / 2;
-			}
+			return new_update->target / context.num_vertices_per_part;
+//			int target = new_update->target;
+//
+//			int lb = 0, ub = context.num_partitions;
+//			int i = (lb + ub) / 2;
+//
+//			while(true){
+////				int c = context.vertex_intervals[i];
+//				if(i == 0){
+//					return 0;
+//				}
+////				int p = context.vertex_intervals[i - 1];
+//				if(c >= target && p < target){
+//					return i;
+//				}
+//				else if(c > target){
+//					ub = i;
+//				}
+//				else if(c < target){
+//					lb = i;
+//				}
+//				i = (lb + ub) / 2;
+//			}
 		}
 
 	};

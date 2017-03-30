@@ -121,9 +121,9 @@ namespace RStream {
 
 					for(long pos = 0; pos < valid_io_size; pos += sizeof(UpdateType)) {
 						// get an update
-						UpdateType & update = *(UpdateType*)(update_local_buf + pos);
-						assert(vertex_map.find(update.target) != vertex_map.end());
-						VertexDataType * dst_vertex = vertex_map.find(update.target)->second;
+						UpdateType * update = (UpdateType*)(update_local_buf + pos);
+						assert(vertex_map.find(update->target) != vertex_map.end());
+						VertexDataType * dst_vertex = vertex_map.find(update->target)->second;
 						apply_one_update(update, dst_vertex);
 					}
 

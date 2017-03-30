@@ -10,6 +10,7 @@
 
 #include "../common/RStreamCommon.hpp"
 
+typedef unsigned Update_Stream;
 typedef int VertexId;
 typedef float Weight;
 
@@ -38,10 +39,10 @@ struct WeightedEdge {
 	}
 };
 
-struct Vertex_Interval {
-	VertexId start;
-	VertexId end;
-};
+//struct Vertex_Interval {
+//	VertexId start;
+//	VertexId end;
+//};
 
 inline std::ostream & operator<<(std::ostream & strm, const WeightedEdge& edge){
 	strm << "(" << edge.src << ", " << edge.target << ", " << edge.weight << ")";
@@ -67,9 +68,9 @@ struct BaseVertex {
 	VertexId id;
 };
 
-struct Update_Stream {
-	std::string update_filename;
-};
+//struct Update_Stream {
+//	unsigned update_filename;
+//};
 
 inline std::ostream & operator<<(std::ostream & strm, const BaseUpdate& up){
 	strm << "(" << up.target << ")";

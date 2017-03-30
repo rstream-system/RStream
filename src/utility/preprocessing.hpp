@@ -8,8 +8,8 @@
 #ifndef UTILITY_PREPROCESSING_HPP_
 #define UTILITY_PREPROCESSING_HPP_
 
-#include <cstring>
-#include "../core/engine.hpp"
+#include "../common/RStreamCommon.hpp"
+//#include "../core/engine.hpp"
 
 namespace RStream {
 	class Preprocessing {
@@ -17,7 +17,7 @@ namespace RStream {
 		std::atomic<int> atomic_chunk_id;
 		std::atomic<int> atomic_partition_number;
 		std::string input;
-		std::string output;
+//		std::string output;
 		int num_partitions;
 		int num_vertices;
 		int vertices_per_partition;
@@ -25,8 +25,20 @@ namespace RStream {
 		int edge_type;
 
 	public:
-		Preprocessing(std::string _input, std::string _output, int _num_partitions, int _num_vertices) :
-			input(_input), output(_output), num_partitions(_num_partitions), num_vertices(_num_vertices)
+		inline int getEdgeUnit(){
+			return edge_unit;
+		}
+
+		inline int getEdgeType(){
+			return edge_type;
+		}
+
+		inline int getNumVerPerPartition(){
+			return vertices_per_partition;
+		}
+
+		Preprocessing(std::string & _input, int _num_partitions, int _num_vertices) :
+			input(_input), num_partitions(_num_partitions), num_vertices(_num_vertices)
 		{
 			atomic_num_producers = 0;
 			atomic_chunk_id = 0;
@@ -34,6 +46,7 @@ namespace RStream {
 			vertices_per_partition = num_vertices / num_partitions;
 
 			convert_edgelist();
+			dump(_input + ".binary");
 
 			if(edge_type == 0) {
 				generate_partitions<Edge>();
@@ -44,7 +57,7 @@ namespace RStream {
 
 			for(int i = 0; i < num_partitions; i++) {
 				std::cout << "===============Printing Partition " << i << "================" << std::endl;
-				dump(output + "." + std::to_string(i));
+				dump(input + "." + std::to_string(i));
 			}
 		}
 
@@ -70,10 +83,10 @@ namespace RStream {
 				t = strtok(s, delims);
 				assert(t != NULL);
 
-				VertexId from = atoi(t);
+				VertexId from = atoi(t) - 1;
 				t = strtok(NULL, delims);
 				assert(t != NULL);
-				VertexId to = atoi(t);
+				VertexId to = atoi(t) - 1;
 
 				if(from == to) continue;
 
@@ -208,6 +221,7 @@ namespace RStream {
 
 					src = *(VertexId*)(local_buf + pos);
 					dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
+					std::cout << src << ", " << dst << std::endl;
 					assert(src >= 0 && src < num_vertices && dst >= 0 && dst < num_vertices);
 
 					// insert into shuffle buffer accordingly
@@ -238,7 +252,7 @@ namespace RStream {
 				//debugging info
 //				print_thread_info_locked("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-				const char * file_name = (output + "." + std::to_string(i)).c_str();
+				const char * file_name = (input + "." + std::to_string(i)).c_str();
 				global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
 				g_buf->flush(file_name, i);
 			}
@@ -250,7 +264,7 @@ namespace RStream {
 //					//debugging info
 //					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-					const char * file_name = (output + "." + std::to_string(i)).c_str();
+					const char * file_name = (input + "." + std::to_string(i)).c_str();
 					global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
 					g_buf->flush_end(file_name, i);
 

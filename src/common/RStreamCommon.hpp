@@ -53,6 +53,9 @@
 #include <climits>
 #include <memory>
 
+#include <cstring>
+#include <malloc.h>
+
 //#include <boost/asio/io_service.hpp>
 //#include <boost/bind.hpp>
 //#include <boost/thread/thread.hpp>
