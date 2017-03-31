@@ -35,7 +35,7 @@ namespace RStream {
 
 		Gather(Engine& e) : context(e) {};
 
-		void gather(std::function<void(UpdateType&, VertexDataType*)> apply_one_update) {
+		void gather(Update_Stream in_update_stream, std::function<void(UpdateType*, VertexDataType*)> apply_one_update) {
 			// a pair of <vertex, update_stream> for each partition
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
@@ -47,7 +47,7 @@ namespace RStream {
 			// threads will load vertex and update, and apply update one by one
 			std::vector<std::thread> threads;
 			for(int i = 0; i < context.num_threads; i++)
-				threads.push_back(std::thread(&Gather::gather_producer, this, apply_one_update, task_queue));
+				threads.push_back(std::thread(&Gather::gather_producer, this, in_update_stream, apply_one_update, task_queue));
 
 			// join all threads
 			for(auto & t : threads)
@@ -64,12 +64,12 @@ namespace RStream {
 			}
 		}
 
-		void gather_producer(std::function<void(UpdateType&, VertexDataType*)> apply_one_update,
+		void gather_producer(Update_Stream in_update_stream, std::function<void(UpdateType*, VertexDataType*)> apply_one_update,
 						concurrent_queue<int> * task_queue) {
 			int partition_id = -1;
 			while(task_queue->test_pop_atomic(partition_id)) {
 				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDWR);
-				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream").c_str(), O_RDONLY);
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 //				int fd_vertex = fd_pair.first;
 //				int fd_update = fd_pair.second;
 				assert(fd_vertex > 0 && fd_update > 0 );

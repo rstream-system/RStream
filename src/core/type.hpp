@@ -58,6 +58,8 @@ inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
 struct BaseUpdate {
 	VertexId target;
 
+	BaseUpdate(VertexId _target) : target(_target) {};
+
 	std::string toString(){
 		return std::to_string(target);
 	}

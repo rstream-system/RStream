@@ -73,7 +73,8 @@ namespace RStream {
 			num_partitions = num_parts;
 			edge_type = static_cast<EdgeType>(proc.getEdgeType());
 			edge_unit = proc.getEdgeUnit();
-			vertex_unit = 8;
+			vertex_unit = 0;
+//			vertex_unit = 8;
 			num_vertices_per_part = proc.getNumVerPerPartition();
 
 			std::cout << "Number of partitions: " << num_partitions << std::endl;
@@ -106,6 +107,8 @@ namespace RStream {
 		/* init vertex data*/
 		template <typename VertexDataType>
 		void init_vertex(std::function<void(char*)> init) {
+			vertex_unit = sizeof(VertexDataType);
+
 			// a pair of <vertex_file, num_vertices>
 			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(num_partitions);
 
@@ -130,9 +133,31 @@ namespace RStream {
 				t.join();
 		}
 
+		/*compute out degree for each vertex*/
+		template <typename VertexDataType>
+		void compute_degree() {
+
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(num_partitions);
+
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+			}
+
+			std::vector<std::thread> threads;
+			for(int i = 0; i < num_threads; i++)
+				threads.push_back(std::thread(&Engine::compute_degree_producer<VertexDataType>, this, task_queue));
+
+			// join all threads
+			for(auto & t : threads)
+				t.join();
+
+			delete task_queue;
+		}
 
 
-	protected:
+
+	private:
 
 		template <typename VertexDataType>
 		void init_produer(std::function<void(char*)> init, concurrent_queue<std::pair<int, int>> * task_queue) {
@@ -155,6 +180,81 @@ namespace RStream {
 
 				delete[] vertex_local_buf;
 				close(fd);
+			}
+		}
+
+		template <typename VertexDataType>
+		void load_vertices_hashMap(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
+			for(size_t off = 0; off < vertex_file_size; off += vertex_unit){
+				VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
+				vertex_map[v->id] = v;
+			}
+		}
+
+		template <typename VertexDataType>
+		void compute_degree_producer(concurrent_queue<int> * task_queue) {
+			int partition_id = -1;
+			while(task_queue->test_pop_atomic(partition_id)) {
+				int fd_vertex = open((filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDWR);
+				int fd_edge = open((filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				assert(fd_vertex > 0 && fd_edge > 0 );
+
+				// get file size
+				long vertex_file_size = io_manager::get_filesize(fd_vertex);
+				long edge_file_size = io_manager::get_filesize(fd_edge);
+
+				// vertex data fully loaded into memory
+				char * vertex_local_buf = new char[vertex_file_size];
+				io_manager::read_from_file(fd_vertex, vertex_local_buf, vertex_file_size, 0);
+				std::unordered_map<VertexId, VertexDataType*> vertex_map;
+				load_vertices_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
+
+				// streaming edges
+				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = edge_file_size / IO_SIZE + 1;
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				// for all streaming
+				for(int counter = 0; counter < streaming_counter; counter++) {
+
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = edge_file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
+
+					assert(valid_io_size % sizeof(edge_unit) == 0);
+
+					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
+
+					for(long pos = 0; pos < valid_io_size; pos += edge_unit) {
+						// get an edge
+						Edge * e = (Edge*)(edge_local_buf + pos);
+						assert(vertex_map.find(e->src) != vertex_map.end());
+						VertexDataType * src_vertex = vertex_map.find(e->src)->second;
+						src_vertex->degree++;
+					}
+
+				}
+
+				//for debugging
+				for(size_t off = 0; off < vertex_file_size; off += vertex_unit){
+					VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
+					std::cout << *v << std::endl;
+				}
+
+				// write updated vertex value to disk
+				io_manager::write_to_file(fd_vertex, vertex_local_buf, vertex_file_size);
+
+				// delete
+				delete[] vertex_local_buf;
+				delete[] edge_local_buf;
+				close(fd_vertex);
+				close(fd_edge);
 			}
 		}
 

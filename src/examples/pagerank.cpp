@@ -14,67 +14,65 @@
 
 using namespace RStream;
 
-//struct Update : BaseUpdate{
+struct Update : BaseUpdate{
 //	int target;
-//	float sum;
+	float rank;
+
+	Update(int _target, float _rank) : BaseUpdate(_target), rank(_rank) {};
+
+	Update() : BaseUpdate(0), rank(0.0) {}
+
+	std::string toString(){
+		return "(" + std::to_string(target) + ", " + std::to_string(rank) + ")";
+	}
+};
+
+//struct RInUpdate : BaseUpdate {
+//	VertexId src;
+////	int target;
 //
-//	Update(int t, float s) {
+//	RInUpdate(VertexId t, VertexId s){
 //		target = t;
-//		sum = s;
+//		src = s;
 //	}
 //
-//	Update() : target(0), sum(0.0) {}
-//
-//	std::string toString(){
-//		return "(" + std::to_string(target) + ", " + std::to_string(sum) + ")";
+//	RInUpdate() {
+////		target = 0;
+////		src = 0;
 //	}
 //};
 
-struct RInUpdate : BaseUpdate {
-	VertexId src;
-//	int target;
+//inline std::ostream & operator<<(std::ostream & strm, const RInUpdate& update){
+//	strm << "(" << update.target << ", " << update.src << ")";
+//	return strm;
+//}
 
-	RInUpdate(VertexId t, VertexId s){
-		target = t;
-		src = s;
-	}
+//struct ROutUpdate : BaseUpdate {
+//	VertexId src1;
+//	VertexId src2;
+////	int target;
+//
+//	ROutUpdate(VertexId t, VertexId s1, VertexId s2) {
+//		target = t;
+//		src1 = s1;
+//		src2 = s2;
+//	}
+//	ROutUpdate() {
+////		target = 0;
+////		src1 = 0;
+////		src2 = 0;
+//	}
+//};
 
-	RInUpdate() {
-//		target = 0;
-//		src = 0;
-	}
-};
-
-inline std::ostream & operator<<(std::ostream & strm, const RInUpdate& update){
-	strm << "(" << update.target << ", " << update.src << ")";
-	return strm;
-}
-
-struct ROutUpdate : BaseUpdate {
-	VertexId src1;
-	VertexId src2;
-//	int target;
-
-	ROutUpdate(VertexId t, VertexId s1, VertexId s2) {
-		target = t;
-		src1 = s1;
-		src2 = s2;
-	}
-	ROutUpdate() {
-//		target = 0;
-//		src1 = 0;
-//		src2 = 0;
-	}
-};
-
-inline std::ostream & operator<<(std::ostream & strm, const ROutUpdate& update){
-	strm << "(" << update.target << ", " << update.src1 << ", " << update.src2 << ")";
-	return strm;
-}
+//inline std::ostream & operator<<(std::ostream & strm, const ROutUpdate& update){
+//	strm << "(" << update.target << ", " << update.src1 << ", " << update.src2 << ")";
+//	return strm;
+//}
 
 struct Vertex : BaseVertex {
 	int degree;
-//	float pr_value;
+	float rank;
+	float sum;
 };
 
 inline std::ostream & operator<<(std::ostream & strm, const Vertex& vertex){
@@ -82,41 +80,48 @@ inline std::ostream & operator<<(std::ostream & strm, const Vertex& vertex){
 	return strm;
 }
 
-//void init(char* vertices) {
-//	struct Vertex* v= (struct Vertex*) vertices;
-//	v->degree = 0;
-////	v->vertexId = 0;
-//}
-
 void init(char* data) {
 	struct Vertex * v = (struct Vertex*)data;
 	v->degree = 0;
+	v->sum = 0;
+	v->rank = 1.0f;
 }
 
-RInUpdate* generate_one_update(Edge * e)
-{
-	RInUpdate* update = new RInUpdate(e->target, e->src);
+Update * generate_one_update(Edge * e, Vertex * v) {
+
+	Update* update = new Update(e->src, v->rank / v->degree);
 	return update;
 }
+
+void apply_one_update(Update * update, Vertex * dst_vertex) {
+	dst_vertex->sum += update->rank;
+	dst_vertex->rank = 0.15 + 0.85 * dst_vertex->sum;
+}
+
+//RInUpdate* generate_one_update(Edge * e)
+//{
+//	RInUpdate* update = new RInUpdate(e->target, e->src);
+//	return update;
+//}
 
 //void apply_one_update(Update * update, Vertex* dst_vertex) {
 //	dst_vertex->degree += update->sum;
 //}
 
-class R1 : public RPhase<RInUpdate, ROutUpdate> {
-public:
-	R1(Engine & e) : RPhase(e) {};
-
-	bool filter(RInUpdate * update, Edge * edge) {
-		return false;
-	}
-
-	ROutUpdate * project_columns(RInUpdate * in_update, Edge * edge) {
-//		std::cout << *edge << std::endl;
-		ROutUpdate * new_update = new ROutUpdate(edge->target, in_update->src, in_update->target);
-		return new_update;
-	}
-};
+//class R1 : public RPhase<RInUpdate, ROutUpdate> {
+//public:
+//	R1(Engine & e) : RPhase(e) {};
+//
+//	bool filter(RInUpdate * update, Edge * edge) {
+//		return false;
+//	}
+//
+//	ROutUpdate * project_columns(RInUpdate * in_update, Edge * edge) {
+////		std::cout << *edge << std::endl;
+//		ROutUpdate * new_update = new ROutUpdate(edge->target, in_update->src, in_update->target);
+//		return new_update;
+//	}
+//};
 
 
 template<typename T>
@@ -169,14 +174,26 @@ int main(int argc, char ** argv) {
 //			exit(-1);
 //		}
 
-		Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
-		Scatter<Vertex, RInUpdate> scatter_phase(e);
-		Update_Stream in_stream = scatter_phase.scatter_no_vertex(generate_one_update);
-		printUpdateStream<RInUpdate>(e.num_partitions, e.filename, in_stream);
+//		Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
+//		Scatter<Vertex, RInUpdate> scatter_phase(e);
+//		Update_Stream in_stream = scatter_phase.scatter_no_vertex(generate_one_update);
+//		printUpdateStream<RInUpdate>(e.num_partitions, e.filename, in_stream);
 
-		R1 r1(e);
-		Update_Stream out_stream = r1.join(in_stream);
-		printUpdateStream<ROutUpdate>(e.num_partitions, e.filename, out_stream);
+//		R1 r1(e);
+//		Update_Stream out_stream = r1.join(in_stream);
+//		printUpdateStream<ROutUpdate>(e.num_partitions, e.filename, out_stream);
+
+		Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
+		e.init_vertex<Vertex>(init);
+		e.compute_degree<Vertex>();
+
+		int num_iters = 5;
+		for(int i = 0; i < num_iters; i++) {
+			Scatter<Vertex, Update> scatter_phase(e);
+			Update_Stream in_stream = scatter_phase.scatter_with_vertex(generate_one_update);
+			Gather<Vertex, Update> gather_phase(e);
+			gather_phase.gather(in_stream, apply_one_update);
+		}
 }
 
 
