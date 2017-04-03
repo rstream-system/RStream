@@ -45,7 +45,9 @@ namespace RStream {
 			atomic_num_producers = 0;
 			atomic_partition_id = 0;
 			atomic_partition_number = context.num_partitions;
-		};
+		}
+
+		virtual ~RPhase() {}
 
 		/* join update stream with edge stream
 		 * @param in_update_stream -input file for update stream
