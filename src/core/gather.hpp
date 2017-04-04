@@ -67,12 +67,19 @@ namespace RStream {
 		void gather_producer(Update_Stream in_update_stream, std::function<void(UpdateType*, VertexDataType*)> apply_one_update,
 						concurrent_queue<int> * task_queue) {
 			int partition_id = -1;
+			int vertex_start = -1;
+			assert(context.vertex_unit == sizeof(VertexDataType));
+
 			while(task_queue->test_pop_atomic(partition_id)) {
 				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDWR);
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 //				int fd_vertex = fd_pair.first;
 //				int fd_update = fd_pair.second;
 				assert(fd_vertex > 0 && fd_update > 0 );
+
+				// get start vertex id
+				vertex_start = context.vertex_intervals[partition_id].first;
+				assert(vertex_start >= 0 && vertex_start < context.num_vertices);
 
 				// get file size
 				long vertex_file_size = io_manager::get_filesize(fd_vertex);
@@ -122,18 +129,23 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof(UpdateType)) {
 						// get an update
 						UpdateType * update = (UpdateType*)(update_local_buf + pos);
-						assert(vertex_map.find(update->target) != vertex_map.end());
-						VertexDataType * dst_vertex = vertex_map.find(update->target)->second;
+
+						// get target vertex in vertex buf
+						size_t offset = (update->target - vertex_start) * sizeof(VertexDataType);
+						VertexDataType* dst_vertex = reinterpret_cast<VertexDataType*>(vertex_local_buf + offset);
+
+//						assert(vertex_map.find(update->target) != vertex_map.end());
+//						VertexDataType * dst_vertex = vertex_map.find(update->target)->second;
 						apply_one_update(update, dst_vertex);
 					}
 
 				}
 
 				//for debugging
-				for(size_t off = 0; off < vertex_file_size; off += context.vertex_unit){
-					VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
-					std::cout << *v << std::endl;
-				}
+//				for(size_t off = 0; off < vertex_file_size; off += context.vertex_unit){
+//					VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
+//					std::cout << *v << std::endl;
+//				}
 
 				// write updated vertex value to disk
 //				store_updatedvertices(vertex_map, vertex_local_buf, vertex_file_size);

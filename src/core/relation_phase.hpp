@@ -126,13 +126,14 @@ namespace RStream {
 				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size, 0);
 
 				// build edge hashmap
-				const int num_vertices = context.num_vertices_per_part;
-				int start_vertex = partition_id * num_vertices;
-				assert(num_vertices > 0 && start_vertex >= 0);
+				const int n_vertices = context.vertex_intervals[partition_id].second - context.vertex_intervals[partition_id].first + 1;
+//				int start_vertex = partition_id * num_vertices;
+				int vertex_start = context.vertex_intervals[partition_id].first;
+				assert(n_vertices > 0 && vertex_start >= 0);
 
 //				std::array<std::vector<VertexId>, num_vertices> edge_hashmap;
-				std::vector<VertexId> edge_hashmap[num_vertices];
-				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, start_vertex);
+				std::vector<VertexId> edge_hashmap[n_vertices];
+				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
 
 				long valid_io_size = 0;
 				long offset = 0;
@@ -158,7 +159,7 @@ namespace RStream {
 						InUpdateType * update = (InUpdateType*)(update_local_buf + pos);
 
 						// update.target is edge.src, the key to index edge_hashmap
-						for(VertexId target : edge_hashmap[update->target - start_vertex]) {
+						for(VertexId target : edge_hashmap[update->target - vertex_start]) {
 							Edge * e = new Edge(update->target, target);
 							if(!filter(update, e)) {
 	//							NewUpdateType * new_update = new NewUpdateType(update, target);
@@ -249,8 +250,10 @@ namespace RStream {
 		}
 
 		void build_edge_hashmap(char * edge_buf, std::vector<VertexId> * edge_hashmap, size_t edge_file_size, int start_vertex) {
+			int edge_unit = context.edge_unit;
+			assert(edge_unit > 0);
 			// for each edge
-			for(size_t pos = 0; pos < edge_file_size; pos += context.edge_unit) {
+			for(size_t pos = 0; pos < edge_file_size; pos += edge_unit) {
 				// get an edge
 				Edge e = *(Edge*)(edge_buf + pos);
 				assert(e.src >= start_vertex);

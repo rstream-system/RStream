@@ -112,6 +112,8 @@ int main(int argc, char ** argv) {
 
 	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 
+//	Engine e("/home/kai/workspace/dataset/test.txt", 3, 10);
+
 	//scatter phase first to generate updates
 	Scatter<BaseVertex, RInUpdate_TriC> scatter_phase(e);
 	Update_Stream in_stream = scatter_phase.scatter_no_vertex(generate_one_update);

@@ -8,6 +8,7 @@
 #ifndef CORE_ENGINE_HPP_
 #define CORE_ENGINE_HPP_
 
+#include <sys/stat.h>
 #include "io_manager.hpp"
 #include "buffer_manager.hpp"
 #include "concurrent_queue.hpp"
@@ -58,6 +59,7 @@ namespace RStream {
 		int num_vertices_per_part;
 
 //		int* vertex_intervals;
+		std::vector<std::pair<VertexId, VertexId>> vertex_intervals;
 
 		static unsigned update_count;
 
@@ -68,14 +70,24 @@ namespace RStream {
 			num_exec_threads = num_threads > 2 ? num_threads - 2 : 1;
 
 			num_vertices = _num_vertices;
-			Preprocessing proc(_filename, num_parts, num_vertices);
-
 			num_partitions = num_parts;
-			edge_type = static_cast<EdgeType>(proc.getEdgeType());
-			edge_unit = proc.getEdgeUnit();
+			num_vertices_per_part = num_vertices / num_partitions;
+//			Preprocessing proc(_filename, num_parts, num_vertices);
+
+
+			const std::string meta_file = _filename + ".meta";
+			if(!file_exists(meta_file)) {
+				Preprocessing proc(_filename, num_parts, num_vertices);
+			}
+
+			// get meta data from .meta file
+			read_meta_file(meta_file);
+
+//			edge_type = static_cast<EdgeType>(proc.getEdgeType());
+//			edge_unit = proc.getEdgeUnit();
 			vertex_unit = 0;
 //			vertex_unit = 8;
-			num_vertices_per_part = proc.getNumVerPerPartition();
+//			num_vertices_per_part = proc.getNumVerPerPartition();
 
 			std::cout << "Number of partitions: " << num_partitions << std::endl;
 			std::cout << "Edge type: " << edge_type << std::endl;
@@ -83,6 +95,9 @@ namespace RStream {
 			std::cout << "Number of exec threads: " << num_exec_threads << std::endl;
 			std::cout << "Number of write threads: " << num_write_threads << std::endl;
 			std::cout << std::endl;
+
+//			for(int i = 0; i < num_partitions; i++)
+//				std::cout << "partition " << i << " , start: " << vertex_intervals[i].first << " , end: " << vertex_intervals[i].second << std::endl;
 		}
 
 		~Engine(){
@@ -119,7 +134,13 @@ namespace RStream {
 				if(fd < 0) {
 					fd = creat(vertex_file.c_str(), S_IRWXU);
 				}
-				task_queue->push(std::make_pair(fd, num_vertices_per_part));
+
+//				if(partition_id < num_partitions - 1)
+//					task_queue->push(std::make_pair(fd, num_vertices_per_part));
+//				else
+//					task_queue->push(std::make_pair(fd, num_vertices - num_vertices_per_part * (num_partitions - 1)));
+				int n_vertices = vertex_intervals[partition_id].second - vertex_intervals[partition_id].first + 1;
+				task_queue->push(std::make_pair(fd, n_vertices));
 
 			}
 
@@ -172,7 +193,7 @@ namespace RStream {
 				char * vertex_local_buf = new char[vertex_file_size];
 
 				// for each vertex
-				for(size_t pos = 0; pos < vertex_file_size; pos += sizeof(int)) {
+				for(size_t pos = 0; pos < vertex_file_size; pos += sizeof(VertexDataType)) {
 					init(vertex_local_buf + pos);
 				}
 
@@ -258,6 +279,56 @@ namespace RStream {
 			}
 		}
 
+		inline bool file_exists(const std::string  filename) {
+			struct stat buffer;
+			return (stat(filename.c_str(), &buffer) == 0);
+		}
+
+		inline void read_meta_file(const std::string & filename) {
+			FILE * fd = fopen(filename.c_str(), "r");
+			assert(fd != NULL );
+			int counter = 0;
+			char s[1024];
+			VertexId start = 0, end = 0;
+
+			while(fgets(s, 1024, fd) != NULL) {
+				FIXLINE(s);
+
+				char delims[] = "\t";
+				char * t;
+				t = strtok(s, delims);
+				assert(t != NULL);
+
+				// first line for edge_type and edge_unit
+				if(counter == 0) {
+					edge_type =  static_cast<EdgeType>(atoi(t));
+					t = strtok(NULL, delims);
+					assert(t != NULL);
+
+					edge_unit = atoi(t);
+				} else {
+					assert(counter <= (num_partitions + 1));
+					start = atoi(t);
+					t = strtok(NULL, delims);
+					assert(t != NULL);
+
+					end = atoi(t);
+
+					vertex_intervals.push_back(std::make_pair(start, end));
+				}
+
+				counter++;
+
+			}
+
+			fclose(fd);
+		}
+
+		// Removes \n from the end of line
+		inline void FIXLINE(char * s) {
+			int len = (int) strlen(s)-1;
+			if(s[len] == '\n') s[len] = 0;
+		}
 	};
 
 	unsigned Engine::update_count = 0;

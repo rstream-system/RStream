@@ -141,11 +141,18 @@ namespace RStream {
 
 			atomic_num_producers++;
 			int partition_id = -1;
+			VertexId vertex_start = -1;
+			assert(context.vertex_unit == sizeof(VertexDataType));
+
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
 				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDONLY);
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_vertex > 0 && fd_edge > 0 );
+
+				// get start vertex id
+				vertex_start = context.vertex_intervals[partition_id].first;
+				assert(vertex_start >= 0 && vertex_start < context.num_vertices);
 
 				// get file size
 				long vertex_file_size = io_manager::get_filesize(fd_vertex);
@@ -168,6 +175,7 @@ namespace RStream {
 
 				long valid_io_size = 0;
 				long offset = 0;
+				int edge_unit = context.edge_unit;
 				// for all streaming
 				for(int counter = 0; counter < streaming_counter; counter++) {
 
@@ -178,21 +186,25 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
-					assert(valid_io_size % context.edge_unit == 0);
+					assert(valid_io_size % edge_unit == 0);
 
 //					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size);
 					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 
 					// for each streaming
-					for(long pos = 0; pos < valid_io_size; pos += context.edge_unit) {
+					for(long pos = 0; pos < valid_io_size; pos += edge_unit) {
 						// get an edge
 						Edge * e = (Edge*)(edge_local_buf + pos);
 	//					std::cout << e << std::endl;
 
+						// get src vertex in vertex buf
+						size_t offset = (e->src - vertex_start) * sizeof(VertexDataType);
+						VertexDataType* src_vertex = reinterpret_cast<VertexDataType*>(vertex_local_buf + offset);
+
 						// gen one update
-						assert(vertex_map.find(e->src) != vertex_map.end());
-						VertexDataType * src_vertex = vertex_map.find(e->src)->second;
+//						assert(vertex_map.find(e->src) != vertex_map.end());
+//						VertexDataType * src_vertex = vertex_map.find(e->src)->second;
 						UpdateType * update_info = generate_one_update(e, src_vertex);
 	//					std::cout << update_info->target << std::endl;
 
@@ -246,6 +258,7 @@ namespace RStream {
 				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
 			int partition_id = -1;
+
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
 				int fd = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
@@ -265,6 +278,7 @@ namespace RStream {
 
 				long valid_io_size = 0;
 				long offset = 0;
+				int edge_unit = context.edge_unit;
 
 				// for all streaming
 				for(int counter = 0; counter < streaming_counter; counter++) {
@@ -276,13 +290,13 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
-					assert(valid_io_size % context.edge_unit == 0);
+					assert(valid_io_size % edge_unit == 0);
 
 					io_manager::read_from_file(fd, local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 
 					// for each streaming
-					for(long pos = 0; pos < valid_io_size; pos += context.edge_unit) {
+					for(long pos = 0; pos < valid_io_size; pos += edge_unit) {
 						// get an edge
 						Edge * e = (Edge*)(local_buf + pos);
 	//					std::cout << e << std::endl;

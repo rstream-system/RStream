@@ -8,6 +8,7 @@
 #ifndef UTILITY_PREPROCESSING_HPP_
 #define UTILITY_PREPROCESSING_HPP_
 
+#include <iostream>
 #include "../common/RStreamCommon.hpp"
 //#include "../core/engine.hpp"
 
@@ -59,6 +60,8 @@ namespace RStream {
 				std::cout << "===============Printing Partition " << i << "================" << std::endl;
 				dump(input + "." + std::to_string(i));
 			}
+
+			write_meta_file();
 		}
 
 		void convert_edgelist() {
@@ -84,9 +87,11 @@ namespace RStream {
 				assert(t != NULL);
 
 				VertexId from = atoi(t) - 1;
+//				VertexId from = atoi(t);
 				t = strtok(NULL, delims);
 				assert(t != NULL);
 				VertexId to = atoi(t) - 1;
+//				VertexId to = atoi(t);
 
 				if(from == to) continue;
 
@@ -134,6 +139,8 @@ namespace RStream {
 			}
 			io_manager::write_to_file(fout, buf, counter * edge_unit);
 			close(fout);
+
+			fclose(fd);
 
 		}
 
@@ -317,6 +324,31 @@ namespace RStream {
 			}
 
 			close(fd);
+		}
+
+		void write_meta_file() {
+			std::ofstream meta_file(input + ".meta");
+			if(meta_file.is_open()) {
+				meta_file << edge_type << "\t" << edge_unit << "\n";
+
+				VertexId start = 0, end = 0;
+				for(int i = 0; i < num_partitions; i++) {
+					// last partition
+					if(i == num_partitions - 1) {
+						end = start + num_vertices - vertices_per_partition * (num_partitions - 1) - 1;
+						meta_file << start << "\t" << end << "\n";
+					} else {
+						end = start + vertices_per_partition - 1;
+						meta_file << start << "\t" << end << "\n";
+						start = end + 1;
+					}
+				}
+
+			} else {
+				std::cout << "Could not open meta file!";
+			}
+
+			meta_file.close();
 		}
 	};
 

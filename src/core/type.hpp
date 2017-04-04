@@ -68,7 +68,7 @@ struct BaseUpdate {
 };
 
 struct BaseVertex {
-	VertexId id;
+//	VertexId id;
 };
 
 //struct Update_Stream {
