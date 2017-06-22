@@ -14,6 +14,84 @@
 
 namespace RStream {
 
+	// global buffer for shuffling in graph mining.
+	//The data structure of tuple is fixed(variable sized array) for every join all keys.
+	// that's why we don't use template
+	// TODO: buffer_manager needs to be rewritten later.
+
+	class global_buffer_for_mining {
+		size_t capacity;
+		size_t count;
+		size_t sizeof_tuple;
+		size_t index;
+		char * buf;
+		std::mutex mutex;
+		std::condition_variable not_full;
+
+	public:
+		global_buffer_for_mining(size_t _capacity, size_t _sizeof_tuple) :
+			capacity{_capacity}, count(0), sizeof_tuple(_sizeof_tuple), index(0) {
+			buf = new char[sizeof_tuple * capacity];
+		}
+
+		~global_buffer_for_mining() {
+			delete[] buf;
+		}
+
+		void insert(char * tuple) {
+			std::unique_lock<std::mutex> lock(mutex);
+			not_full.wait(lock, [&] {return !is_full();});
+
+			// insert tuple to buffer
+			std::memcpy(buf + index, tuple, sizeof_tuple);
+			index += sizeof_tuple;
+			count++;
+		}
+
+		void flush(const char * file_name, const int i) {
+			std::unique_lock<std::mutex> lock(mutex);
+
+			if(is_full()){
+				int perms = O_WRONLY | O_APPEND;
+				int fd = open(file_name, perms, S_IRWXU);
+				if(fd < 0){
+					fd = creat(file_name, S_IRWXU);
+				}
+				// flush buffer to update out stream
+				io_manager::write_to_file(fd, buf, capacity * sizeof_tuple);
+				close(fd);
+
+				count = 0;
+				not_full.notify_one();
+			}
+		}
+
+		void flush_end(const char * file_name, const int i) {
+			std::unique_lock<std::mutex> lock(mutex);
+			if(!is_empty()){
+				int perms = O_WRONLY | O_APPEND;
+				int fd = open(file_name, perms, S_IRWXU);
+				if(fd < 0){
+					fd = creat(file_name, S_IRWXU);
+				}
+
+				// flush buffer to update out stream
+				io_manager::write_to_file(fd, buf, count * sizeof_tuple);
+				close(fd);
+			}
+
+		}
+
+		bool is_full() {
+			return count == capacity;
+		}
+
+		bool is_empty() {
+			return count == 0;
+		}
+
+	};
+
 	// global buffer for shuffling, accessing by multithreads
 	template <typename T>
 	class global_buffer {
@@ -100,6 +178,26 @@ namespace RStream {
 
 		bool is_empty() {
 			return count == 0;
+		}
+	};
+
+	class buffer_manager_for_mining {
+	public:
+		static global_buffer_for_mining ** get_global_buffers_for_mining(int num_partitions, int sizeof_tuple) {
+			global_buffer_for_mining ** buffers = new global_buffer_for_mining * [num_partitions];
+
+			for(int i = 0; i < num_partitions; i++) {
+				buffers[i] = new global_buffer_for_mining(BUFFER_CAPACITY, sizeof_tuple);
+			}
+
+			return buffers;
+		}
+
+		static global_buffer_for_mining * get_global_buffer_for_mining(global_buffer_for_mining ** buffers, int num_partitions, int index) {
+			if(index >= 0 && index < num_partitions)
+				return buffers[index];
+			else
+				return nullptr;
 		}
 	};
 

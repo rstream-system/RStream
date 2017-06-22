@@ -13,6 +13,7 @@
 typedef unsigned Update_Stream;
 typedef int VertexId;
 typedef float Weight;
+typedef unsigned char BYTE;
 
 struct Edge {
 	VertexId src;
@@ -24,6 +25,15 @@ struct Edge {
 	std::string toString(){
 		return "(" + std::to_string(src) + ", " + std::to_string(target) + ")";
 	}
+};
+
+struct LabeledEdge {
+	VertexId src;
+	VertexId target;
+	BYTE src_label;
+	BYTE target_label;
+	BYTE edge_label;
+
 };
 
 struct WeightedEdge {
