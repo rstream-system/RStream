@@ -172,10 +172,18 @@ namespace RStream {
 						BYTE key_index = get_key_index(in_update_tuple);
 						assert(key_index >= 0 && key_index < in_update_tuple.size());
 
+						// get neighbors of current key
+						std::unordered_set<VertexId> neighbors = get_neighborsof_current_key(in_update_tuple, key_index);
+
 						// get vertex_id as the key to index edge hashmap
 						VertexId key = in_update_tuple.at(key_index).vertex_id;
 
 						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
+							// check if target of this edge in edge_hashmap already existed in in_update_tuple
+							auto existed = neighbors.find(element.vertex_id);
+							if(existed != neighbors.end())
+								continue;
+
 							// generate a new out update tuple
 							std::vector<Element_In_Tuple> & out_update_tuple = gen_an_out_update(in_update_tuple, element, key_index);
 
@@ -268,6 +276,23 @@ namespace RStream {
 
 		void set_key_index(std::vector<Element_In_Tuple> & out_update_tuple, int new_key_index) {
 			out_update_tuple.at(0).key_index = new_key_index;
+		}
+
+		std::unordered_set<VertexId> & get_neighborsof_current_key(std::vector<Element_In_Tuple> & in_update_tuple, BYTE key_index) {
+			std::unordered_set<VertexId> neighbors;
+			for(int i = 1; i < in_update_tuple.size(); i++) {
+				if(i != key_index) {
+					if(in_update_tuple.at(i).history_info == key_index) {
+						neighbors.insert(in_update_tuple.at(i).vertex_id);
+					}
+				} else {
+					BYTE history = in_update_tuple.at(i).history_info;
+					neighbors.insert(in_update_tuple.at(history).vertex_id);
+				}
+
+			}
+
+			return neighbors;
 		}
 
 		// TODO: do we need to store src.label?
