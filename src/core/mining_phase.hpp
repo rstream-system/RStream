@@ -38,7 +38,9 @@ namespace RStream {
 		Element_In_Tuple(int _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
 					vertex_id(_vertex_id), edge_label(_edge_label), vertex_label(_vertex_label), key_index(0), history_info(_history) {
 
-				}
+		}
+
+		void set_vertex_id(VertexId new_id) : vertex_id(new_id) {}
 	};
 
 	// One tuple contains multiple elements. "size" is the num of elements in one tuple
@@ -316,7 +318,7 @@ namespace RStream {
 						LabeledEdge & e = *(LabeledEdge*)(edge_local_buf + pos);
 						std::vector<Element_In_Tuple> out_update_tuple;
 						out_update_tuple.push_back(Element_In_Tuple(e.src, e.edge_label, e.src_label));
-						out_update_tuple.push_back(Element_In_Tuple(e.target, e.edge_label, e.target_label, 1));
+						out_update_tuple.push_back(Element_In_Tuple(e.target, e.edge_label, e.target_label));
 
 						// shuffle on both src and target
 						shuffle_on_all_keys(out_update_tuple, buffers_for_shuffle);
@@ -426,7 +428,23 @@ namespace RStream {
 		}
 
 		std::vector<Element_In_Tuple> & turn_quick_pattern(std::vector<Element_In_Tuple> & sub_graph) {
+			std::unordered_map<VertexId, VertexId> map;
+			VertexId new_id = 0;
 
+			for(int i = 0; i < sub_graph.size(); i++) {
+				VertexId old_id = sub_graph.at(i).vertex_id;
+
+				auto iterator = map.find(old_id);
+				if(iterator == map.end()) {
+					sub_graph.at(i).set_vertex_id(new_id);
+					map[old_id] = new_id++;
+
+				} else {
+					sub_graph.at(i).set_vertex_id(iterator->second);
+				}
+			}
+
+			return sub_graph;
 		}
 
 	};
