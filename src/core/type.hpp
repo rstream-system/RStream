@@ -91,4 +91,44 @@ inline std::ostream & operator<<(std::ostream & strm, const BaseUpdate& up){
 }
 
 
+/*
+ *  Graph mining support. Join on all keys for each vertex tuple.
+ *  Each element in the tuple contains 8 bytes, first 4 bytes is vertex id,
+ *  second 4 bytes contains edge label(1byte) + vertex label(1byte) + history info(1byte).
+ *  History info is used to record subgraph structure.
+ *
+ *
+ *  [ ] [ ] [ ] [ ] || [ ] [ ] [ ] [ ]
+ *    vertex id        idx  el  vl info
+ *     4 bytes          1   1   1    1
+ *
+ * */
+struct Element_In_Tuple {
+	VertexId vertex_id;
+	BYTE key_index;
+	BYTE edge_label;
+	BYTE vertex_label;
+	BYTE history_info;
+
+	Element_In_Tuple(int _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
+		vertex_id(_vertex_id), edge_label(_edge_label), vertex_label(_vertex_label), key_index(0), history_info(0) {
+
+	}
+
+	Element_In_Tuple(int _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+				vertex_id(_vertex_id), edge_label(_edge_label), vertex_label(_vertex_label), key_index(0), history_info(_history) {
+
+	}
+
+	void set_vertex_id(VertexId new_id){
+		vertex_id = new_id;
+	}
+};
+
+// One tuple contains multiple elements. "size" is the num of elements in one tuple
+struct Update_Tuple {
+	std::vector<Element_In_Tuple> elements;
+};
+
+
 #endif /* CORE_TYPE_HPP_ */
