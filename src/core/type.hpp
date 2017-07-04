@@ -110,13 +110,18 @@ struct Element_In_Tuple {
 	BYTE vertex_label;
 	BYTE history_info;
 
-	Element_In_Tuple(int _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
-		vertex_id(_vertex_id), edge_label(_edge_label), vertex_label(_vertex_label), key_index(0), history_info(0) {
+	Element_In_Tuple(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
+		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(0) {
 
 	}
 
-	Element_In_Tuple(int _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
-				vertex_id(_vertex_id), edge_label(_edge_label), vertex_label(_vertex_label), key_index(0), history_info(_history) {
+	Element_In_Tuple(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+				vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) {
+
+	}
+
+	Element_In_Tuple(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
+		vertex_id(_vertex_id), key_index(_key_index), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) {
 
 	}
 

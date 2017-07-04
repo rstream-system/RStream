@@ -53,11 +53,11 @@ public:
 	}
 
 
-	static std::vector<Element_In_Tuple> & turn_quick_pattern(std::vector<Element_In_Tuple> & sub_graph) {
+	static void turn_quick_pattern_sideffect(std::vector<Element_In_Tuple> & sub_graph) {
 		std::unordered_map<VertexId, VertexId> map;
-		VertexId new_id = 0;
+		VertexId new_id = 1;
 
-		for(int i = 0; i < sub_graph.size(); i++) {
+		for(unsigned int i = 0; i < sub_graph.size(); i++) {
 			VertexId old_id = sub_graph.at(i).vertex_id;
 
 			auto iterator = map.find(old_id);
@@ -70,8 +70,31 @@ public:
 			}
 		}
 
-		return sub_graph;
 	}
+
+
+	static void turn_quick_pattern_pure(std::vector<Element_In_Tuple> & sub_graph, std::vector<Element_In_Tuple> & graph_quick_pattern) {
+			std::unordered_map<VertexId, VertexId> map;
+			VertexId new_id = 1;
+
+			for(unsigned int i = 0; i < sub_graph.size(); i++) {
+				Element_In_Tuple old_tuple = sub_graph[i];
+				Element_In_Tuple * new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, old_tuple.edge_label, old_tuple.vertex_label, old_tuple.history_info);
+
+				VertexId old_id = new_tuple->vertex_id;
+				auto iterator = map.find(old_id);
+				if(iterator == map.end()) {
+					new_tuple->set_vertex_id(new_id);
+					map[old_id] = new_id++;
+
+				} else {
+					new_tuple->set_vertex_id(iterator->second);
+				}
+
+				graph_quick_pattern.push_back(*new_tuple);
+			}
+
+		}
 
 
 private:
