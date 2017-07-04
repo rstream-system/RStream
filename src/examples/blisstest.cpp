@@ -5,7 +5,7 @@
  *      Author: icuzzq
  */
 
-#include "../core/bliss_lib.hpp"
+#include "../core/pattern.hpp"
 
 int main(int argc, char **argv) {
 //	const char* in = "/home/icuzzq/Desktop/bliss-0.73/inputs/input2.txt";
@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
 	sub_graph.push_back(*tuple2);
 	sub_graph.push_back(*tuple3);
 
-	Bliss_Lib::turn_canonical_graph(sub_graph, out);
+	pattern::turn_canonical_graph(sub_graph, false);
 
 }
 

@@ -384,33 +384,7 @@ namespace RStream {
 			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
 		}
 
-		bool is_automorphism(std::vector<Element_In_Tuple> & sub_graph) {
-			return false;
-		}
 
-//		std::vector<Element_In_Tuple> & turn_canonical_graph(std::vector<Element_In_Tuple> & sub_graph) {
-//
-//		}
-
-		std::vector<Element_In_Tuple> & turn_quick_pattern(std::vector<Element_In_Tuple> & sub_graph) {
-			std::unordered_map<VertexId, VertexId> map;
-			VertexId new_id = 0;
-
-			for(int i = 0; i < sub_graph.size(); i++) {
-				VertexId old_id = sub_graph.at(i).vertex_id;
-
-				auto iterator = map.find(old_id);
-				if(iterator == map.end()) {
-					sub_graph.at(i).set_vertex_id(new_id);
-					map[old_id] = new_id++;
-
-				} else {
-					sub_graph.at(i).set_vertex_id(iterator->second);
-				}
-			}
-
-			return sub_graph;
-		}
 
 	};
 }

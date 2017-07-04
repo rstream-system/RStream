@@ -5,8 +5,8 @@
  *      Author: icuzzq
  */
 
-#ifndef SRC_CORE_BLISS_LIB_HPP_
-#define SRC_CORE_BLISS_LIB_HPP_
+#ifndef SRC_CORE_PATTERN_HPP_
+#define SRC_CORE_PATTERN_HPP_
 
 #include "../common/RStreamCommon.hpp"
 #include "type.hpp"
@@ -16,9 +16,9 @@
 #include "timer.hh"
 #include "utils.hh"
 
-static bool opt_directed = false;
+//static bool opt_directed = false;
 
-class Bliss_Lib {
+class pattern {
 
 	/**
 	 * The hook function that prints the found automorphisms.
@@ -34,29 +34,45 @@ class Bliss_Lib {
 
 public:
 
-	static std::vector<Element_In_Tuple> turn_canonical_graph(std::vector<Element_In_Tuple> & sub_graph, std::string & outfile) {
-		bliss::AbstractGraph* aGraph = 0;
+	static bliss::AbstractGraph* turn_canonical_graph(std::vector<Element_In_Tuple> & sub_graph, const bool is_directed) {
+		bliss::AbstractGraph* ag = 0;
 
 		//read graph from tuple
-		aGraph = readGraph(sub_graph, opt_directed);
-		writeOut(aGraph, outfile);
+		ag = readGraph(sub_graph, is_directed);
 
-		//canonical labeling
-		bliss::Stats stats;
-		const unsigned int* cl = aGraph->canonical_form(stats, &report_aut, stdout);
+		//turn to canonical form
+		bliss::AbstractGraph* cf = turnCanonical(ag);
 
-		//permute to canonical form
-		bliss::AbstractGraph* cf = aGraph->permute(cl);
-		writeOut(cf, outfile.append(".cano"));
-
-		//write back to tuple
-		std::vector<Element_In_Tuple> out = writeGraph(cf);
-
-		delete cf;
-		delete aGraph;
-
-		return out;
+		delete ag;
+		return cf;
 	}
+
+
+	static bool is_automorphism(std::vector<Element_In_Tuple> & sub_graph) {
+		return false;
+	}
+
+
+	static std::vector<Element_In_Tuple> & turn_quick_pattern(std::vector<Element_In_Tuple> & sub_graph) {
+		std::unordered_map<VertexId, VertexId> map;
+		VertexId new_id = 0;
+
+		for(int i = 0; i < sub_graph.size(); i++) {
+			VertexId old_id = sub_graph.at(i).vertex_id;
+
+			auto iterator = map.find(old_id);
+			if(iterator == map.end()) {
+				sub_graph.at(i).set_vertex_id(new_id);
+				map[old_id] = new_id++;
+
+			} else {
+				sub_graph.at(i).set_vertex_id(iterator->second);
+			}
+		}
+
+		return sub_graph;
+	}
+
 
 private:
 
@@ -96,13 +112,26 @@ private:
 		return g;
 	}
 
-	static std::vector<Element_In_Tuple> writeGraph(bliss::AbstractGraph* cf){
-		std::vector<Element_In_Tuple> out;
-		return out;
+	static bliss::AbstractGraph* turnCanonical(bliss::AbstractGraph* ag){
+		//canonical labeling
+		bliss::Stats stats;
+		const unsigned int* cl = ag->canonical_form(stats, &report_aut, stdout);
+
+		//permute to canonical form
+		bliss::AbstractGraph* cf = ag->permute(cl);
+
+		delete[] cl;
+		return cf;
 	}
 
+//	static std::vector<Element_In_Tuple> writeTuple(bliss::AbstractGraph* cf){
+//		std::vector<Element_In_Tuple> out;
+//		//TODO
+//
+//		return out;
+//	}
 
-	static void writeOut(bliss::AbstractGraph* graph, std::string& outfile){
+	static void writeOutGraph(bliss::AbstractGraph* graph, std::string& outfile){
 		FILE* const fp = fopen(outfile.c_str(), "w");
 		if (!fp)
 			printf("Cannot open '%s' for outputting the canonical form, aborting", outfile.c_str());
@@ -112,4 +141,4 @@ private:
 
 };
 
-#endif /* SRC_CORE_BLISS_LIB_HPP_ */
+#endif /* SRC_CORE_PATTERN_HPP_ */
