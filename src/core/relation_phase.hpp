@@ -92,6 +92,44 @@ namespace RStream {
 			return update_c;
 		}
 
+		/* compute set difference for the two update_stream
+		 * result = update_stream1 - update_stream2
+		 * */
+		Update_Stream set_difference(Update_Stream update_stream1, Update_Stream update_stream2) {
+			Update_Stream update_c = Engine::update_count++;
+
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+//				std::cout << partition_id << std::endl;
+			}
+
+			global_buffer<OutUpdateType> ** buffers = buffer_manager<OutUpdateType>::get_global_buffers(context.num_partitions);
+
+			// exec threads will produce updates and push into shuffle buffers
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < context.num_exec_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->set_difference_producer(update_stream1, update_stream2, buffers, task_queue); } ));
+
+			// write threads will flush buffer to update out stream file as long as it's full
+			std::vector<std::thread> write_threads;
+			for(int i = 0; i < context.num_write_threads; i++)
+				write_threads.push_back(std::thread(&RPhase::set_difference_consumer, this, update_c, buffers));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			for(auto &t : write_threads)
+				t.join();
+
+			delete[] buffers;
+			delete task_queue;
+
+			return update_c;
+		}
+
 	private:
 		// each exec thread generates a join producer
 		void join_producer(Update_Stream in_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
@@ -219,8 +257,12 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
-		// each writer thread generates a join_consumer
 		void join_consumer(Update_Stream out_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle) {
+			consumer(out_update_stream, buffers_for_shuffle);
+		}
+
+		// each writer thread generates a join_consumer
+		void consumer(Update_Stream out_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle) {
 			while(atomic_num_producers != 0) {
 				int i = (atomic_partition_id++) % context.num_partitions ;
 
@@ -249,6 +291,71 @@ namespace RStream {
 			}
 		}
 
+		void set_difference_producer(Update_Stream update_stream1, Update_Stream update_stream2, global_buffer<OutUpdateType> ** buffers, concurrent_queue<int> * task_queue) {
+			atomic_num_producers++;
+			int partition_id = -1;
+
+			// pop from queue
+			while(task_queue->test_pop_atomic(partition_id)){
+				std::cout << partition_id << std::endl;
+
+				int fd_update1 = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(update_stream1)).c_str(), O_RDONLY);
+				int fd_update2 = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(update_stream2)).c_str(), O_RDONLY);
+				assert(fd_update1 > 0 && fd_update2 > 0 );
+
+				// get file size
+				long update1_file_size = io_manager::get_filesize(fd_update1);
+				long update2_file_size = io_manager::get_filesize(fd_update2);
+
+				// streaming update1
+				char * update1_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = update1_file_size / IO_SIZE + 1;
+
+				// Assumption: update2 can be fully loaded into memory
+				char * update2_buf = new char[update2_file_size];
+				io_manager::read_from_file(fd_update2, update2_buf, update2_file_size, 0);
+
+				std::unordered_set<OutUpdateType> set_of_updates2;
+				build_update_hashset(update2_buf, set_of_updates2, update2_file_size);
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				// for all streaming updates
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = update1_file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
+
+					assert(valid_io_size % sizeof(OutUpdateType) == 0);
+
+					io_manager::read_from_file(fd_update1, update1_buf, valid_io_size, offset);
+					offset += valid_io_size;
+
+					// streaming update1 in, do set difference
+					for(long pos = 0; pos < valid_io_size; pos += sizeof(OutUpdateType)) {
+						// get an update1
+						OutUpdateType & one_update1 = *(OutUpdateType*)(update1_buf + pos);
+						auto existed = set_of_updates2.find(one_update1);
+
+						if(existed != set_of_updates2.end())
+							continue;
+
+						int index = partition_id;
+						global_buffer<OutUpdateType>* global_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers, context.num_partitions, index);
+						global_buf->insert(one_update1, index);
+					}
+				}
+			}
+		}
+
+		void set_difference_consumer(Update_Stream out_update_stream, global_buffer<OutUpdateType> ** buffers) {
+			consumer(out_update_stream, buffers);
+		}
+
 		void build_edge_hashmap(char * edge_buf, std::vector<VertexId> * edge_hashmap, size_t edge_file_size, int start_vertex) {
 			int edge_unit = context.edge_unit;
 			assert(edge_unit > 0);
@@ -259,6 +366,15 @@ namespace RStream {
 				assert(e.src >= start_vertex);
 				// e.src is the key
 				edge_hashmap[e.src - start_vertex].push_back(e.target);
+			}
+		}
+
+		void build_update_hashset(char * update_buf, std::unordered_set<OutUpdateType> & set_of_updates, size_t update_file_size) {
+			// for each update
+			for(size_t pos = 0;  pos < update_file_size; pos += sizeof(OutUpdateType)) {
+				// get an update
+				OutUpdateType & one_update = *(OutUpdateType*)(update_buf + pos);
+				set_of_updates.insert(one_update);
 			}
 		}
 
