@@ -52,22 +52,21 @@ public:
 		assert(sub_graph.size() > 2);
 
 		Element_In_Tuple last_tuple = sub_graph.back();
-		std::pair<VertexId, VertexId> added_edge = getEdge(sub_graph, sub_graph.size() - 1);
+		std::pair<VertexId, VertexId> added_edge;
+		getEdge(sub_graph, sub_graph.size() - 1, added_edge);
 
 		//check to see if there already exists the vertex added; if so, just allow to add edge which is (smaller id -> bigger id)
-		for(unsigned int i = 0; i < sub_graph.size() - 1; ++i){
-			if(sub_graph[i].vertex_id == last_tuple.vertex_id){
-				if(added_edge.first > added_edge.second){
+		if(added_edge.first > added_edge.second){
+			for(unsigned int i = 0; i < sub_graph.size() - 1; ++i){
+				if(sub_graph[i].vertex_id == last_tuple.vertex_id){
 					return true;
-				}
-				else{
-					break;
 				}
 			}
 		}
 
-		for(unsigned int index = last_tuple.history_info + 1; index < sub_graph.size(); ++index){
-			std::pair<VertexId, VertexId> edge = getEdge(sub_graph, index);
+		for(unsigned int index = last_tuple.history_info + 1; index < sub_graph.size() - 1; ++index){
+			std::pair<VertexId, VertexId> edge;
+			getEdge(sub_graph, index, edge);
 			int cmp = compare(added_edge, edge);
 			assert(cmp != 0);
 			if(cmp < 0){
@@ -126,10 +125,10 @@ public:
 private:
 
 	//generate a pair which consists of <keyId, addedId>
-	static std::pair<VertexId, VertexId> getEdge(std::vector<Element_In_Tuple> & sub_graph, unsigned int index){
+	static void getEdge(std::vector<Element_In_Tuple> & sub_graph, unsigned int index, std::pair<VertexId, VertexId>& edge){
 		Element_In_Tuple tuple = sub_graph[index];
-		std::pair<VertexId, VertexId> * edge = new std::pair<VertexId, VertexId>(sub_graph[tuple.history_info].vertex_id, tuple.vertex_id);
-		return *edge;
+		edge.first = sub_graph[tuple.history_info].vertex_id;
+		edge.second = tuple.vertex_id;
 	}
 
 	static void swap(std::pair<VertexId, VertexId>& pair){
@@ -139,6 +138,7 @@ private:
 			pair.second = tmp;
 		}
 	}
+
 	static int compare(std::pair<VertexId, VertexId>& oneEdge, std::pair<VertexId, VertexId>& otherEdge){
 		swap(oneEdge);
 		swap(otherEdge);
