@@ -195,6 +195,10 @@ namespace RStream {
 							// generate a new out update tuple
 							std::vector<Element_In_Tuple> & out_update_tuple = gen_an_out_update(in_update_tuple, element, key_index);
 
+							// remove auotomorphism, only keep one unique tuple.
+							if(pattern::is_automorphism(out_update_tuple))
+								continue;
+
 							shuffle_on_all_keys(out_update_tuple, buffers_for_shuffle);
 
 						}
@@ -305,6 +309,8 @@ namespace RStream {
 		void shuffle_on_all_keys(std::vector<Element_In_Tuple> & out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle) {
 			char* out_update = nullptr;
 
+			std::unordered_set<VertexId> vertex_set;
+
 			// shuffle on all other keys
 			for(int i = 0; i < out_update_tuple.size(); i++) {
 
@@ -312,6 +318,15 @@ namespace RStream {
 
 				set_key_index(out_update_tuple, i);
 				VertexId key = out_update_tuple.at(i).vertex_id;
+
+				// check if vertex id exsited already
+				// DO NOT shuffle if vertex exsited
+				auto exsited = vertex_set.find(key);
+				if(exsited != vertex_set.end())
+					continue;
+
+				vertex_set.insert(key);
+
 				int index = get_global_buffer_index(key);
 				global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
 				global_buf->insert(out_update);

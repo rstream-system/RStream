@@ -5,9 +5,9 @@
  *      Author: icuzzq
  */
 
-#include "../core/io_manager.hpp"
+//#include "../core/io_manager.hpp"
 //#include "../common/RStreamCommon.hpp"
-#include "../core/type.hpp"
+//#include "../core/type.hpp"
 
 #ifndef SRC_PRINT_HPP_
 #define SRC_PRINT_HPP_

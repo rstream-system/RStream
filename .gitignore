@@ -4,3 +4,7 @@ Debug/*
 .project
 /Debug/
 input/*
+/lib/bliss-0.73/*.o
+lib/bliss-0.73/bliss
+lib/bliss-0.73/libbliss.a
+
