@@ -69,7 +69,7 @@ public:
 			getEdge(sub_graph, index, edge);
 			int cmp = compare(added_edge, edge);
 			assert(cmp != 0);
-			if(cmp < 0){
+			if(cmp <= 0){
 				return true;
 			}
 		}
@@ -129,6 +129,7 @@ private:
 		Element_In_Tuple tuple = sub_graph[index];
 		edge.first = sub_graph[tuple.history_info].vertex_id;
 		edge.second = tuple.vertex_id;
+		assert(edge.first != edge.second);
 	}
 
 	static void swap(std::pair<VertexId, VertexId>& pair){
