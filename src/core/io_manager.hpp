@@ -77,6 +77,26 @@ namespace RStream {
 				n_write += n_bytes;
 			}
 		}
+
+		static void append_to_file(int fd, char * buf, size_t fsize) {
+			assert(fd > 0);
+
+			off_t offset = lseek(fd, 0, SEEK_END);
+			size_t n_write = 0;
+			assert(fd > 0);
+
+			while(n_write < fsize) {
+				ssize_t n_bytes = pwrite(fd, buf, fsize - n_write, n_write + offset);
+				if(n_bytes == ssize_t(-1)) {
+					std::cout << "Write error! " << std::endl;
+					std::cout << strerror(errno) << std::endl;
+					assert(false);
+				}
+				assert(n_bytes > 0);
+				buf += n_bytes;
+				n_write += n_bytes;
+			}
+		}
 	};
 }
 

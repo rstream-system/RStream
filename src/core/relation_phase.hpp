@@ -130,6 +130,30 @@ namespace RStream {
 			return update_c;
 		}
 
+		// append update_stream2 to the end of update_stream1
+		void union_relation (Update_Stream update_stream1, Update_Stream update_stream2) {
+			Update_Stream update_c = Engine::update_count++;
+
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+//				std::cout << partition_id << std::endl;
+			}
+
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < context.num_exec_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->union_relation_worker(update_stream1, update_stream2, task_queue); } ));
+
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			delete task_queue;
+
+		}
+
 	private:
 		// each exec thread generates a join producer
 		void join_producer(Update_Stream in_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
@@ -349,11 +373,49 @@ namespace RStream {
 						global_buf->insert(one_update1, index);
 					}
 				}
+
+				delete[] update1_buf;
+				delete[] update2_buf;
+
+				close(fd_update1);
+				close(fd_update2);
 			}
+
+			atomic_num_producers--;
 		}
 
 		void set_difference_consumer(Update_Stream out_update_stream, global_buffer<OutUpdateType> ** buffers) {
 			consumer(out_update_stream, buffers);
+		}
+
+		void union_relation_worker(Update_Stream update_stream1, Update_Stream update_stream2, concurrent_queue<int> * task_queue) {
+			atomic_num_producers++;
+			int partition_id = -1;
+
+			// pop from queue
+			while(task_queue->test_pop_atomic(partition_id)){
+				int fd_update1 = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(update_stream1)).c_str(), O_WRONLY | O_APPEND);
+				int fd_update2 = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(update_stream2)).c_str(), O_RDONLY);
+				assert(fd_update1 > 0 && fd_update2 > 0 );
+
+				// get file size
+				long update1_file_size = io_manager::get_filesize(fd_update1);
+				long update2_file_size = io_manager::get_filesize(fd_update2);
+
+				// Assumption: update2 can be fully loaded into memory
+				char * update2_buf = new char[update2_file_size];
+				io_manager::read_from_file(fd_update2, update2_buf, update2_file_size, 0);
+
+				// append update2 to update1
+				io_manager::append_to_file(fd_update1, update2_buf, update2_file_size);
+
+				delete[] update2_buf;
+
+				close(fd_update1);
+				close(fd_update2);
+			}
+
+			atomic_num_producers--;
 		}
 
 		void build_edge_hashmap(char * edge_buf, std::vector<VertexId> * edge_hashmap, size_t edge_file_size, int start_vertex) {

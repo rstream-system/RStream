@@ -9,6 +9,7 @@
 #define CORE_MINING_PHASE_HPP_
 
 #include "scatter.hpp"
+#include "pattern.hpp"
 
 namespace RStream {
 
@@ -171,7 +172,7 @@ namespace RStream {
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 
-					std::vector<Element_In_Tuple> & in_update_tuple;
+					std::vector<Element_In_Tuple> in_update_tuple;
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
@@ -346,7 +347,7 @@ namespace RStream {
 		}
 
 
-		std::vector<Element_In_Tuple> & get_an_in_update(char * update_local_buf) {
+		std::vector<Element_In_Tuple> &  get_an_in_update(char * update_local_buf) {
 			std::vector<Element_In_Tuple> tuple;
 
 			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
