@@ -38,10 +38,12 @@ int main(int argc, char **argv) {
 
 	//init: get the edges stream
 	Update_Stream up_stream = mPhase.init();
+	Aggregation_Stream agg_stream = agg.aggregate(up_stream);
+	up_stream = mPhase.aggregate_filter(up_stream, agg_stream);
 
 	for(int i = 1; i <= MAXSIZE; ++i){
 		up_stream = mPhase.join_all_keys(up_stream);
-		Aggregation_Stream agg_stream = agg.aggregate(up_stream);
+		agg_stream = agg.aggregate(up_stream);
 		up_stream = mPhase.aggregate_filter(up_stream, agg_stream);
 	}
 
