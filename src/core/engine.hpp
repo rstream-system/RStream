@@ -62,6 +62,7 @@ namespace RStream {
 		std::vector<std::pair<VertexId, VertexId>> vertex_intervals;
 
 		static unsigned update_count;
+		static unsigned aggregation_count;
 
 		Engine(std::string _filename, int num_parts, int _num_vertices) : filename(_filename) {
 //			num_threads = std::thread::hardware_concurrency();

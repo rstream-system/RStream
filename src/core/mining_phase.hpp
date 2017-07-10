@@ -171,10 +171,11 @@ namespace RStream {
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 
+					std::vector<Element_In_Tuple> & in_update_tuple;
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-						std::vector<Element_In_Tuple> & in_update_tuple = get_an_in_update(update_local_buf + pos);
+						in_update_tuple = get_an_in_update(update_local_buf + pos);
 
 						// get key index
 						BYTE key_index = get_key_index(in_update_tuple);
@@ -281,11 +282,12 @@ namespace RStream {
 					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 
+					std::vector<Element_In_Tuple> out_update_tuple;
 					// for each streaming
 					for(long pos = 0; pos < valid_io_size; pos += sizeof(LabeledEdge)) {
 						// get an labeled edge
 						LabeledEdge & e = *(LabeledEdge*)(edge_local_buf + pos);
-						std::vector<Element_In_Tuple> out_update_tuple;
+
 						out_update_tuple.push_back(Element_In_Tuple(e.src, e.edge_label, e.src_label));
 						out_update_tuple.push_back(Element_In_Tuple(e.target, e.edge_label, e.target_label));
 

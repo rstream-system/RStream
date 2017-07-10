@@ -11,6 +11,7 @@
 #include "../common/RStreamCommon.hpp"
 
 typedef unsigned Update_Stream;
+typedef unsigned Aggregation_Stream;
 typedef int VertexId;
 typedef float Weight;
 typedef unsigned char BYTE;
