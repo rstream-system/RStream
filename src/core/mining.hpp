@@ -171,6 +171,106 @@ namespace RStream {
 		}
 
 
+		//------------------------------------- public functions also used by mining_phase.hpp -----------------------------------------
+
+		static void gen_an_out_update(std::vector<Element_In_Tuple> & in_update_tuple, Element_In_Tuple & element, BYTE history) {
+			Element_In_Tuple new_element(element.vertex_id, element.edge_label, element.vertex_label, history);
+			in_update_tuple.push_back(new_element);
+		}
+
+
+		static void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple) {
+			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
+				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
+				tuple.push_back(element);
+			}
+		}
+
+		// key index is always stored in the first element of the vector
+		static BYTE get_key_index(std::vector<Element_In_Tuple> & in_update_tuple) {
+			return in_update_tuple.at(0).key_index;
+		}
+
+		static void set_key_index(std::vector<Element_In_Tuple> & out_update_tuple, int new_key_index) {
+			out_update_tuple.at(0).key_index = new_key_index;
+		}
+
+
+		// TODO: do we need to store src.label?
+		static void build_edge_hashmap(char * edge_buf, std::vector<Element_In_Tuple> * edge_hashmap, size_t edge_file_size, int start_vertex) {
+
+			// for each edge
+			for(size_t pos = 0; pos < edge_file_size; pos += sizeof(LabeledEdge)) {
+				// get a labeled edge
+				LabeledEdge e = *(LabeledEdge*)(edge_buf + pos);
+				assert(e.src >= start_vertex);
+				// e.src is the key
+				edge_hashmap[e.src - start_vertex].push_back(Element_In_Tuple(e.target, e.edge_label, e.target_label));
+			}
+		}
+
+		static int get_global_buffer_index(VertexId key) {
+
+			int partition_id = key / context.num_vertices_per_part;
+			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
+		}
+
+		static void shuffle_on_all_keys(std::vector<Element_In_Tuple> & out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle) {
+			std::unordered_set<VertexId> vertex_set;
+			// shuffle on all other keys
+			for(int i = 0; i < out_update_tuple.size(); i++) {
+				VertexId key = out_update_tuple[i].vertex_id;
+
+				// check if vertex id exsited already
+				// DO NOT shuffle if vertex exsited
+				if(vertex_set.find(key) == vertex_set.end()){
+					vertex_set.insert(key);
+
+					set_key_index(out_update_tuple, i);
+					char* out_update = reinterpret_cast<char*>(out_update_tuple.data());
+
+
+					int index = get_global_buffer_index(key);
+					global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
+					global_buf->insert(out_update);
+
+				}
+
+			}
+
+		}
+
+		// each writer thread generates a join_consumer
+		void consumer(Update_Stream out_update_stream, global_buffer_for_mining ** buffers_for_shuffle) {
+			while(atomic_num_producers != 0) {
+				int i = (atomic_partition_id++) % context.num_partitions ;
+
+				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+				global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
+				g_buf->flush(file_name, i);
+			}
+
+			//the last run - deal with all remaining content in buffers
+			while(true){
+				int i = --atomic_partition_number;
+
+				if(i >= 0){
+
+					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+					global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
+					g_buf->flush_end(file_name, i);
+
+					delete g_buf;
+				}
+				else{
+					break;
+				}
+			}
+		}
+
+		//------------------------------------- public functions also used by mining_phase.hpp -----------------------------------------
+
+
 
 	private:
 		// each exec thread generates a join producer
@@ -243,7 +343,7 @@ namespace RStream {
 							gen_an_out_update(in_update_tuple, element, key_index);
 
 							// remove auotomorphism, only keep one unique tuple.
-							if(pattern::is_automorphism(out_update_tuple))
+							if(pattern::is_automorphism(in_update_tuple))
 								continue;
 
 							char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
@@ -377,106 +477,6 @@ namespace RStream {
 				close(fd_edge);
 			}
 			atomic_num_producers--;
-		}
-
-
-		void shuffle_on_all_keys(std::vector<Element_In_Tuple> & out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle) {
-			std::unordered_set<VertexId> vertex_set;
-			// shuffle on all other keys
-			for(int i = 0; i < out_update_tuple.size(); i++) {
-				VertexId key = out_update_tuple[i].vertex_id;
-
-				// check if vertex id exsited already
-				// DO NOT shuffle if vertex exsited
-				if(vertex_set.find(key) == vertex_set.end()){
-					vertex_set.insert(key);
-
-					set_key_index(out_update_tuple, i);
-					char* out_update = reinterpret_cast<char*>(out_update_tuple.data());
-
-
-					int index = get_global_buffer_index(key);
-					global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
-					global_buf->insert(out_update);
-
-				}
-
-			}
-
-		}
-
-		// each writer thread generates a join_consumer
-		void consumer(Update_Stream out_update_stream, global_buffer_for_mining ** buffers_for_shuffle) {
-			while(atomic_num_producers != 0) {
-				int i = (atomic_partition_id++) % context.num_partitions ;
-
-				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
-				global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
-				g_buf->flush(file_name, i);
-			}
-
-			//the last run - deal with all remaining content in buffers
-			while(true){
-				int i = --atomic_partition_number;
-
-				if(i >= 0){
-
-					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
-					global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
-					g_buf->flush_end(file_name, i);
-
-					delete g_buf;
-				}
-				else{
-					break;
-				}
-			}
-		}
-
-
-
-
-
-		void gen_an_out_update(std::vector<Element_In_Tuple> & in_update_tuple, Element_In_Tuple & element, BYTE history) {
-			Element_In_Tuple new_element(element.vertex_id, element.edge_label, element.vertex_label, history);
-			in_update_tuple.push_back(new_element);
-		}
-
-
-		void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple) {
-			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
-				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
-				tuple.push_back(element);
-			}
-		}
-
-		// key index is always stored in the first element of the vector
-		BYTE get_key_index(std::vector<Element_In_Tuple> & in_update_tuple) {
-			return in_update_tuple.at(0).key_index;
-		}
-
-		void set_key_index(std::vector<Element_In_Tuple> & out_update_tuple, int new_key_index) {
-			out_update_tuple.at(0).key_index = new_key_index;
-		}
-
-
-		// TODO: do we need to store src.label?
-		void build_edge_hashmap(char * edge_buf, std::vector<Element_In_Tuple> * edge_hashmap, size_t edge_file_size, int start_vertex) {
-
-			// for each edge
-			for(size_t pos = 0; pos < edge_file_size; pos += sizeof(LabeledEdge)) {
-				// get a labeled edge
-				LabeledEdge e = *(LabeledEdge*)(edge_buf + pos);
-				assert(e.src >= start_vertex);
-				// e.src is the key
-				edge_hashmap[e.src - start_vertex].push_back(Element_In_Tuple(e.target, e.edge_label, e.target_label));
-			}
-		}
-
-		int get_global_buffer_index(VertexId key) {
-
-			int partition_id = key / context.num_vertices_per_part;
-			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
 		}
 
 
