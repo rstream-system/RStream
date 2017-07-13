@@ -26,11 +26,11 @@ namespace RStream {
 
 	public:
 		// num of bytes for in_update_tuple
-		static int sizeof_in_tuple;
+		int sizeof_in_tuple;
 		// num of bytes for out_update_tuple
-		static int sizeof_out_tuple;
+		int sizeof_out_tuple;
 
-		virtual bool filter(std::vector<Element_In_Tuple> & update_tuple) = 0;
+		virtual bool filter_join(std::vector<Element_In_Tuple> & update_tuple) = 0;
 		virtual bool filter_collect(std::vector<Element_In_Tuple> & update_tuple) = 0;
 
 
@@ -38,6 +38,9 @@ namespace RStream {
 			atomic_num_producers = 0;
 			atomic_partition_id = 0;
 			atomic_partition_number = context.num_partitions;
+
+			sizeof_in_tuple = 0;
+			sizeof_out_tuple = 0;
 		}
 
 		virtual ~MPhase() {}
@@ -108,7 +111,7 @@ namespace RStream {
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < context.num_exec_threads; i++)
-				exec_threads.push_back( std::thread([=] { this->shuffle_all_keys_producer(buffers_for_shuffle, task_queue); } ));
+				exec_threads.push_back( std::thread([=] { this->shuffle_all_keys_producer_init(buffers_for_shuffle, task_queue); } ));
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
@@ -171,6 +174,42 @@ namespace RStream {
 
 		}
 
+		Update_Stream collect(Update_Stream in_update_stream) {
+			Update_Stream update_c = Engine::update_count++;
+
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+			}
+
+			// allocate global buffers for shuffling
+			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_in_tuple);
+
+			// exec threads will produce updates and push into shuffle buffers
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < context.num_exec_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->collect_producer(in_update_stream, buffers_for_shuffle, task_queue); } ));
+
+			// write threads will flush shuffle buffer to update out stream file as long as it's full
+			std::vector<std::thread> write_threads;
+			for(int i = 0; i < context.num_write_threads; i++)
+				write_threads.push_back(std::thread(&MPhase::consumer, this, update_c, buffers_for_shuffle));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			for(auto &t : write_threads)
+				t.join();
+
+			delete[] buffers_for_shuffle;
+			delete task_queue;
+
+			return update_c;
+		}
+
 
 		/* join update stream with edge stream, shuffle on all keys
 		 * @param in_update_stream -input file for update stream
@@ -217,6 +256,10 @@ namespace RStream {
 			return update_c;
 		}
 
+
+		void printout_upstream(Update_Stream in_update_stream){
+
+		}
 
 
 	private:
@@ -393,11 +436,10 @@ namespace RStream {
 							if(pattern::is_automorphism(in_update_tuple))
 								continue;
 
-							char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
-							int index = partition_id;
-							assert(index == get_global_buffer_index(key));
-							global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
-							global_buf->insert(out_update);
+							if(!filter_join(in_update_tuple)){
+								assert(partition_id == get_global_buffer_index(key));
+								insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
+							}
 
 							in_update_tuple.pop_back();
 						}
@@ -414,6 +456,13 @@ namespace RStream {
 
 			atomic_num_producers--;
 		}
+
+		void insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
+			char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
+			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
+			global_buf->insert(out_update);
+		}
+
 
 		void shuffle_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
@@ -471,7 +520,65 @@ namespace RStream {
 		}
 
 
-		void shuffle_all_keys_producer(global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+		void collect_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+			atomic_num_producers++;
+			int partition_id = -1;
+
+			// pop from queue
+			while(task_queue->test_pop_atomic(partition_id)){
+				std::cout << partition_id << std::endl;
+
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0);
+
+				// get file size
+				long update_file_size = io_manager::get_filesize(fd_update);
+
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
+
+				// streaming updates
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = update_file_size / IO_SIZE + 1;
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				// for all streaming updates
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
+
+					assert(valid_io_size % sizeof_in_tuple == 0);
+
+					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
+
+					// streaming updates in, do hash join
+					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
+						// get an in_update_tuple
+						std::vector<Element_In_Tuple> in_update_tuple;
+						get_an_in_update(update_local_buf + pos, in_update_tuple);
+
+						if(!filter_collect(in_update_tuple)){
+							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
+						}
+					}
+				}
+
+				delete[] update_local_buf;
+				close(fd_update);
+			}
+
+			atomic_num_producers--;
+
+		}
+
+
+		void shuffle_all_keys_producer_init(global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			atomic_num_producers++;
 			int partition_id = -1;
 
@@ -556,7 +663,7 @@ namespace RStream {
 		void shuffle_on_all_keys(std::vector<Element_In_Tuple> & out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle) {
 			std::unordered_set<VertexId> vertex_set;
 			// shuffle on all other keys
-			for(int i = 0; i < out_update_tuple.size(); i++) {
+			for(unsigned i = 0; i < out_update_tuple.size(); i++) {
 				VertexId key = out_update_tuple[i].vertex_id;
 
 				// check if vertex id exsited already
@@ -639,8 +746,7 @@ namespace RStream {
 //		}
 
 
-
-	};
+};
 }
 
 

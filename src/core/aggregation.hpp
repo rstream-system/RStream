@@ -7,7 +7,8 @@
 
 #ifndef CORE_AGGREGATION_HPP_
 #define CORE_AGGREGATION_HPP_
-#include "scatter.hpp"
+
+#include "mining_phase.hpp"
 
 typedef std::vector<Element_In_Tuple> Tuple;
 typedef std::vector<Element_In_Tuple> Quick_Pattern;
@@ -62,7 +63,7 @@ namespace RStream {
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < context.num_write_threads; i++)
-				write_threads.push_back(std::thread(&MPhase::join_all_keys_consumer, this, aggreg_c, buffers_for_shuffle));
+				write_threads.push_back(std::thread(&Aggregation::aggregate_consumer, this, aggreg_c, buffers_for_shuffle));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -77,6 +78,13 @@ namespace RStream {
 			return aggreg_c;
 
 		}
+
+
+		void printout_aggstream(Aggregation_Stream agg_stream){
+
+		}
+
+
 
 	private:
 
