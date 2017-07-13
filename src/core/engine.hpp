@@ -15,6 +15,7 @@
 #include "type.hpp"
 #include "constants.hpp"
 #include "../utility/preprocessing.hpp"
+#include "../utility/preproc.hpp"
 
 namespace RStream {
 	enum class EdgeType {
@@ -78,7 +79,7 @@ namespace RStream {
 
 			const std::string meta_file = _filename + ".meta";
 			if(!file_exists(meta_file)) {
-				Preprocessing proc(_filename, num_parts, num_vertices);
+				Preproc proc(_filename, num_vertices, num_partitions, false);
 			}
 
 			// get meta data from .meta file
