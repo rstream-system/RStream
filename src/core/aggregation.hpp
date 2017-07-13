@@ -21,14 +21,11 @@ namespace RStream {
 		std::atomic<int> atomic_partition_id;
 		std::atomic<int> atomic_partition_number;
 
-		int sizeof_in_tuple;
-
 	public:
 		Aggregation(Engine & e) : context(e) {
 			atomic_num_producers = 0;
 			atomic_partition_id = 0;
 			atomic_partition_number = context.num_partitions;
-			sizeof_in_tuple = MPhase::sizeof_in_tuple;
 		}
 
 		~Aggregation() {}
@@ -38,7 +35,7 @@ namespace RStream {
 		 * @param: in update stream
 		 * @return: aggregation stream
 		 * */
-		Aggregation_Stream aggregate(Update_Stream in_update_stream) {
+		Aggregation_Stream aggregate(Update_Stream in_update_stream, int sizeof_in_tuple) {
 			Aggregation_Stream aggreg_c = Engine::aggregation_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -58,7 +55,7 @@ namespace RStream {
 			// exec threads will do aggregate and push result patterns into shuffle buffers
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < context.num_exec_threads; i++)
-				exec_threads.push_back( std::thread([=] { this->aggregate_producer(in_update_stream, buffers_for_shuffle, task_queue); } ));
+				exec_threads.push_back( std::thread([=] { this->aggregate_producer(in_update_stream, buffers_for_shuffle, task_queue, sizeof_in_tuple); } ));
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
@@ -88,7 +85,7 @@ namespace RStream {
 
 	private:
 
-		void aggregate_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+		void aggregate_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue, int sizeof_in_tuple) {
 			atomic_num_producers++;
 			int partition_id = -1;
 
@@ -110,7 +107,6 @@ namespace RStream {
 				long offset = 0;
 
 				std::vector<std::pair<Quick_Pattern, int>> quick_patterns_aggregation;
-				std::vector<std::pair<bliss::AbstractGraph *, int>> canonical_graphs;
 
 				// for all streaming updates
 				for(int counter = 0; counter < streaming_counter; counter++) {
@@ -121,64 +117,68 @@ namespace RStream {
 					else
 						valid_io_size = IO_SIZE;
 
-					assert(valid_io_size % MPhase::sizeof_in_tuple == 0);
+					assert(valid_io_size % sizeof_in_tuple == 0);
 
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 
-					std::vector<Element_In_Tuple> in_update_tuple;
 					std::vector<std::pair<Quick_Pattern, int>> quick_patterns;
 
 					// streaming tuples in, do aggregation
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-						in_update_tuple = get_an_in_update(update_local_buf + pos);
+						std::vector<Element_In_Tuple> in_update_tuple;
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
-						Quick_Pattern quick_pattern;
 						// turn tuple to quick pattern
-						pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern);
-						quick_patterns.push_back(std::make_pair(quick_pattern, 1));
+						pattern::turn_quick_pattern_sideffect(in_update_tuple);
+						quick_patterns.push_back(std::make_pair(in_update_tuple, 1));
 					}
 
 					// do aggregation on quick patterns
 					local_aggregate(quick_patterns, quick_patterns_aggregation);
 
-					quick_patterns.clear();
 				}
 
 				// for all the aggregated quick patterns, turn to canocail graphs
-				for(int i = 0; i < quick_patterns_aggregation; i++) {
-					std::pair<Quick_Pattern, int> one_quick_pair = quick_patterns_aggregation.at(i);
-					bliss::AbstractGraph * ag = pattern::turn_canonical_graph(one_quick_pair.first, false);
-					canonical_graphs.push_back(std::make_pair(ag, one_quick_pair.second));
-				}
+				std::vector<std::pair<bliss::AbstractGraph *, int>> canonical_graphs;
+				map_canonical(quick_patterns_aggregation, canonical_graphs);
 
-				quick_patterns_aggregation.clear();
-
-				std::vector<std::pair<bliss::AbstractGraph *, int>> canonical_graphs_aggregation;
 				// for all the canonical graphs, do local aggregation
+				std::vector<std::pair<bliss::AbstractGraph *, int>> canonical_graphs_aggregation;
 				local_aggregate(canonical_graphs, canonical_graphs_aggregation);
 
-				canonical_graphs.clear();
-
-				char* out_cg = nullptr;
 				// for each canonical graph, do map reduce, shuffle to corresponding buckets
-				for(int i = 0; i < canonical_graphs_aggregation.size(); i++) {
-					std::pair<bliss::AbstractGraph *, int> one_canonical_graph = canonical_graphs_aggregation.at(i);
-					int hash = hash_canonical_graph(one_canonical_graph);
-					int index = get_global_bucket_index(hash);
+				shuffle_canonical_aggregation(canonical_graphs_aggregation, buffers_for_shuffle);
 
-					// TODO: insert
-					global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
-					global_buf->insert(out_cg);
-				}
-				canonical_graphs_aggregation.clear();
+				//clean memory for bliss::AbstractGraph occurred in two vectors
+				clean(canonical_graphs, canonical_graphs_aggregation);
 
 				delete[] update_local_buf;
 				close(fd_update);
 
 			}
 			atomic_num_producers--;
+		}
+
+		void shuffle_canonical_aggregation(std::vector<std::pair<bliss::AbstractGraph *, int>>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
+			char* out_cg = nullptr;
+			for(int i = 0; i < canonical_graphs_aggregation.size(); i++) {
+				std::pair<bliss::AbstractGraph *, int> one_canonical_graph = canonical_graphs_aggregation.at(i);
+				int hash = one_canonical_graph.first->get_hash();
+				int index = get_global_bucket_index(hash);
+
+				//get out_cf
+				//TODO
+
+				// TODO: insert
+				global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
+				global_buf->insert(out_cg);
+			}
+		}
+
+		void clean(std::vector<std::pair<bliss::AbstractGraph *, int>>& canonical_graphs, std::vector<std::pair<bliss::AbstractGraph *, int>>& canonical_graphs_aggregation){
+
 		}
 
 		// each writer thread generates a join_consumer
@@ -209,14 +209,19 @@ namespace RStream {
 			}
 		}
 
-		std::vector<Element_In_Tuple> & get_an_in_update(char * update_local_buf) {
-			std::vector<Element_In_Tuple> tuple;
-
+		void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
 			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
 				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
 				tuple.push_back(element);
 			}
-			return tuple;
+		}
+
+		void map_canonical(std::vector<std::pair<Quick_Pattern, int>> & quick_patterns_aggregation, std::vector<std::pair<bliss::AbstractGraph *, int>> & canonical_graphs){
+			for (int i = 0; i < quick_patterns_aggregation.size(); i++) {
+				std::pair<Quick_Pattern, int> one_quick_pair = quick_patterns_aggregation.at(i);
+				bliss::AbstractGraph * cf = pattern::turn_canonical_graph(one_quick_pair.first, false);
+				canonical_graphs.push_back(std::make_pair(cf, one_quick_pair.second));
+			}
 		}
 
 		// TODO:
@@ -229,17 +234,8 @@ namespace RStream {
 
 		}
 
-		// TODO:
-		int hash_canonical_graph(std::pair<bliss::AbstractGraph * , int> ag_pair) {
-			return 0;
-		}
-
-		// TODO:
 		int get_global_bucket_index(int hash_val) {
-
-			return hash_val;
-//			int partition_id = hash_val / context.num_vertices_per_part;
-//			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
+			return hash_val % context.num_partitions;
 		}
 	};
 }
