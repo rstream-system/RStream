@@ -46,8 +46,15 @@ namespace RStream {
 			atomic_partition_number = num_partitions;
 			vertices_per_partition = num_vertices / num_partitions;
 
+			std::cout << "start preprocessing..." << std::endl;
+			std::cout << "start to convert edge list file..." << std::endl;
+
 			convert_edgelist();
-			dump(_input + ".binary");
+
+			std::cout << "convert edgelist done!" << std::endl;
+			std::cout << "start to partition binary file..." << std::endl;
+
+//			dump(_input + ".binary");
 
 			if(edge_type == 0) {
 				generate_partitions<Edge>();
@@ -56,10 +63,12 @@ namespace RStream {
 				generate_partitions<WeightedEdge>();
 			}
 
-			for(int i = 0; i < num_partitions; i++) {
-				std::cout << "===============Printing Partition " << i << "================" << std::endl;
-				dump(input + "." + std::to_string(i));
-			}
+//			for(int i = 0; i < num_partitions; i++) {
+//				std::cout << "===============Printing Partition " << i << "================" << std::endl;
+//				dump(input + "." + std::to_string(i));
+//			}
+
+			std::cout << "gen partition done!" << std::endl;
 
 			write_meta_file();
 		}
@@ -86,12 +95,12 @@ namespace RStream {
 				t = strtok(s, delims);
 				assert(t != NULL);
 
-				VertexId from = atoi(t) - 1;
-//				VertexId from = atoi(t);
+//				VertexId from = atoi(t) - 1;
+				VertexId from = atoi(t);
 				t = strtok(NULL, delims);
 				assert(t != NULL);
-				VertexId to = atoi(t) - 1;
-//				VertexId to = atoi(t);
+//				VertexId to = atoi(t) - 1;
+				VertexId to = atoi(t);
 
 				if(from == to) continue;
 
@@ -148,9 +157,9 @@ namespace RStream {
 		void generate_partitions() {
 
 //			int num_threads = std::thread::hardware_concurrency();
-			int num_threads = 8;
-			int num_write_threads = num_threads > 2 ? 2 : 1;
-			int num_exec_threads = num_threads > 2 ? num_threads - 2 : 1;
+//			int num_threads = 4;
+			int num_write_threads = 2;
+			int num_exec_threads = 4;
 
 			int fd = open((input + ".binary").c_str(), O_RDONLY);
 			assert(fd > 0 );
@@ -176,6 +185,9 @@ namespace RStream {
 
 //			print_thread_info_locked("task queue size is: " + std::to_string(task_queue->size()) + "\n");
 			const int queue_size = task_queue->size();
+
+//			print_thread_info_locked("queue size: " + std::to_string(queue_size) + "\n");
+
 			// allocate global buffers for shuffling
 			// TODO: Edge?
 			global_buffer<T> ** buffers_for_shuffle = buffer_manager<T>::get_global_buffers(num_partitions);
@@ -189,7 +201,7 @@ namespace RStream {
 			// write threads will flush shuffle buffer to file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < num_write_threads; i++)
-				write_threads.push_back(std::thread(&Preprocessing::consumer<T>, this, buffers_for_shuffle, queue_size));
+				write_threads.push_back(std::thread(&Preprocessing::consumer<T>, this, buffers_for_shuffle));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -206,6 +218,7 @@ namespace RStream {
 
 		template<typename T>
 		void producer(global_buffer<T> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long> > * task_queue) {
+			print_thread_info_locked("start a producer... \n");
 			atomic_num_producers++;
 
 			int fd = -1;
@@ -228,7 +241,6 @@ namespace RStream {
 
 					src = *(VertexId*)(local_buf + pos);
 					dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
-					std::cout << src << ", " << dst << std::endl;
 					assert(src >= 0 && src < num_vertices && dst >= 0 && dst < num_vertices);
 
 					// insert into shuffle buffer accordingly
@@ -245,6 +257,8 @@ namespace RStream {
 					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, index);
 					global_buf->insert((T*)data, index);
 				}
+
+//				print_thread_info_locked("src: " + std::to_string(src) + " , dst: " + std::to_string(dst) + "\n");
 			}
 
 			delete[] local_buf;
@@ -252,9 +266,11 @@ namespace RStream {
 		}
 
 		template<typename T>
-		void consumer(global_buffer<T> ** buffers_for_shuffle, const int num_chunks) {
+		void consumer(global_buffer<T> ** buffers_for_shuffle) {
+			print_thread_info_locked("start a consumer... \n");
+
 			while(atomic_num_producers != 0) {
-				int i = (atomic_chunk_id++) % num_chunks ;
+				int i = (atomic_chunk_id++) % num_partitions ;
 
 				//debugging info
 //				print_thread_info_locked("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");

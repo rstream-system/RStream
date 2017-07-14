@@ -62,7 +62,7 @@ namespace RStream {
 				close(fd);
 
 				count = 0;
-				not_full.notify_one();
+				not_full.notify_all();
 			}
 		}
 
@@ -118,7 +118,7 @@ namespace RStream {
 			buf[count++] = *item;
 
 //			debugging info
-			print_thread_info_locked("inserting an item: " + item->toString() + " to buffer[" + std::to_string(index) + "]\n");
+//			print_thread_info_locked("inserting an item: " + item->toString() + " to buffer[" + std::to_string(index) + "]\n");
 		}
 
 		void flush(const char * file_name, const int i) {
@@ -136,13 +136,15 @@ namespace RStream {
 				close(fd);
 
 				count = 0;
-				not_full.notify_one();
+				not_full.notify_all();
+
+//				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
 			}
 
 			//debugging info
-			if(is_full()){
-				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
-			}
+//			if(is_full()){
+//				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+//			}
 //			else{
 //				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
 //			}
