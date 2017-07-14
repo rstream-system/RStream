@@ -334,6 +334,7 @@ namespace RStream {
 	};
 
 	unsigned Engine::update_count = 0;
+	unsigned Engine::aggregation_count = 0;
 }
 
 

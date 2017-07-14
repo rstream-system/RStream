@@ -1,7 +1,7 @@
 #ifndef PREPROC_HPP
 #define PREPROC_HPP
 
-#include "common/RStreamCommon.hpp"
+#include "../common/RStreamCommon.hpp"
 
 namespace RStream {
 	class Preproc
