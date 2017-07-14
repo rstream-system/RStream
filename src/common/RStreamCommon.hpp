@@ -64,4 +64,5 @@
 
 
 
+
 #endif /* SRC_COMMON_RSTREAMCOMMON_HPP_ */

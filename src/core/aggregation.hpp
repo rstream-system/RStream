@@ -12,7 +12,7 @@
 
 typedef std::vector<Element_In_Tuple> Tuple;
 typedef std::vector<Element_In_Tuple> Quick_Pattern;
-typedef std::vector<Element_In_Tuple> Canonical_Graph;
+//typedef std::vector<Element_In_Tuple> Canonical_Graph;
 
 namespace RStream {
 	class Aggregation {

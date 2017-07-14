@@ -1,5 +1,5 @@
 /*
- * bliss_lib.hpp
+ * pattern.hpp
  *
  *  Created on: Jul 3, 2017
  *      Author: icuzzq
@@ -8,13 +8,8 @@
 #ifndef SRC_CORE_PATTERN_HPP_
 #define SRC_CORE_PATTERN_HPP_
 
-#include "../common/RStreamCommon.hpp"
 #include "type.hpp"
 
-#include "defs.hh"
-#include "graph.hh"
-#include "timer.hh"
-#include "utils.hh"
 
 //static bool opt_directed = false;
 

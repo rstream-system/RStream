@@ -10,6 +10,11 @@
 
 #include "../common/RStreamCommon.hpp"
 
+#include "defs.hh"
+#include "graph.hh"
+#include "timer.hh"
+#include "utils.hh"
+
 typedef unsigned Update_Stream;
 typedef unsigned Aggregation_Stream;
 typedef int VertexId;

@@ -11,8 +11,8 @@
 #include "io_manager.hpp"
 #include "buffer_manager.hpp"
 #include "concurrent_queue.hpp"
-#include "type.hpp"
 #include "constants.hpp"
+
 #include "pattern.hpp"
 
 namespace RStream {
