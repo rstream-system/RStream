@@ -34,7 +34,7 @@ class pattern {
 
 public:
 
-	static bliss::AbstractGraph* turn_canonical_graph(std::vector<Element_In_Tuple> & sub_graph, const bool is_directed) {
+	static bliss::AbstractGraph* turn_canonical_graph_bliss(std::vector<Element_In_Tuple> & sub_graph, const bool is_directed) {
 		bliss::AbstractGraph* ag = 0;
 
 		//read graph from tuple
@@ -44,6 +44,13 @@ public:
 		bliss::AbstractGraph* cf = turnCanonical(ag);
 
 		delete ag;
+		return cf;
+	}
+
+	static Canonical_Graph* turn_canonical_graph(std::vector<Element_In_Tuple> & sub_graph, const bool is_directed){
+		bliss::AbstractGraph* cf_bliss = turn_canonical_graph_bliss(sub_graph, is_directed);
+		Canonical_Graph* cf = new Canonical_Graph(cf_bliss, is_directed);
+		delete cf_bliss;
 		return cf;
 	}
 

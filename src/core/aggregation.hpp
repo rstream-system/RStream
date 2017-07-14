@@ -159,11 +159,11 @@ namespace RStream {
 				}
 
 				// for all the aggregated quick patterns, turn to canocail graphs
-				std::vector<std::pair<bliss::AbstractGraph *, int>> canonical_graphs;
+				std::vector<std::pair<Canonical_Graph*, int>> canonical_graphs;
 				map_canonical(quick_patterns_aggregation, canonical_graphs);
 
 				// for all the canonical graphs, do local aggregation
-				std::vector<std::pair<bliss::AbstractGraph *, int>> canonical_graphs_aggregation;
+				std::vector<std::pair<Canonical_Graph*, int>> canonical_graphs_aggregation;
 				local_aggregate(canonical_graphs, canonical_graphs_aggregation);
 
 				// for each canonical graph, do map reduce, shuffle to corresponding buckets
@@ -179,7 +179,7 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
-		void shuffle_canonical_aggregation(std::vector<std::pair<bliss::AbstractGraph *, int>>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
+		void shuffle_canonical_aggregation(std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
 			char* out_cg = nullptr;
 			for(unsigned i = 0; i < canonical_graphs_aggregation.size(); i++) {
 				std::pair<bliss::AbstractGraph *, int> one_canonical_graph = canonical_graphs_aggregation.at(i);
@@ -195,7 +195,7 @@ namespace RStream {
 			}
 		}
 
-		void clean(std::vector<std::pair<bliss::AbstractGraph *, int>>& canonical_graphs, std::vector<std::pair<bliss::AbstractGraph *, int>>& canonical_graphs_aggregation){
+		void clean(std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs, std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs_aggregation){
 
 		}
 
@@ -234,10 +234,10 @@ namespace RStream {
 			}
 		}
 
-		void map_canonical(std::vector<std::pair<Quick_Pattern, int>> & quick_patterns_aggregation, std::vector<std::pair<bliss::AbstractGraph *, int>> & canonical_graphs){
+		void map_canonical(std::vector<std::pair<Quick_Pattern, int>> & quick_patterns_aggregation, std::vector<std::pair<Canonical_Graph*, int>> & canonical_graphs){
 			for (unsigned i = 0; i < quick_patterns_aggregation.size(); i++) {
 				std::pair<Quick_Pattern, int> one_quick_pair = quick_patterns_aggregation.at(i);
-				bliss::AbstractGraph * cf = pattern::turn_canonical_graph(one_quick_pair.first, false);
+				Canonical_Graph* cf = pattern::turn_canonical_graph(one_quick_pair.first, false);
 				canonical_graphs.push_back(std::make_pair(cf, one_quick_pair.second));
 			}
 		}
@@ -248,7 +248,7 @@ namespace RStream {
 		}
 
 		// TODO:
-		void local_aggregate(std::vector<std::pair<bliss::AbstractGraph *, int>> & in_graphs, std::vector<std::pair<bliss::AbstractGraph *, int>> & out_graphs) {
+		void local_aggregate(std::vector<std::pair<Canonical_Graph*, int>> & in_graphs, std::vector<std::pair<Canonical_Graph*, int>> & out_graphs) {
 
 		}
 

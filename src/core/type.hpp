@@ -137,4 +137,13 @@ struct Update_Tuple {
 };
 
 
+struct Canonical_Graph {
+
+	Canonical_Graph(bliss::AbstractGraph* ag, bool is_directed){
+
+	}
+
+};
+
+
 #endif /* CORE_TYPE_HPP_ */
