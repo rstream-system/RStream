@@ -27,8 +27,8 @@ namespace RStream {
 	public:
 		// num of bytes for in_update_tuple
 		int sizeof_in_tuple;
-		// num of bytes for out_update_tuple
-		int sizeof_out_tuple;
+//		// num of bytes for out_update_tuple
+//		int sizeof_out_tuple;
 
 		virtual bool filter_join(std::vector<Element_In_Tuple> & update_tuple) = 0;
 		virtual bool filter_collect(std::vector<Element_In_Tuple> & update_tuple) = 0;
@@ -40,7 +40,6 @@ namespace RStream {
 			atomic_partition_number = context.num_partitions;
 
 			sizeof_in_tuple = 0;
-			sizeof_out_tuple = 0;
 		}
 
 		virtual ~MPhase() {}
@@ -54,7 +53,7 @@ namespace RStream {
 		Update_Stream join_mining(Update_Stream in_update_stream) {
 
 			// each element in the tuple is 2 ints
-			sizeof_out_tuple = sizeof_in_tuple + sizeof(Element_In_Tuple);
+			int sizeof_out_tuple = sizeof_in_tuple + sizeof(Element_In_Tuple);
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -218,7 +217,7 @@ namespace RStream {
 		Update_Stream join_all_keys(Update_Stream in_update_stream) {
 
 			// each element in the tuple is 2 ints
-			sizeof_out_tuple = sizeof_in_tuple + sizeof(Element_In_Tuple);
+			int sizeof_out_tuple = sizeof_in_tuple + sizeof(Element_In_Tuple);
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);

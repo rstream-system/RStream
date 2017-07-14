@@ -1,10 +1,10 @@
-///*
-// * motifcounting.cpp
-// *
-// *  Created on: Jul 7, 2017
-// *      Author: icuzzq
-// */
-//
+/*
+ * motifcounting.cpp
+ *
+ *  Created on: Jul 7, 2017
+ *      Author: icuzzq
+ */
+
 //#include "../core/engine.hpp"
 //#include "../core/mining_phase.hpp"
 //#include "../core/aggregation.hpp"
@@ -21,6 +21,10 @@
 //
 //	bool filter_join(std::vector<Element_In_Tuple> & update_tuple){
 //		return get_num_vertices(update_tuple) > MAXSIZE;
+//	}
+//
+//	bool filter_collect(std::vector<Element_In_Tuple> & update_tuple){
+//		return false;
 //	}
 //
 //private:
@@ -49,15 +53,15 @@
 //	for(int i = 1; i < max_iterations; ++i){
 //
 //		up_stream_non_shuffled = mPhase.join_mining(up_stream_shuffled);
-//		agg_stream = agg.aggregate(up_stream_non_shuffled);
+//		agg_stream = agg.aggregate(up_stream_non_shuffled, mPhase.sizeof_in_tuple);
 //		agg.printout_aggstream(agg_stream);
 //
 //		up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled);
 //	}
 //
 //}
-//
-//
-//
-//
-//
+
+
+
+
+
