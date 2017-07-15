@@ -91,6 +91,9 @@ namespace RStream {
 			return update_c;
 		}
 
+		Update_Stream init() {
+
+		}
 
 		// gen shuffled init update stream based on edge partitions
 		Update_Stream init_shuffle_all_keys() {

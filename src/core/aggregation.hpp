@@ -41,6 +41,10 @@ namespace RStream {
 		}
 
 
+		Update_Stream aggregate_filter(Update_Stream up_stream, Aggregation_Stream agg_stream){
+
+		}
+
 		void printout_aggstream(Aggregation_Stream agg_stream){
 
 		}
