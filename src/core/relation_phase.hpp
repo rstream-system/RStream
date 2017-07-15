@@ -54,6 +54,8 @@ namespace RStream {
 		 * @param out_update_stream -output file for update stream
 		 * */
 		Update_Stream join(Update_Stream in_update_stream) {
+			print_thread_info_locked("--------------------Start Join Phase--------------------\n");
+
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -66,8 +68,6 @@ namespace RStream {
 
 			// allocate global buffers for shuffling
 			global_buffer<OutUpdateType> ** buffers_for_shuffle = buffer_manager<OutUpdateType>::get_global_buffers(context.num_partitions);
-
-//			std::cout << "67" << std::endl;
 
 			// exec threads will produce updates and push into shuffle buffers
 			std::vector<std::thread> exec_threads;
@@ -88,6 +88,8 @@ namespace RStream {
 
 			delete[] buffers_for_shuffle;
 			delete task_queue;
+
+			print_thread_info_locked("--------------------Finish Join Phase--------------------\n");
 
 			return update_c;
 		}
@@ -162,7 +164,6 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				std::cout << partition_id << std::endl;
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
@@ -172,7 +173,8 @@ namespace RStream {
 				long update_file_size = io_manager::get_filesize(fd_update);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
-				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
+						+ " of update size " + std::to_string(update_file_size) + ", edge file size " + std::to_string(edge_file_size) + "\n");
 
 				// read from files to thread local buffer
 //				char * update_local_buf = new char[update_file_size];
@@ -194,7 +196,12 @@ namespace RStream {
 				assert(n_vertices > 0 && vertex_start >= 0);
 
 //				std::array<std::vector<VertexId>, num_vertices> edge_hashmap;
-				std::vector<VertexId> edge_hashmap[n_vertices];
+//				std::vector<VertexId> edge_hashmap[n_vertices];
+
+				std::vector<std::vector<VertexId>> edge_hashmap(n_vertices);
+				for(unsigned int i = 0; i < edge_hashmap.size(); i++)
+					edge_hashmap[i] = std::vector<VertexId>();
+
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
 
 				long valid_io_size = 0;
@@ -202,7 +209,6 @@ namespace RStream {
 
 				// for all streaming updates
 				for(int counter = 0; counter < streaming_counter; counter++) {
-
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
@@ -211,6 +217,7 @@ namespace RStream {
 						valid_io_size = IO_SIZE;
 
 					assert(valid_io_size % sizeof(InUpdateType) == 0);
+					print_thread_info_locked(std::to_string(counter) + "th streaming, start to join with size " + std::to_string(valid_io_size) + "\n");
 
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
@@ -229,20 +236,24 @@ namespace RStream {
 								//TODO: generate join result
 //								char* join_result = reinterpret_cast<char*>(&update);
 								OutUpdateType * out_update = project_columns(update, e);
-								std::cout << *e << std::endl;
-								std::cout << *update << std::endl;
-								std::cout << *out_update << std::endl;
+//								std::cout << *e << std::endl;
+//								std::cout << *update << std::endl;
+//								std::cout << *out_update << std::endl;
 
 								// insert into shuffle buffer accordingly
 								int index = get_global_buffer_index(out_update);
 								global_buffer<OutUpdateType>* global_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
 								global_buf->insert(out_update, index);
 
+								delete out_update;
+
 							}
 							delete e;
 						}
 
 					}
+
+					print_thread_info_locked(std::to_string(counter) + "th streaming, finish join with size " + std::to_string(valid_io_size) + "\n");
 
 				}
 
@@ -418,7 +429,7 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
-		void build_edge_hashmap(char * edge_buf, std::vector<VertexId> * edge_hashmap, size_t edge_file_size, int start_vertex) {
+		void build_edge_hashmap(char * edge_buf, std::vector<std::vector<VertexId>> & edge_hashmap, size_t edge_file_size, int start_vertex) {
 			int edge_unit = context.edge_unit;
 			assert(edge_unit > 0);
 			// for each edge
