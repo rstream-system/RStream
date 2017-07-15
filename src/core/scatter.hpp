@@ -83,7 +83,7 @@ namespace RStream {
 
 		/* scatter without vertex data (for relational algebra use)*/
 		Update_Stream scatter_no_vertex(std::function<UpdateType*(Edge*)> generate_one_update) {
-			print_thread_info_locked("--------------------Start Scatter Phase--------------------\n");
+			print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -122,7 +122,7 @@ namespace RStream {
 			delete[] buffers_for_shuffle;
 			delete task_queue;
 
-			print_thread_info_locked("--------------------Finish Scatter Phase--------------------\n");
+			print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
 
 			return update_c;
 		}

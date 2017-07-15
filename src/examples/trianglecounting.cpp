@@ -81,7 +81,8 @@ public:
 	}
 
 	ROutUpdate_TriC * project_columns(ROutUpdate_TriC * in_update, Edge * edge) {
-		return in_update;
+		ROutUpdate_TriC * new_update = new ROutUpdate_TriC(in_update->target, in_update->src1, in_update->src2);
+		return new_update;
 	}
 };
 
@@ -90,7 +91,10 @@ void printUpdateStream(int num_partitions, std::string fileName, Update_Stream i
 	for(int i = 0; i < num_partitions; i++) {
 		std::cout << "--------------------" + (fileName + "." + std::to_string(i) + ".update_stream_" + std::to_string(in_stream)) + "---------------------\n";
 		int fd_update = open((fileName + "." + std::to_string(i) + ".update_stream_" + std::to_string(in_stream)).c_str(), O_RDONLY);
-		assert(fd_update > 0 );
+//		assert(fd_update > 0 );
+
+		if(fd_update <= 0)
+			continue;
 
 		// get file size
 		long update_file_size = io_manager::get_filesize(fd_update);
@@ -113,6 +117,8 @@ int main(int argc, char ** argv) {
 //	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 
 	Engine e("/home/kai/workspace/rstream_data/soc-LiveJournal1.txt", 10, 4847571);
+//	Engine e("/home/kai/workspace/rstream_data/com-amazon.ungraph.txt", 4, 600000);
+//	Engine e("/home/kai/workspace/rstream_data/test.txt", 3, 7);
 
 	//scatter phase first to generate updates
 	Scatter<BaseVertex, RInUpdate_TriC> scatter_phase(e);
@@ -125,10 +131,9 @@ int main(int argc, char ** argv) {
 //	printUpdateStream<ROutUpdate_TriC>(e.num_partitions, e.filename, out_stream_1);
 //
 //	//relational phase 2
-//	R2 r2(e);
-//	Update_Stream out_stream_2 = r2.join(out_stream_1);
+	R2 r2(e);
+	Update_Stream out_stream_2 = r2.join(out_stream_1);
 //	printUpdateStream<ROutUpdate_TriC>(e.num_partitions, e.filename, out_stream_2);
-
 
 }
 

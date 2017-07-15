@@ -54,7 +54,7 @@ namespace RStream {
 		 * @param out_update_stream -output file for update stream
 		 * */
 		Update_Stream join(Update_Stream in_update_stream) {
-			print_thread_info_locked("--------------------Start Join Phase--------------------\n");
+			print_thread_info_locked("--------------------Start Join Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -89,7 +89,7 @@ namespace RStream {
 			delete[] buffers_for_shuffle;
 			delete task_queue;
 
-			print_thread_info_locked("--------------------Finish Join Phase--------------------\n");
+			print_thread_info_locked("--------------------Finish Join Phase--------------------\n\n");
 
 			return update_c;
 		}
@@ -199,8 +199,8 @@ namespace RStream {
 //				std::vector<VertexId> edge_hashmap[n_vertices];
 
 				std::vector<std::vector<VertexId>> edge_hashmap(n_vertices);
-				for(unsigned int i = 0; i < edge_hashmap.size(); i++)
-					edge_hashmap[i] = std::vector<VertexId>();
+//				for(unsigned int i = 0; i < edge_hashmap.size(); i++)
+//					edge_hashmap[i] = std::vector<VertexId>();
 
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
 
