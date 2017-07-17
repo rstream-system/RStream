@@ -564,7 +564,9 @@ public:
     shs_flm
   } SplittingHeuristic;
 
-protected:
+
+
+  //moved from protected scope by Zhiqiang
   class Vertex {
   public:
     Vertex();
@@ -577,6 +579,18 @@ protected:
     std::vector<unsigned int> edges;
     unsigned int nof_edges() const {return edges.size(); }
   };
+
+  //added by Zhiqiang
+  std::vector<Vertex> & get_vertices_rstream(){
+	  return vertices;
+  }
+
+  void sort_edges_rstream(){
+	  sort_edges();
+  }
+
+
+protected:
   std::vector<Vertex> vertices;
   void sort_edges();
   void remove_duplicate_edges();
@@ -793,7 +807,8 @@ public:
     shs_flm
   } SplittingHeuristic;
 
-protected:
+
+  //moved from protected scope by Zhiqiang
   class Vertex {
   public:
     Vertex();
@@ -808,6 +823,17 @@ protected:
     unsigned int nof_edges_in() const {return edges_in.size(); }
     unsigned int nof_edges_out() const {return edges_out.size(); }
   };
+
+  //added by Zhiqiang
+  std::vector<Vertex> & get_vertices_rstream(){
+	  return vertices;
+  }
+
+  void sort_edges_rstream(){
+	  sort_edges();
+  }
+
+protected:
   std::vector<Vertex> vertices;
   void remove_duplicate_edges();
 

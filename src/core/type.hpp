@@ -31,6 +31,20 @@ struct Edge {
 	std::string toString(){
 		return "(" + std::to_string(src) + ", " + std::to_string(target) + ")";
 	}
+
+
+};
+
+class EdgeComparator{
+public:
+	int operator()(const Edge& oneEdge, const Edge& otherEdge){
+		if(oneEdge.src == otherEdge.src){
+			return oneEdge.target > otherEdge.target;
+		}
+		else{
+			return oneEdge.src > otherEdge.src;
+		}
+	}
 };
 
 struct LabeledEdge {
@@ -144,11 +158,110 @@ struct Update_Tuple {
 
 struct Canonical_Graph {
 
+public:
 	Canonical_Graph(bliss::AbstractGraph* ag, bool is_directed){
+		construct_cg(ag, is_directed);
+	}
+
+	~Canonical_Graph(){
 
 	}
 
+
+	int cmp(Canonical_Graph& other_cg){
+
+	}
+
+	unsigned int get_hash(){
+
+	}
+
+
+
+private:
+	std::vector<Element_In_Tuple> tuple;
+
+	void construct_cg(bliss::AbstractGraph* ag, bool is_directed){
+		assert(!is_directed);
+		if(!is_directed){
+			bliss::Graph* graph = (bliss::Graph*) ag;
+			graph->sort_edges_rstream();
+
+			std::unordered_map<VertexId, BYTE> map;
+			std::priority_queue<Edge, std::vector<Edge>, EdgeComparator> min_heap;
+
+			std::vector<bliss::Graph::Vertex> vertices = graph->get_vertices_rstream();
+
+			Edge* first_edge = getFirstEdge(vertices);
+			min_heap.push(*first_edge);
+			Element_In_Tuple* element = generate_first_element(*first_edge, map, vertices);
+			tuple.push_back(*element);
+			delete first_edge;
+			delete element;
+
+			while(!min_heap.empty()){
+				Edge edge = min_heap.top();
+				Element_In_Tuple* element = generate_element(edge, map, vertices);
+				tuple.push_back(*element);
+				delete element;
+
+				min_heap.pop();
+				add_neighbours(edge, min_heap, vertices);
+			}
+
+		}
+	}
+
+	Edge* getFirstEdge(std::vector<bliss::Graph::Vertex>& vertices){
+		for(unsigned int i = 0; i < vertices.size(); ++i){
+			if(!vertices[i].edges.empty()){
+				Edge* edge = new Edge(i+1, vertices[i].edges[0] + 1);
+				assert(edge->src < edge->target);
+				return edge;
+			}
+		}
+
+		return nullptr;
+	}
+
+	Element_In_Tuple* generate_first_element(Edge& edge, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
+		map[edge.src] = 0;
+		Element_In_Tuple* element = new Element_In_Tuple(edge.src, (BYTE)0, (BYTE)vertices[edge.src - 1].color);
+		return element;
+	}
+
+	Element_In_Tuple* generate_element(Edge& edge, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
+		assert(edge.src < edge.target);
+		Element_In_Tuple* element;
+		if(map.find(edge.src) != map.end()){
+			element = new Element_In_Tuple(edge.target, 0, vertices[edge.target - 1].color, map[edge.src]);
+			if(map.find(edge.target) == map.end()){
+				unsigned int s = tuple.size() + 1;
+				map[edge.target] = s;
+			}
+		}
+		else if(map.find(edge.target) != map.end()){
+			element = new Element_In_Tuple(edge.src, 0, vertices[edge.src - 1].color, map[edge.target]);
+			if(map.find(edge.src) == map.end()){
+				unsigned int s = tuple.size() + 1;
+				map[edge.src] = s;
+			}
+		}
+		else{
+			//wrong case
+
+		}
+		return element;
+	}
+
+	void add_neighbours(Edge& edge, std::priority_queue<Edge, std::vector<Edge>, EdgeComparator>& min_heap, std::vector<bliss::Graph::Vertex>& vertices){
+
+	}
+
+
 };
+
+
 
 
 #endif /* CORE_TYPE_HPP_ */
