@@ -185,8 +185,8 @@ namespace RStream {
 
 		void shuffle_canonical_aggregation(std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
 			char* out_cg = nullptr;
-			for(unsigned i = 0; i < canonical_graphs_aggregation.size(); i++) {
-				std::pair<bliss::AbstractGraph *, int> one_canonical_graph = canonical_graphs_aggregation.at(i);
+			for(unsigned int i = 0; i < canonical_graphs_aggregation.size(); i++) {
+				std::pair<Canonical_Graph *, int> one_canonical_graph = canonical_graphs_aggregation.at(i);
 				int hash = one_canonical_graph.first->get_hash();
 				int index = get_global_bucket_index(hash);
 
@@ -239,7 +239,7 @@ namespace RStream {
 		}
 
 		void map_canonical(std::vector<std::pair<Quick_Pattern, int>> & quick_patterns_aggregation, std::vector<std::pair<Canonical_Graph*, int>> & canonical_graphs){
-			for (unsigned i = 0; i < quick_patterns_aggregation.size(); i++) {
+			for (unsigned int i = 0; i < quick_patterns_aggregation.size(); i++) {
 				std::pair<Quick_Pattern, int> one_quick_pair = quick_patterns_aggregation.at(i);
 				Canonical_Graph* cf = pattern::turn_canonical_graph(one_quick_pair.first, false);
 				canonical_graphs.push_back(std::make_pair(cf, one_quick_pair.second));

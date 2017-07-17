@@ -1,10 +1,10 @@
-/*
- * motifcounting.cpp
- *
- *  Created on: Jul 7, 2017
- *      Author: icuzzq
- */
-
+///*
+// * motifcounting.cpp
+// *
+// *  Created on: Jul 7, 2017
+// *      Author: icuzzq
+// */
+//
 //#include "../core/engine.hpp"
 //#include "../core/mining_phase.hpp"
 //#include "../core/aggregation.hpp"
@@ -62,8 +62,8 @@
 //	}
 //
 //}
-
-
-
-
-
+//
+//
+//
+//
+//
