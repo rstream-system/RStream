@@ -32,6 +32,13 @@ struct Edge {
 		return "(" + std::to_string(src) + ", " + std::to_string(target) + ")";
 	}
 
+	void swap(){
+		if (src > target) {
+			VertexId tmp = src;
+			src = target;
+			target = tmp;
+		}
+	}
 
 };
 
@@ -187,61 +194,57 @@ private:
 			bliss::Graph* graph = (bliss::Graph*) ag;
 			graph->sort_edges_rstream();
 
+			std::unordered_set<VertexId> set;
 			std::unordered_map<VertexId, BYTE> map;
 			std::priority_queue<Edge, std::vector<Edge>, EdgeComparator> min_heap;
 
 			std::vector<bliss::Graph::Vertex> vertices = graph->get_vertices_rstream();
 
-			Edge* first_edge = getFirstEdge(vertices);
-			min_heap.push(*first_edge);
-			Element_In_Tuple* element = generate_first_element(*first_edge, map, vertices);
-			tuple.push_back(*element);
-			delete first_edge;
-			delete element;
+			VertexId first_src = init_heapAndset(vertices, min_heap, set);
+			assert(first_src != -1);
+			push_first_element(first_src, map, vertices);
 
 			while(!min_heap.empty()){
 				Edge edge = min_heap.top();
-				Element_In_Tuple* element = generate_element(edge, map, vertices);
-				tuple.push_back(*element);
-				delete element;
+				push_element(edge, map, vertices);
 
 				min_heap.pop();
-				add_neighbours(edge, min_heap, vertices);
+				add_neighbours(edge, min_heap, vertices, set);
 			}
 
 		}
 	}
 
-	Edge* getFirstEdge(std::vector<bliss::Graph::Vertex>& vertices){
+	VertexId init_heapAndset(std::vector<bliss::Graph::Vertex>& vertices, std::priority_queue<Edge, std::vector<Edge>, EdgeComparator>& min_heap, std::unordered_set<VertexId>& set){
 		for(unsigned int i = 0; i < vertices.size(); ++i){
 			if(!vertices[i].edges.empty()){
-				Edge* edge = new Edge(i+1, vertices[i].edges[0] + 1);
-				assert(edge->src < edge->target);
-				return edge;
+				for(auto v: vertices[i].edges){
+					min_heap.push(Edge(i + 1, v + 1));
+				}
+				set.insert(i + 1);
+				return i + 1;
 			}
 		}
 
-		return nullptr;
+		return -1;
 	}
 
-	Element_In_Tuple* generate_first_element(Edge& edge, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
-		map[edge.src] = 0;
-		Element_In_Tuple* element = new Element_In_Tuple(edge.src, (BYTE)0, (BYTE)vertices[edge.src - 1].color);
-		return element;
+	void push_first_element(VertexId first, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
+		map[first] = 0;
+		tuple.push_back(Element_In_Tuple(first, (BYTE)0, (BYTE)vertices[first - 1].color));
 	}
 
-	Element_In_Tuple* generate_element(Edge& edge, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
+	void push_element(Edge& edge, std::unordered_map<VertexId, BYTE>& map, std::vector<bliss::Graph::Vertex>& vertices){
 		assert(edge.src < edge.target);
-		Element_In_Tuple* element;
 		if(map.find(edge.src) != map.end()){
-			element = new Element_In_Tuple(edge.target, 0, vertices[edge.target - 1].color, map[edge.src]);
+			tuple.push_back(Element_In_Tuple(edge.target, 0, vertices[edge.target - 1].color, map[edge.src]));
 			if(map.find(edge.target) == map.end()){
 				unsigned int s = tuple.size() + 1;
 				map[edge.target] = s;
 			}
 		}
 		else if(map.find(edge.target) != map.end()){
-			element = new Element_In_Tuple(edge.src, 0, vertices[edge.src - 1].color, map[edge.target]);
+			tuple.push_back(Element_In_Tuple(edge.src, 0, vertices[edge.src - 1].color, map[edge.target]));
 			if(map.find(edge.src) == map.end()){
 				unsigned int s = tuple.size() + 1;
 				map[edge.src] = s;
@@ -251,13 +254,26 @@ private:
 			//wrong case
 
 		}
-		return element;
 	}
 
-	void add_neighbours(Edge& edge, std::priority_queue<Edge, std::vector<Edge>, EdgeComparator>& min_heap, std::vector<bliss::Graph::Vertex>& vertices){
-
+	void add_neighbours(Edge& edge, std::priority_queue<Edge, std::vector<Edge>, EdgeComparator>& min_heap, std::vector<bliss::Graph::Vertex>& vertices, std::unordered_set<VertexId>& set){
+		add_neighbours(edge.src, min_heap, vertices, set);
+		add_neighbours(edge.target, min_heap, vertices, set);
 	}
 
+	void add_neighbours(VertexId srcId, std::priority_queue<Edge, std::vector<Edge>, EdgeComparator>& min_heap, std::vector<bliss::Graph::Vertex>& vertices, std::unordered_set<VertexId>& set){
+		if(set.find(srcId) == set.end()){
+			for(auto v: vertices[srcId - 1].edges){
+				VertexId target = v + 1;
+				if(set.find(target) == set.end()){
+					Edge edge(srcId, target);
+					edge.swap();
+					min_heap.push(edge);
+				}
+			}
+
+		}
+	}
 
 };
 
