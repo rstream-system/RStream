@@ -73,7 +73,7 @@ namespace RStream {
 			// exec threads will do aggregate and push result patterns into shuffle buffers
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < context.num_exec_threads; i++)
-				exec_threads.push_back( std::thread([=] { this->aggregate_producer(in_update_stream, buffers_for_shuffle, task_queue, sizeof_in_tuple); } ));
+				exec_threads.push_back( std::thread([=] { this->aggregate_local_producer(in_update_stream, buffers_for_shuffle, task_queue, sizeof_in_tuple); } ));
 
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
@@ -99,15 +99,82 @@ namespace RStream {
 			return sizeof(int);
 		}
 
-		Aggregation_Stream aggregate_global(Update_Stream in_update_stream, int sizeof_in_tuple) {
+		Aggregation_Stream aggregate_global(Aggregation_Stream in_agg_stream, int sizeof_in_tuple) {
 			Aggregation_Stream aggreg_c = Engine::aggregation_count++;
 
 			//TODO
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+			}
+
+			// output should be a pair of <tuples, count>
+			// tuples -- canonical pattern
+			// count -- counter for patterns
+
+			// exec threads will do aggregate and push result patterns into shuffle buffers
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < context.num_exec_threads + context.num_write_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->aggregate_global_per_thread(in_agg_stream, task_queue, sizeof_in_tuple, aggreg_c); } ));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			delete task_queue;
 
 			return aggreg_c;
 		}
 
-		void aggregate_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue, int sizeof_in_tuple) {
+		void aggregate_global_per_thread(Aggregation_Stream in_agg_stream, concurrent_queue<int> * task_queue, int sizeof_in_tuple, Aggregation_Stream out_agg_stream) {
+			int partition_id = -1;
+
+			// pop from queue
+			while(task_queue->test_pop_atomic(partition_id)) {
+				std::cout << partition_id << std::endl;
+
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0);
+
+				// get file size
+				long update_file_size = io_manager::get_filesize(fd_update);
+
+				// streaming updates
+				char * agg_local_buf = (char *)malloc(update_file_size);
+
+				// read tuples in, do aggregation
+				std::vector<std::pair<Canonical_Graph*, int>> tmp_aggregation;
+				for(long pos = 0; pos < update_file_size; pos += sizeof_in_tuple) {
+					// get an in_update_tuple
+					std::pair<Canonical_Graph*, int> in_agg_pair;
+					get_an_in_agg_pair(agg_local_buf + pos, in_agg_pair, sizeof_in_tuple);
+					tmp_aggregation.push_back(in_agg_pair);
+				}
+
+				// for all the canonical graphs, do local aggregation
+				std::vector<std::pair<Canonical_Graph*, int>> canonical_graphs_aggregation;
+				local_aggregate(tmp_aggregation, canonical_graphs_aggregation);
+
+				const char * file_name = (context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(out_agg_stream)).c_str();
+				write_canonical_aggregation(canonical_graphs_aggregation, file_name);
+
+				free(agg_local_buf);
+				close(fd_update);
+
+			}
+		}
+
+		void get_an_in_agg_pair(char * update_local_buf, std::pair<Canonical_Graph*, int> & agg_pair, int sizeof_in_tuple){
+
+		}
+
+		void write_canonical_aggregation(std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs_aggregation, const char* file_name){
+
+		}
+
+		void aggregate_local_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue, int sizeof_in_tuple) {
 			atomic_num_producers++;
 			int partition_id = -1;
 

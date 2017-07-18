@@ -27,8 +27,6 @@ namespace RStream {
 	public:
 		// num of bytes for in_update_tuple
 		int sizeof_in_tuple;
-//		// num of bytes for out_update_tuple
-//		int sizeof_out_tuple;
 
 		virtual bool filter_join(std::vector<Element_In_Tuple> & update_tuple) = 0;
 		virtual bool filter_collect(std::vector<Element_In_Tuple> & update_tuple) = 0;
