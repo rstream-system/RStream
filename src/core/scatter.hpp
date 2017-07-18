@@ -334,7 +334,7 @@ namespace RStream {
 //				}
 
 //				std::cout << std::endl;
-				delete[] local_buf;
+				free(local_buf);
 				close(fd);
 
 			}
@@ -344,8 +344,15 @@ namespace RStream {
 
 		// each writer thread generates a scatter_consumer
 		void scatter_consumer(global_buffer<UpdateType> ** buffers_for_shuffle, Update_Stream update_count) {
+			unsigned int counter = 0;
+
 			while(atomic_num_producers != 0) {
-				int i = (atomic_partition_id++) % context.num_partitions ;
+//				int i = (atomic_partition_id++) % context.num_partitions ;
+
+				if(counter == context.num_partitions)
+					counter = 0;
+
+				unsigned int i = counter++;
 
 //				//debugging info
 //				print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");

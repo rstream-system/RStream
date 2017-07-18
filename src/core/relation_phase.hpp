@@ -217,7 +217,8 @@ namespace RStream {
 						valid_io_size = IO_SIZE;
 
 					assert(valid_io_size % sizeof(InUpdateType) == 0);
-					print_thread_info_locked(std::to_string(counter) + "th streaming, start to join with size " + std::to_string(valid_io_size) + "\n");
+					print_thread_info_locked(std::to_string(counter) + "th streaming, start join of size "
+							+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
@@ -253,7 +254,8 @@ namespace RStream {
 
 					}
 
-					print_thread_info_locked(std::to_string(counter) + "th streaming, finish join with size " + std::to_string(valid_io_size) + "\n");
+					print_thread_info_locked(std::to_string(counter) + "th streaming, finish join of size "
+												+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 
 				}
 
@@ -298,8 +300,14 @@ namespace RStream {
 
 		// each writer thread generates a join_consumer
 		void consumer(Update_Stream out_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle) {
+			unsigned int counter = 0;
+
 			while(atomic_num_producers != 0) {
-				int i = (atomic_partition_id++) % context.num_partitions ;
+//				int i = (atomic_partition_id++) % context.num_partitions ;
+				if(counter == context.num_partitions)
+					counter = 0;
+
+				unsigned int i = counter++;
 
 				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
 				global_buffer<OutUpdateType>* g_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
@@ -385,7 +393,7 @@ namespace RStream {
 					}
 				}
 
-				delete[] update1_buf;
+				free(update1_buf);
 				delete[] update2_buf;
 
 				close(fd_update1);
