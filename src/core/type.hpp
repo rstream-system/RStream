@@ -155,6 +155,50 @@ struct Element_In_Tuple {
 	void set_vertex_id(VertexId new_id){
 		vertex_id = new_id;
 	}
+
+	int cmp(Element_In_Tuple& other){
+		//compare vertex id
+		if(vertex_id < other.vertex_id){
+			return -1;
+		}
+		if(vertex_id > other.vertex_id){
+			return 1;
+		}
+
+		//compare history info
+		if(history_info < other.history_info){
+			return -1;
+		}
+		if(history_info > other.history_info){
+			return 1;
+		}
+
+		//compare vertex label
+		if(vertex_label < other.vertex_label){
+			return -1;
+		}
+		if(vertex_label > other.vertex_label){
+			return 1;
+		}
+
+		//compare edge label
+		if(edge_label < other.edge_label){
+			return -1;
+		}
+		if(edge_label > other.edge_label){
+			return 1;
+		}
+
+		//compare index
+		if(key_index < other.key_index){
+			return -1;
+		}
+		if(key_index > other.key_index){
+			return 1;
+		}
+
+		return 0;
+	}
 };
 
 // One tuple contains multiple elements. "size" is the num of elements in one tuple
@@ -176,42 +220,81 @@ public:
 
 
 	int cmp(Canonical_Graph& other_cg){
+		//compare the numbers of vertices
+		if(get_number_vertices() < other_cg.get_number_vertices()){
+			return -1;
+		}
+		if(get_number_vertices() > other_cg.get_number_vertices()){
+			return 1;
+		}
 
+		//compare hash value
+		if(get_hash() < other_cg.get_hash()){
+			return -1;
+		}
+		if(get_hash() > other_cg.get_hash()){
+			return 1;
+		}
+
+		//compare edges
+		assert(tuple.size() == other_cg.tuple.size());
+		for(unsigned int i = 0; i < tuple.size(); ++i){
+			Element_In_Tuple & t1 = tuple[i];
+			Element_In_Tuple & t2 = other_cg.tuple[i];
+
+			int cmp_element = t1.cmp(t2);
+			if(cmp_element != 0){
+				return cmp_element;
+			}
+		}
+
+		return 0;
 	}
 
 	unsigned int get_hash(){
+		return hash_value;
+	}
 
+	unsigned int get_number_vertices(){
+		return number_of_vertices;
 	}
 
 
 
 private:
 	std::vector<Element_In_Tuple> tuple;
+	unsigned int number_of_vertices;
+	unsigned int hash_value;
+
 
 	void construct_cg(bliss::AbstractGraph* ag, bool is_directed){
 		assert(!is_directed);
 		if(!is_directed){
-			bliss::Graph* graph = (bliss::Graph*) ag;
-			graph->sort_edges_rstream();
+			number_of_vertices = ag->get_nof_vertices();
+			hash_value = ag->get_hash();
 
-			std::unordered_set<VertexId> set;
-			std::unordered_map<VertexId, BYTE> map;
-			std::priority_queue<Edge, std::vector<Edge>, EdgeComparator> min_heap;
+			transform_to_tuple(ag);
+		}
+	}
 
-			std::vector<bliss::Graph::Vertex> vertices = graph->get_vertices_rstream();
+	void transform_to_tuple(bliss::AbstractGraph* ag){
+		bliss::Graph* graph = (bliss::Graph*) ag;
+		std::unordered_set<VertexId> set;
+		std::unordered_map<VertexId, BYTE> map;
+		std::priority_queue<Edge, std::vector<Edge>, EdgeComparator> min_heap;
 
-			VertexId first_src = init_heapAndset(vertices, min_heap, set);
-			assert(first_src != -1);
-			push_first_element(first_src, map, vertices);
+		std::vector<bliss::Graph::Vertex> vertices = graph->get_vertices_rstream();
 
-			while(!min_heap.empty()){
-				Edge edge = min_heap.top();
-				push_element(edge, map, vertices);
+		VertexId first_src = init_heapAndset(vertices, min_heap, set);
+		assert(first_src != -1);
+		push_first_element(first_src, map, vertices);
 
-				min_heap.pop();
-				add_neighbours(edge, min_heap, vertices, set);
-			}
+		while(!min_heap.empty()){
+			Edge edge = min_heap.top();
+			push_element(edge, map, vertices);
 
+			min_heap.pop();
+			add_neighbours(edge, min_heap, vertices, set);
 		}
 	}
 
@@ -252,7 +335,8 @@ private:
 		}
 		else{
 			//wrong case
-
+	    	std::cout << "wrong case!!!" << std::endl;
+	    	throw std::exception();
 		}
 	}
 

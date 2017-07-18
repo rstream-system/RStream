@@ -1,11 +1,11 @@
-
-/*
- * cliquefinding.cpp
- *
- *  Created on: Jul 7, 2017
- *      Author: icuzzq
- */
-
+//
+///*
+// * cliquefinding.cpp
+// *
+// *  Created on: Jul 7, 2017
+// *      Author: icuzzq
+// */
+//
 //#include "../core/engine.hpp"
 //#include "../core/mining_phase.hpp"
 //
@@ -28,7 +28,14 @@
 //	}
 //
 //private:
-//	static unsigned get_num_vertices(std::vector<Element_In_Tuple> & update_tuple){
+//
+//	bool isClique(std::vector<Element_In_Tuple> & update_tuple){
+//		unsigned int num_vertices = get_num_vertices(update_tuple);
+//		unsigned int num_edges = get_num_edges(update_tuple);
+//		return num_edges == num_vertices * (num_vertices - 1) / 2;
+//	}
+//
+//	unsigned int get_num_vertices(std::vector<Element_In_Tuple> & update_tuple){
 //		std::unordered_set<VertexId> set;
 //		for(auto it = update_tuple.cbegin(); it != update_tuple.cend(); ++it){
 //			set.insert((*it).vertex_id);
@@ -36,13 +43,11 @@
 //		return set.size();
 //	}
 //
-//	static bool isClique(std::vector<Element_In_Tuple> & update_tuple){
-//		unsigned num_vertices = get_num_vertices(update_tuple);
-//		return update_tuple.size() == num_vertices * (num_vertices - 1) / 2;
+//	unsigned int get_num_edges(std::vector<Element_In_Tuple> & update_tuple){
+//		return update_tuple.size() - 1;
 //	}
-//
 //};
-
+//
 //int main(int argc, char **argv) {
 //	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 //
@@ -66,4 +71,4 @@
 //	}
 //
 //}
-
+//
