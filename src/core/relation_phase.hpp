@@ -284,7 +284,7 @@ namespace RStream {
 //
 //				}
 
-				delete[] update_local_buf;
+				free(update_local_buf);
 				delete[] edge_local_buf;
 
 				close(fd_update);

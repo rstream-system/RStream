@@ -241,7 +241,7 @@ namespace RStream {
 
 				// delete
 				delete[] vertex_local_buf;
-				delete[] edge_local_buf;
+				free(edge_local_buf);
 
 //				//clear vertex_map
 //				for(auto it = vertex_map.cbegin(); it != vertex_map.cend(); ++it){
