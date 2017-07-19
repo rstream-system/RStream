@@ -15,8 +15,9 @@
 namespace RStream {
 	class Preprocessing {
 		std::atomic<int> atomic_num_producers;
-		std::atomic<int> atomic_chunk_id;
+//		std::atomic<int> atomic_chunk_id;
 		std::atomic<int> atomic_partition_number;
+
 		std::string input;
 //		std::string output;
 		int num_partitions;
@@ -41,9 +42,11 @@ namespace RStream {
 		Preprocessing(std::string & _input, int _num_partitions, int _num_vertices) :
 			input(_input), num_partitions(_num_partitions), num_vertices(_num_vertices)
 		{
-			atomic_num_producers = 0;
-			atomic_chunk_id = 0;
+//			atomic_num_producers = 0;
+			atomic_num_producers = 3;
+//			atomic_chunk_id = 0;
 			atomic_partition_number = num_partitions;
+
 			vertices_per_partition = num_vertices / num_partitions;
 
 			std::cout << "start preprocessing..." << std::endl;
@@ -83,12 +86,12 @@ namespace RStream {
 			long counter = 0;
 			char s[1024];
 			while(fgets(s, 1024, fd) != NULL) {
-				FIXLINE(s);
+//				FIXLINE(s);
 
 				if (s[0] == '#') continue; // Comment
 				if (s[0] == '%') continue; // Comment
 
-				counter++;
+//				counter++;
 
 				char delims[] = "\t, ";
 				char * t;
@@ -124,6 +127,9 @@ namespace RStream {
 					edge_type = 0;
 				}
 
+				counter++;
+
+//				std::cout << "src: " << from << " , target: " << to << std::endl;
 //				std::cout << "src: " << from << " , target: " << to  << " , weight : " << val << std::endl;
 				assert(IO_SIZE % edge_unit == 0);
 
@@ -146,6 +152,7 @@ namespace RStream {
 			if(fout < 0){
 				fout = creat((input + ".binary").c_str(), S_IRWXU);
 			}
+
 			io_manager::write_to_file(fout, buf, counter * edge_unit);
 			close(fout);
 
@@ -155,11 +162,8 @@ namespace RStream {
 
 		template<typename T>
 		void generate_partitions() {
-
-//			int num_threads = std::thread::hardware_concurrency();
-//			int num_threads = 4;
-			int num_write_threads = 2;
-			int num_exec_threads = 4;
+			int num_write_threads = 1;
+			int num_exec_threads = 3;
 
 			int fd = open((input + ".binary").c_str(), O_RDONLY);
 			assert(fd > 0 );
@@ -178,6 +182,9 @@ namespace RStream {
 					valid_io_size = file_size - IO_SIZE * (streaming_counter - 1);
 				else
 					valid_io_size = IO_SIZE;
+
+//				print_thread_info_locked("push to queue, fd " + std::to_string(fd) + " , offset "
+//						+ std::to_string(offset) + " , valid size " + std::to_string(valid_io_size) + "\n");
 
 				task_queue->push(std::make_tuple(fd, offset, valid_io_size));
 				offset += valid_io_size;
@@ -214,12 +221,13 @@ namespace RStream {
 			delete task_queue;
 			close(fd);
 
+//			print_thread_info_locked("finish gen partitions. \n");
 		}
 
 		template<typename T>
 		void producer(global_buffer<T> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long> > * task_queue) {
-			print_thread_info_locked("start a producer... \n");
-			atomic_num_producers++;
+//			print_thread_info_locked("start a producer... \n");
+//			atomic_num_producers++;
 
 			int fd = -1;
 			long offset = 0, length = 0;
@@ -235,6 +243,9 @@ namespace RStream {
 				fd = std::get<0>(one_task);
 				offset = std::get<1>(one_task);
 				length = std::get<2>(one_task);
+
+//				print_thread_info_locked("pop from queue, fd " + std::to_string(fd) + " , offset "
+//										+ std::to_string(offset) + " , valid size " + std::to_string(length) + "\n");
 
 				io_manager::read_from_file(fd, local_buf, length, offset);
 				for(long pos = 0; pos < length; pos += edge_unit) {
@@ -256,21 +267,27 @@ namespace RStream {
 
 					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, index);
 					global_buf->insert((T*)data, index);
+
+//					print_thread_info_locked("src: " + std::to_string(src) + " , dst: " + std::to_string(dst) + "\n");
 				}
 
-//				print_thread_info_locked("src: " + std::to_string(src) + " , dst: " + std::to_string(dst) + "\n");
 			}
 
-			delete[] local_buf;
+			free(local_buf);
 			atomic_num_producers--;
 		}
 
 		template<typename T>
 		void consumer(global_buffer<T> ** buffers_for_shuffle) {
-			print_thread_info_locked("start a consumer... \n");
+//			print_thread_info_locked("start a consumer... \n");
+			unsigned int counter = 0;
 
 			while(atomic_num_producers != 0) {
-				int i = (atomic_chunk_id++) % num_partitions ;
+//				int i = (atomic_chunk_id++) % num_partitions ;
+				if(counter == num_partitions)
+				counter = 0;
+
+				unsigned int i = counter++;
 
 				//debugging info
 //				print_thread_info_locked("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
@@ -280,12 +297,14 @@ namespace RStream {
 				g_buf->flush(file_name, i);
 			}
 
+			print_thread_info_locked("prepare to flush end...\n");
+
 			//the last run - deal with all remaining content in buffers
 			while(true){
 				int i = --atomic_partition_number;
 				if(i >= 0){
 //					//debugging info
-//					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
+//					print_thread_info_locked("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
 					const char * file_name = (input + "." + std::to_string(i)).c_str();
 					global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
