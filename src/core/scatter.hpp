@@ -38,13 +38,17 @@ namespace RStream {
 	public:
 
 		Scatter(Engine & e) : context(e) {
-			atomic_num_producers = 0;
-			atomic_partition_id = 0;
-			atomic_partition_number = context.num_partitions;
+//			atomic_num_producers = 0;
+//			atomic_partition_id = 0;
+//			atomic_partition_number = context.num_partitions;
 		};
 
 		/* scatter with vertex data (for graph computation use)*/
 		Update_Stream scatter_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update) {
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_id = 0;
+			atomic_partition_number = context.num_partitions;
+
 			Update_Stream update_c = Engine::update_count++;
 
 			// a pair of <vertex, edge_stream> for each partition
@@ -83,6 +87,10 @@ namespace RStream {
 
 		/* scatter without vertex data (for relational algebra use)*/
 		Update_Stream scatter_no_vertex(std::function<UpdateType*(Edge*)> generate_one_update) {
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_id = 0;
+			atomic_partition_number = context.num_partitions;
+
 			print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
@@ -143,7 +151,7 @@ namespace RStream {
 		void scatter_producer_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update,
 				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 
-			atomic_num_producers++;
+//			atomic_num_producers++;
 			int partition_id = -1;
 			VertexId vertex_start = -1;
 			assert(context.vertex_unit == sizeof(VertexDataType));
@@ -260,13 +268,12 @@ namespace RStream {
 		// each exec thread generates a scatter_producer
 		void scatter_producer_no_vertex(std::function<UpdateType*(Edge*)> generate_one_update,
 				global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
+//			atomic_num_producers++;
 			int partition_id = -1;
 
 			for(unsigned int i = 0; i < context.num_partitions; i++) {
 				assert(buffers_for_shuffle[i]->get_capacity() == BUFFER_CAPACITY);
 			}
-
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){

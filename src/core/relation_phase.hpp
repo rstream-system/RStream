@@ -42,9 +42,9 @@ namespace RStream {
 //		virtual int new_key();
 
 		RPhase(Engine & e) : context(e) {
-			atomic_num_producers = 0;
-			atomic_partition_id = 0;
-			atomic_partition_number = context.num_partitions;
+//			atomic_num_producers = 0;
+//			atomic_partition_id = 0;
+//			atomic_partition_number = context.num_partitions;
 		}
 
 		virtual ~RPhase() {}
@@ -54,6 +54,10 @@ namespace RStream {
 		 * @param out_update_stream -output file for update stream
 		 * */
 		Update_Stream join(Update_Stream in_update_stream) {
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_id = 0;
+			atomic_partition_number = context.num_partitions;
+
 			print_thread_info_locked("--------------------Start Join Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
@@ -159,7 +163,7 @@ namespace RStream {
 	private:
 		// each exec thread generates a join producer
 		void join_producer(Update_Stream in_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
+//			atomic_num_producers++;
 			int partition_id = -1;
 
 			for(unsigned int i = 0; i < context.num_partitions; i++) {
