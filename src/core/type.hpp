@@ -156,7 +156,7 @@ struct Element_In_Tuple {
 		vertex_id = new_id;
 	}
 
-	int cmp(Element_In_Tuple& other){
+	int cmp(const Element_In_Tuple& other) const {
 		//compare vertex id
 		if(vertex_id < other.vertex_id){
 			return -1;
@@ -219,7 +219,7 @@ public:
 	}
 
 
-	int cmp(Canonical_Graph& other_cg){
+	int cmp(const Canonical_Graph& other_cg) const {
 		//compare the numbers of vertices
 		if(get_number_vertices() < other_cg.get_number_vertices()){
 			return -1;
@@ -239,8 +239,8 @@ public:
 		//compare edges
 		assert(tuple.size() == other_cg.tuple.size());
 		for(unsigned int i = 0; i < tuple.size(); ++i){
-			Element_In_Tuple & t1 = tuple[i];
-			Element_In_Tuple & t2 = other_cg.tuple[i];
+			const Element_In_Tuple & t1 = tuple[i];
+			const Element_In_Tuple & t2 = other_cg.tuple[i];
 
 			int cmp_element = t1.cmp(t2);
 			if(cmp_element != 0){
@@ -251,14 +251,18 @@ public:
 		return 0;
 	}
 
-	unsigned int get_hash(){
+	unsigned int get_hash() const {
 		return hash_value;
 	}
 
-	unsigned int get_number_vertices(){
+	unsigned int get_number_vertices() const {
 		return number_of_vertices;
 	}
 
+	//operator for map
+	bool operator==(const Canonical_Graph& other) const {
+		return cmp(other) == 0;
+	}
 
 
 private:
@@ -360,6 +364,16 @@ private:
 	}
 
 };
+
+namespace std {
+	template<>
+	struct hash<Canonical_Graph> {
+		std::size_t operator()(const Canonical_Graph& cg) const {
+			//simple hash
+			return std::hash<int>()(cg.get_hash());
+		}
+	};
+}
 
 
 
