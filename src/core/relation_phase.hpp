@@ -162,6 +162,10 @@ namespace RStream {
 			atomic_num_producers++;
 			int partition_id = -1;
 
+			for(unsigned int i = 0; i < context.num_partitions; i++) {
+				assert(buffers_for_shuffle[i]->get_capacity() == BUFFER_CAPACITY);
+			}
+
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
 
@@ -181,9 +185,12 @@ namespace RStream {
 //				io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
 
 				// streaming updates
-				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = update_file_size / IO_SIZE + 1;
-//				std::cout << streaming_counter;
+//				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+//				int streaming_counter = update_file_size / IO_SIZE + 1;
+
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(InUpdateType));
+				int streaming_counter = update_file_size / (IO_SIZE * sizeof(InUpdateType)) + 1;
+				assert((update_file_size % sizeof(InUpdateType)) == 0);
 
 				// edges are fully loaded into memory
 				char * edge_local_buf = new char[edge_file_size];
@@ -212,9 +219,11 @@ namespace RStream {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+//						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = update_file_size - IO_SIZE * sizeof(InUpdateType) * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+//						valid_io_size = IO_SIZE;
+						valid_io_size = IO_SIZE * sizeof(InUpdateType);
 
 					assert(valid_io_size % sizeof(InUpdateType) == 0);
 					print_thread_info_locked(std::to_string(counter) + "th streaming, start join of size "
