@@ -22,6 +22,11 @@ namespace RStream {
 		std::atomic<int> atomic_partition_number;
 
 	public:
+
+		virtual bool filter_aggregate(std::vector<Element_In_Tuple> & update_tuple, std::unordered_map<Canonical_Graph, int>& map) = 0;
+
+
+
 		Aggregation(Engine & e) : context(e) {
 			atomic_num_producers = 0;
 			atomic_partition_id = 0;
@@ -41,8 +46,9 @@ namespace RStream {
 		}
 
 
-		Update_Stream aggregate_filter(Update_Stream up_stream, Aggregation_Stream agg_stream){
-
+		Update_Stream aggregate_filter(Update_Stream up_stream, Aggregation_Stream agg_stream, int sizeof_in_tuple){
+			Update_Stream up_stream_shuffled_on_canonical = shuffle_upstream_canonicalgraph(up_stream, sizeof_in_tuple);
+			return aggregate_filter_local(up_stream_shuffled_on_canonical, agg_stream, sizeof_in_tuple);
 		}
 
 		void printout_aggstream(Aggregation_Stream agg_stream){
@@ -52,6 +58,240 @@ namespace RStream {
 
 
 	private:
+
+		Update_Stream shuffle_upstream_canonicalgraph(Update_Stream in_update_stream, int sizeof_in_tuple){
+			Update_Stream update_c = Engine::aggregation_count++;
+
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+			}
+
+			// output should be a pair of <tuples, count>
+			// tuples -- canonical pattern
+			// count -- counter for patterns
+			int sizeof_output = get_out_size(sizeof_in_tuple);
+			// allocate global buffers for shuffling
+			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_output);
+
+			// exec threads will do aggregate and push result patterns into shuffle buffers
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < context.num_exec_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->shuffle_on_canonical_producer(in_update_stream, buffers_for_shuffle, task_queue, sizeof_in_tuple); } ));
+
+			// write threads will flush shuffle buffer to update out stream file as long as it's full
+			std::vector<std::thread> write_threads;
+			for(int i = 0; i < context.num_write_threads; i++)
+				write_threads.push_back(std::thread(&MPhase::consumer, this, update_c, buffers_for_shuffle));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			for(auto &t : write_threads)
+				t.join();
+
+			delete[] buffers_for_shuffle;
+			delete task_queue;
+
+			return update_c;
+		}
+
+		void shuffle_on_canonical_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue, int sizeof_in_tuple) {
+			atomic_num_producers++;
+			int partition_id = -1;
+
+			// pop from queue
+			while(task_queue->test_pop_atomic(partition_id)) {
+				std::cout << partition_id << std::endl;
+
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0);
+
+				// get file size
+				long update_file_size = io_manager::get_filesize(fd_update);
+
+				// streaming updates
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = update_file_size / IO_SIZE + 1;
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				// for all streaming updates
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
+
+					assert(valid_io_size % sizeof_in_tuple == 0);
+
+					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
+
+					// streaming tuples in, do aggregation
+					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
+						// get an in_update_tuple
+						std::vector<Element_In_Tuple> in_update_tuple;
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+
+						shuffle_on_canonical(in_update_tuple, buffers_for_shuffle);
+					}
+
+				}
+
+				free(update_local_buf);
+				close(fd_update);
+
+			}
+			atomic_num_producers--;
+
+		}
+
+		void shuffle_on_canonical(std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining ** buffers_for_shuffle){
+			std::vector<Element_In_Tuple> quick_pattern(in_update_tuple.size());
+			// turn tuple to quick pattern
+			pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern);
+			Canonical_Graph* cf = pattern::turn_canonical_graph(quick_pattern, false);
+
+			int hash = cf->get_hash();
+			int index = get_global_bucket_index(hash);
+			delete cf;
+
+			//get tuple
+			insert_tuple_to_buffer(index, in_update_tuple, buffers_for_shuffle);
+		}
+
+		void insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
+			char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
+			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
+			global_buf->insert(out_update);
+		}
+
+
+		Update_Stream aggregate_filter_local(Update_Stream up_stream_shuffled_on_canonical, Aggregation_Stream agg_stream, int sizeof_in_tuple){
+			// each element in the tuple is 2 ints
+			Update_Stream update_c = Engine::update_count++;
+
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+			}
+
+			// allocate global buffers for shuffling
+			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_in_tuple);
+
+			// exec threads will produce updates and push into shuffle buffers
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < context.num_exec_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->aggregate_filter_local_producer(up_stream_shuffled_on_canonical, buffers_for_shuffle, task_queue, sizeof_in_tuple, agg_stream); } ));
+
+			// write threads will flush shuffle buffer to update out stream file as long as it's full
+			std::vector<std::thread> write_threads;
+			for(int i = 0; i < context.num_write_threads; i++)
+				write_threads.push_back(std::thread(&MPhase::consumer, this, update_c, buffers_for_shuffle));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			for(auto &t : write_threads)
+				t.join();
+
+			delete[] buffers_for_shuffle;
+			delete task_queue;
+
+			return update_c;
+		}
+
+		void aggregate_filter_local_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue, int sizeof_in_tuple, Aggregation_Stream agg_stream){
+			atomic_num_producers++;
+			int partition_id = -1;
+
+			// pop from queue
+			while(task_queue->test_pop_atomic(partition_id)){
+				std::cout << partition_id << std::endl;
+
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(agg_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0 && fd_agg > 0 );
+
+				// get file size
+				long update_file_size = io_manager::get_filesize(fd_update);
+				long agg_file_size = io_manager::get_filesize(fd_agg);
+
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
+
+				// streaming updates
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				int streaming_counter = update_file_size / IO_SIZE + 1;
+
+				// aggs are fully loaded into memory
+				char * agg_local_buf = new char[agg_file_size];
+				io_manager::read_from_file(fd_agg, agg_local_buf, agg_file_size, 0);
+
+
+				//build hashmap for aggregation tuples
+				std::unordered_map<Canonical_Graph, int> map;
+				build_aggmap(map, agg_local_buf, agg_file_size);
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				// for all streaming updates
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE;
+
+					assert(valid_io_size % sizeof_in_tuple == 0);
+
+					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
+
+					// streaming updates in, do hash join
+					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
+						// get an in_update_tuple
+						std::vector<Element_In_Tuple> in_update_tuple;
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+
+						if(!filter_aggregate(in_update_tuple, map)){
+							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
+						}
+
+					}
+				}
+
+				free(update_local_buf);
+				delete[] agg_local_buf;
+
+				close(fd_update);
+				close(fd_edge);
+			}
+
+			atomic_num_producers--;
+		}
+
+		void build_aggmap(std::unordered_map<Canonical_Graph, int>& map, char* agg_local_buf, int agg_file_size){
+
+		}
+
+		void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
+			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
+				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
+				tuple.push_back(element);
+			}
+		}
 
 		Aggregation_Stream aggregate_local(Update_Stream in_update_stream, int sizeof_in_tuple) {
 			Aggregation_Stream aggreg_c = Engine::aggregation_count++;
@@ -173,6 +413,7 @@ namespace RStream {
 		void write_canonical_aggregation(std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs_aggregation, const char* file_name){
 
 		}
+
 
 		void aggregate_local_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue, int sizeof_in_tuple) {
 			atomic_num_producers++;
@@ -298,12 +539,12 @@ namespace RStream {
 			}
 		}
 
-		void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
-			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
-				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
-				tuple.push_back(element);
-			}
-		}
+//		void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
+//			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
+//				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
+//				tuple.push_back(element);
+//			}
+//		}
 
 		void map_canonical(std::vector<std::pair<Quick_Pattern, int>> & quick_patterns_aggregation, std::vector<std::pair<Canonical_Graph*, int>> & canonical_graphs){
 			for (unsigned int i = 0; i < quick_patterns_aggregation.size(); i++) {
