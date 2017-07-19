@@ -181,6 +181,10 @@ namespace RStream {
 		bool is_empty() {
 			return count == 0;
 		}
+
+		size_t get_capacity() {
+			return capacity;
+		}
 	};
 
 	class buffer_manager_for_mining {
@@ -196,10 +200,11 @@ namespace RStream {
 		}
 
 		static global_buffer_for_mining * get_global_buffer_for_mining(global_buffer_for_mining ** buffers, int num_partitions, int index) {
-			if(index >= 0 && index < num_partitions)
-				return buffers[index];
-			else
-				return nullptr;
+			assert(index >= 0 && index < num_partitions);
+//			if(index >= 0 && index < num_partitions)
+			return buffers[index];
+//			else
+//				return nullptr;
 		}
 	};
 
@@ -221,10 +226,11 @@ namespace RStream {
 
 		// get one global buffer according to the index
 		static global_buffer<T>* get_global_buffer(global_buffer<T> ** buffers, int num_partitions, int index) {
-			if(index >= 0 && index < num_partitions)
-				return buffers[index];
-			else
-				return nullptr;
+			assert(index >= 0 && index < num_partitions);
+//			if(index >= 0 && index < num_partitions)
+			return buffers[index];
+//			else
+//				return nullptr;
 		}
 
 	};

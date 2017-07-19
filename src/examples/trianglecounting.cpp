@@ -60,8 +60,13 @@ public:
 	~R1(){};
 
 	bool filter(RInUpdate_TriC * update, Edge * edge) {
-		if(update->src > update->target || edge->src > edge->target) return true;
-		return false;
+//		if(update->src > update->target || edge->src > edge->target) return true;
+//		return false;
+
+		if(update->src < update->target && edge->src < edge->target)
+			return false;
+
+		return true;
 	}
 
 	ROutUpdate_TriC * project_columns(RInUpdate_TriC * in_update, Edge * edge) {
