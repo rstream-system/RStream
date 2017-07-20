@@ -12,7 +12,6 @@
 
 typedef std::vector<Element_In_Tuple> Tuple;
 typedef std::vector<Element_In_Tuple> Quick_Pattern;
-//typedef std::vector<Element_In_Tuple> Canonical_Graph;
 
 namespace RStream {
 	class Aggregation {
@@ -23,17 +22,22 @@ namespace RStream {
 
 	public:
 
+		//virtual functions
 		virtual bool filter_aggregate(std::vector<Element_In_Tuple> & update_tuple, std::unordered_map<Canonical_Graph, int>& map) = 0;
 
 
+		//constructor
+		Aggregation(Engine & e) : context(e) {}
 
-		Aggregation(Engine & e) : context(e) {
-			atomic_num_producers = 0;
-			atomic_partition_id = 0;
+		virtual ~Aggregation() {}
+
+
+		void atomic_init(){
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_id = -1;
 			atomic_partition_number = context.num_partitions;
 		}
 
-		~Aggregation() {}
 
 		/*
 		 * do aggregation for update stream
@@ -42,7 +46,8 @@ namespace RStream {
 		 * */
 		Aggregation_Stream aggregate(Update_Stream in_update_stream, int sizeof_in_tuple) {
 			Aggregation_Stream stream_local = aggregate_local(in_update_stream, sizeof_in_tuple);
-			return aggregate_global(stream_local, sizeof_in_tuple);
+			int sizeof_agg = get_out_size(sizeof_in_tuple);
+			return aggregate_global(stream_local, sizeof_agg);
 		}
 
 
@@ -138,7 +143,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						shuffle_on_canonical(in_update_tuple, buffers_for_shuffle);
 					}
@@ -263,7 +268,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						if(!filter_aggregate(in_update_tuple, map)){
 							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
@@ -286,14 +291,10 @@ namespace RStream {
 
 		}
 
-		void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
-			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
-				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
-				tuple.push_back(element);
-			}
-		}
 
 		Aggregation_Stream aggregate_local(Update_Stream in_update_stream, int sizeof_in_tuple) {
+			atomic_init();
+
 			Aggregation_Stream aggreg_c = Engine::aggregation_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -334,15 +335,14 @@ namespace RStream {
 
 		}
 
-		int get_out_size(int sizeof_in_tuple){
+		static int get_out_size(int sizeof_in_tuple){
 			//TODO: sizeof(int) + ?
 			return sizeof(int);
 		}
 
-		Aggregation_Stream aggregate_global(Aggregation_Stream in_agg_stream, int sizeof_in_tuple) {
+		Aggregation_Stream aggregate_global(Aggregation_Stream in_agg_stream, int sizeof_in_agg) {
 			Aggregation_Stream aggreg_c = Engine::aggregation_count++;
 
-			//TODO
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
 			// push task into concurrent queue
@@ -350,14 +350,10 @@ namespace RStream {
 				task_queue->push(partition_id);
 			}
 
-			// output should be a pair of <tuples, count>
-			// tuples -- canonical pattern
-			// count -- counter for patterns
-
 			// exec threads will do aggregate and push result patterns into shuffle buffers
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < context.num_exec_threads + context.num_write_threads; i++)
-				exec_threads.push_back( std::thread([=] { this->aggregate_global_per_thread(in_agg_stream, task_queue, sizeof_in_tuple, aggreg_c); } ));
+				exec_threads.push_back( std::thread([=] { this->aggregate_global_per_thread(in_agg_stream, task_queue, sizeof_in_agg, aggreg_c); } ));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -368,55 +364,59 @@ namespace RStream {
 			return aggreg_c;
 		}
 
-		void aggregate_global_per_thread(Aggregation_Stream in_agg_stream, concurrent_queue<int> * task_queue, int sizeof_in_tuple, Aggregation_Stream out_agg_stream) {
+		void aggregate_global_per_thread(Aggregation_Stream in_agg_stream, concurrent_queue<int> * task_queue, int sizeof_in_agg, Aggregation_Stream out_agg_stream) {
 			int partition_id = -1;
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
 				std::cout << partition_id << std::endl;
 
-				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
-				assert(fd_update > 0);
+				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
+				assert(fd_agg > 0);
 
 				// get file size
-				long update_file_size = io_manager::get_filesize(fd_update);
+				long agg_file_size = io_manager::get_filesize(fd_agg);
 
 				// streaming updates
-				char * agg_local_buf = (char *)malloc(update_file_size);
+				char * agg_local_buf = (char *)malloc(agg_file_size);
 
-				// read tuples in, do aggregation
-				std::vector<std::pair<Canonical_Graph*, int>> tmp_aggregation;
-				for(long pos = 0; pos < update_file_size; pos += sizeof_in_tuple) {
+				io_manager::read_from_file(fd_agg, agg_local_buf, agg_file_size, 0);
+
+				// read aggregation pair in, do aggregation
+				std::unordered_map<Canonical_Graph, int> canonical_graphs_aggregation;
+
+				for(long pos = 0; pos < agg_file_size; pos += sizeof_in_agg) {
 					// get an in_update_tuple
-					std::pair<Canonical_Graph*, int> in_agg_pair;
-					get_an_in_agg_pair(agg_local_buf + pos, in_agg_pair, sizeof_in_tuple);
-					tmp_aggregation.push_back(in_agg_pair);
-				}
+					std::pair<Canonical_Graph, int> in_agg_pair;
+					get_an_in_agg_pair(agg_local_buf + pos, in_agg_pair, sizeof_in_agg);
 
-				// for all the canonical graphs, do local aggregation
-				std::vector<std::pair<Canonical_Graph*, int>> canonical_graphs_aggregation;
-				local_aggregate(tmp_aggregation, canonical_graphs_aggregation);
+					// for all the canonical graph pair, do local aggregation
+					aggregate_on_canonical_graph(canonical_graphs_aggregation, in_agg_pair);
+				}
 
 				const char * file_name = (context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(out_agg_stream)).c_str();
 				write_canonical_aggregation(canonical_graphs_aggregation, file_name);
 
 				free(agg_local_buf);
-				close(fd_update);
+				close(fd_agg);
 
 			}
 		}
 
-		void get_an_in_agg_pair(char * update_local_buf, std::pair<Canonical_Graph*, int> & agg_pair, int sizeof_in_tuple){
+		void aggregate_on_canonical_graph(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::pair<Canonical_Graph, int>& in_agg_pair){
 
 		}
 
-		void write_canonical_aggregation(std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs_aggregation, const char* file_name){
+		void get_an_in_agg_pair(char * update_local_buf, std::pair<Canonical_Graph, int> & agg_pair, int sizeof_in_tuple){
+
+		}
+
+		void write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, const char* file_name){
 
 		}
 
 
 		void aggregate_local_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue, int sizeof_in_tuple) {
-			atomic_num_producers++;
 			int partition_id = -1;
 
 			// pop from queue
@@ -431,71 +431,69 @@ namespace RStream {
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = update_file_size / IO_SIZE + 1;
+				long real_io_size = MPhase::get_real_io_size(IO_SIZE, sizeof_in_tuple);
+				int streaming_counter = update_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
 				long offset = 0;
 
-				std::vector<std::pair<Quick_Pattern, int>> quick_patterns_aggregation;
+				std::unordered_map<Quick_Pattern, int> quick_patterns_aggregation;
 
 				// for all streaming updates
 				for(int counter = 0; counter < streaming_counter; counter++) {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
-
+						valid_io_size = real_io_size;
 					assert(valid_io_size % sizeof_in_tuple == 0);
 
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 
-					std::vector<std::pair<Quick_Pattern, int>> quick_patterns;
-
 					// streaming tuples in, do aggregation
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						// turn tuple to quick pattern
 						pattern::turn_quick_pattern_sideffect(in_update_tuple);
-						quick_patterns.push_back(std::make_pair(in_update_tuple, 1));
+						aggregate_on_quick_pattern(quick_patterns_aggregation, in_update_tuple);
 					}
-
-					// do aggregation on quick patterns
-					local_aggregate(quick_patterns, quick_patterns_aggregation);
 
 				}
 
-				// for all the aggregated quick patterns, turn to canocail graphs
-				std::vector<std::pair<Canonical_Graph*, int>> canonical_graphs;
-				map_canonical(quick_patterns_aggregation, canonical_graphs);
-
-				// for all the canonical graphs, do local aggregation
-				std::vector<std::pair<Canonical_Graph*, int>> canonical_graphs_aggregation;
-				local_aggregate(canonical_graphs, canonical_graphs_aggregation);
+				std::unordered_map<Canonical_Graph, int> canonical_graphs_aggregation;
+				aggregate_on_canonical_graph(canonical_graphs_aggregation, quick_patterns_aggregation);
 
 				// for each canonical graph, do map reduce, shuffle to corresponding buckets
 				shuffle_canonical_aggregation(canonical_graphs_aggregation, buffers_for_shuffle);
 
-				//clean memory for bliss::AbstractGraph occurred in two vectors
-				clean(canonical_graphs, canonical_graphs_aggregation);
-
-				delete[] update_local_buf;
+				free(update_local_buf);
 				close(fd_update);
 
 			}
 			atomic_num_producers--;
 		}
 
-		void shuffle_canonical_aggregation(std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
+		void aggregate_on_quick_pattern(std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation, std::vector<Element_In_Tuple>& in_update_tuple){
+
+		}
+
+		void aggregate_on_canonical_graph(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation){
+
+		}
+
+
+		void shuffle_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
 			char* out_cg = nullptr;
-			for(unsigned int i = 0; i < canonical_graphs_aggregation.size(); i++) {
-				std::pair<Canonical_Graph *, int> one_canonical_graph = canonical_graphs_aggregation.at(i);
-				int hash = one_canonical_graph.first->get_hash();
+			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ++it) {
+				Canonical_Graph& canonical_graph = it->first;
+				int s = it->second;
+
+				int hash = canonical_graph.get_hash();
 				int index = get_global_bucket_index(hash);
 
 				//get out_cf
@@ -507,18 +505,16 @@ namespace RStream {
 			}
 		}
 
-		void clean(std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs, std::vector<std::pair<Canonical_Graph*, int>>& canonical_graphs_aggregation){
-
-		}
-
 		// each writer thread generates a join_consumer
 		void aggregate_consumer(Aggregation_Stream aggregation_stream, global_buffer_for_mining ** buffers_for_shuffle) {
 			while(atomic_num_producers != 0) {
-				int i = (atomic_partition_id++) % context.num_partitions ;
+				int i = (++atomic_partition_id) % context.num_partitions;
 
 				const char * file_name = (context.filename + "." + std::to_string(i) + ".aggregate_stream_" + std::to_string(aggregation_stream)).c_str();
 				global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
+
+				atomic_partition_id = atomic_partition_id % context.num_partitions;
 			}
 
 			//the last run - deal with all remaining content in buffers
@@ -539,30 +535,15 @@ namespace RStream {
 			}
 		}
 
-//		void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
-//			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
-//				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
-//				tuple.push_back(element);
+
+//		void map_canonical(std::vector<std::pair<Quick_Pattern, int>> & quick_patterns_aggregation, std::vector<std::pair<Canonical_Graph*, int>> & canonical_graphs){
+//			for (unsigned int i = 0; i < quick_patterns_aggregation.size(); i++) {
+//				std::pair<Quick_Pattern, int> one_quick_pair = quick_patterns_aggregation.at(i);
+//				Canonical_Graph* cf = pattern::turn_canonical_graph(one_quick_pair.first, false);
+//				canonical_graphs.push_back(std::make_pair(cf, one_quick_pair.second));
 //			}
 //		}
 
-		void map_canonical(std::vector<std::pair<Quick_Pattern, int>> & quick_patterns_aggregation, std::vector<std::pair<Canonical_Graph*, int>> & canonical_graphs){
-			for (unsigned int i = 0; i < quick_patterns_aggregation.size(); i++) {
-				std::pair<Quick_Pattern, int> one_quick_pair = quick_patterns_aggregation.at(i);
-				Canonical_Graph* cf = pattern::turn_canonical_graph(one_quick_pair.first, false);
-				canonical_graphs.push_back(std::make_pair(cf, one_quick_pair.second));
-			}
-		}
-
-		// TODO:
-		void local_aggregate(std::vector<std::pair<Quick_Pattern, int>> & in_tuples, std::vector<std::pair<Quick_Pattern, int>> & out_tuples) {
-
-		}
-
-		// TODO:
-		void local_aggregate(std::vector<std::pair<Canonical_Graph*, int>> & in_graphs, std::vector<std::pair<Canonical_Graph*, int>> & out_graphs) {
-
-		}
 
 		int get_global_bucket_index(int hash_val) {
 			return hash_val % context.num_partitions;

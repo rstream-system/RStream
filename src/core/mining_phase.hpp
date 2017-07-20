@@ -325,7 +325,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple);
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						// get key index
 						BYTE key_index = get_key_index(in_update_tuple);
@@ -414,7 +414,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple);
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						// get key index
 						BYTE key_index = get_key_index(in_update_tuple);
@@ -499,7 +499,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple);
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						shuffle_on_all_keys(in_update_tuple, buffers_for_shuffle);
 					}
@@ -554,7 +554,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple);
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						if(!filter_collect(in_update_tuple)){
 							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
@@ -694,7 +694,7 @@ namespace RStream {
 		}
 
 
-		void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple) {
+		static void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
 			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
 				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
 				tuple.push_back(element);
