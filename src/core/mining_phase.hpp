@@ -33,25 +33,26 @@ namespace RStream {
 
 
 		MPhase(Engine & e) : context(e) {
-			atomic_num_producers = 0;
-			atomic_partition_id = 0;
-			atomic_partition_number = context.num_partitions;
-
 			sizeof_in_tuple = 0;
 		}
 
 		virtual ~MPhase() {}
 
 
+		void atomic_init(){
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_id = -1;
+			atomic_partition_number = context.num_partitions;
+		}
 
 		/** join update stream with edge stream to generate non-shuffled update stream
 		 * @param in_update_stream: which is shuffled
 		 * @param out_update_stream: which is non-shuffled
 		 */
 		Update_Stream join_mining(Update_Stream in_update_stream) {
-
-			// each element in the tuple is 2 ints
+			atomic_init();
 			int sizeof_out_tuple = sizeof_in_tuple + sizeof(Element_In_Tuple);
+
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -95,7 +96,9 @@ namespace RStream {
 
 		// gen shuffled init update stream based on edge partitions
 		Update_Stream init_shuffle_all_keys() {
+			atomic_init();
 			sizeof_in_tuple = 2 * sizeof(Element_In_Tuple);
+
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -365,7 +368,6 @@ namespace RStream {
 
 		// each exec thread generates a join producer
 		void join_mining_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
 			int partition_id = -1;
 
 			// pop from queue
@@ -384,7 +386,8 @@ namespace RStream {
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = update_file_size / IO_SIZE + 1;
+				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
+				int streaming_counter = update_file_size / real_io_size + 1;
 
 				// edges are fully loaded into memory
 				char * edge_local_buf = new char[edge_file_size];
@@ -406,9 +409,9 @@ namespace RStream {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+						valid_io_size = real_io_size;
 
 					assert(valid_io_size % sizeof_in_tuple == 0);
 
@@ -447,7 +450,7 @@ namespace RStream {
 					}
 				}
 
-				delete[] update_local_buf;
+				free(update_local_buf);
 				delete[] edge_local_buf;
 
 				close(fd_update);
@@ -579,7 +582,6 @@ namespace RStream {
 
 
 		void shuffle_all_keys_producer_init(global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
 			int partition_id = -1;
 
 			// pop from queue
@@ -592,7 +594,8 @@ namespace RStream {
 
 				// streaming edges
 				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = edge_file_size / IO_SIZE + 1;
+				long real_io_size = get_real_io_size(IO_SIZE, sizeof(LabeledEdge));
+				int streaming_counter = edge_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
 				long offset = 0;
@@ -602,9 +605,9 @@ namespace RStream {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = edge_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = edge_file_size - real_io_size * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+						valid_io_size = real_io_size;
 
 					assert(valid_io_size % sizeof(LabeledEdge) == 0);
 
@@ -617,7 +620,7 @@ namespace RStream {
 						LabeledEdge & e = *(LabeledEdge*)(edge_local_buf + pos);
 
 						std::vector<Element_In_Tuple> out_update_tuple;
-						out_update_tuple.push_back(Element_In_Tuple(e.src, e.edge_label, e.src_label));
+						out_update_tuple.push_back(Element_In_Tuple(e.src, 0, e.src_label));
 						out_update_tuple.push_back(Element_In_Tuple(e.target, e.edge_label, e.target_label));
 
 						// shuffle on both src and target
@@ -629,17 +632,26 @@ namespace RStream {
 				delete[] edge_local_buf;
 				close(fd_edge);
 			}
+
 			atomic_num_producers--;
+		}
+
+		static long get_real_io_size(long io_size, int size_of_unit){
+			long real_io_size = io_size - io_size % size_of_unit;
+			assert(real_io_size % size_of_unit == 0);
+			return real_io_size;
 		}
 
 		// each writer thread generates a join_consumer
 		void consumer(Update_Stream out_update_stream, global_buffer_for_mining ** buffers_for_shuffle) {
 			while(atomic_num_producers != 0) {
-				int i = (atomic_partition_id++) % context.num_partitions ;
+				int i = (++atomic_partition_id) % context.num_partitions;
 
 				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
 				global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
+
+				atomic_partition_id = atomic_partition_id % context.num_partitions;
 			}
 
 			//the last run - deal with all remaining content in buffers
