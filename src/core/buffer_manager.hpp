@@ -68,7 +68,7 @@ namespace RStream {
 
 		void flush_end(const char * file_name, const int i) {
 			std::unique_lock<std::mutex> lock(mutex);
-			if(!is_empty()){
+//			if(!is_empty()){
 				int perms = O_WRONLY | O_APPEND;
 				int fd = open(file_name, perms, S_IRWXU);
 				if(fd < 0){
@@ -78,7 +78,7 @@ namespace RStream {
 				// flush buffer to update out stream
 				io_manager::write_to_file(fd, buf, count * sizeof_tuple);
 				close(fd);
-			}
+//			}
 
 		}
 
@@ -152,7 +152,7 @@ namespace RStream {
 
 		void flush_end(const char * file_name, const int i) {
 			std::unique_lock<std::mutex> lock(mutex);
-			if(!is_empty()){
+//			if(!is_empty()){
 				int perms = O_WRONLY | O_APPEND;
 				int fd = open(file_name, perms, S_IRWXU);
 				if(fd < 0){
@@ -163,7 +163,7 @@ namespace RStream {
 				char * b = (char *) buf;
 				io_manager::write_to_file(fd, b, count * sizeof(T));
 				close(fd);
-			}
+//			}
 
 			//debugging info
 			if(!is_empty()){

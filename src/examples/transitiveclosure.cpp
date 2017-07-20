@@ -95,7 +95,7 @@ bool should_terminate(Update_Stream delta_tc, Engine & e) {
 }
 
 inline std::ostream & operator<<(std::ostream & strm, const In_Update_TC& update){
-	strm << "(" << update.target << ", " << update.src << ")";
+	strm << "(" << update.src << ", " << update.target << ")";
 	return strm;
 }
 
@@ -129,25 +129,48 @@ int main(int argc, char ** argv) {
 	Engine e("/home/kai/workspace/rstream_data/random/test.txt", 3, 10);
 
 	//scatter phase first to generate updates
-//	Scatter<BaseVertex, In_Update_TC> scatter_edges(e);
-//	Update_Stream delta_tc = scatter_edges.scatter_no_vertex(generate_one_update);
-//	printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, delta_tc);
+	// update0
+	Scatter<BaseVertex, In_Update_TC> scatter_edges(e);
+	Update_Stream delta_tc = scatter_edges.scatter_no_vertex(generate_one_update);
+	printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, delta_tc);
 
-//	Update_Stream tc = scatter_edges.scatter_no_vertex(generate_one_update);
-//	printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, tc);
+	// tc = update1
+	Update_Stream tc = scatter_edges.scatter_no_vertex(generate_one_update);
+	printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, tc);
 
-//	Scatter_Updates<In_Update_TC, Out_Update_TC> sc_up(e);
-//	TC triangle_counting(e);
+	Scatter_Updates<In_Update_TC, Out_Update_TC> sc_up(e);
+	TC triangle_counting(e);
+
+	while(!should_terminate(delta_tc, e)) {
 //
-//	while(!should_terminate(delta_tc, e)) {
-//
-//		Update_Stream out = triangle_counting.join(delta_tc);
+		// tmp with dup = update2
+		Update_Stream tmp = triangle_counting.join(delta_tc);
+//		std::cout << "join delta_tc with update_stream" << delta_tc << ", gen update_stream" << tmp << std::endl;
+//		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, tmp);
+
+		// out without dup = update3
+		Update_Stream out = triangle_counting.remove_dup(tmp);
+//		std::cout << "remove dup with update_stream" << tmp << ", gen update_stream" << out << std::endl;
 //		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, out);
-//		Update_Stream delta = triangle_counting.set_difference(out, tc);
-//		triangle_counting.union_relation(tc, delta);
+
+		// delta with set diff = update4
+		Update_Stream delta = triangle_counting.set_difference(out, tc);
+//		std::cout << "set diff with update_stream" << out << " and update_stream" << tc << ", gen update_stream" << delta << std::endl;
+//		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, delta);
+
+		// union = upadte1 = tc
+		triangle_counting.union_relation(tc, delta);
+//		std::cout << "union update_stream" << tc << " with update_stream" << delta << ", gen update_stream" << tc << std::endl;
+//		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, tc);
+
+		// new delta with scatter = update5
 //		Update_Stream new_delta = sc_up.scatter_updates(delta, generate_out_update);
+//		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, new_delta);
 //		delta_tc = new_delta;
-//	}
+		delta_tc = delta;
+	}
+
+		std::cout << "Finish transitive closure." << std::endl;
 }
 
 

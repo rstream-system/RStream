@@ -102,6 +102,12 @@ namespace RStream {
 		 * result = update_stream1 - update_stream2
 		 * */
 		Update_Stream set_difference(Update_Stream update_stream1, Update_Stream update_stream2) {
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_id = 0;
+			atomic_partition_number = context.num_partitions;
+
+			print_thread_info_locked("--------------------Start Set Difference Phase--------------------\n\n");
+
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -133,24 +139,24 @@ namespace RStream {
 			delete[] buffers;
 			delete task_queue;
 
+			print_thread_info_locked("--------------------Finish Set Difference Phase--------------------\n\n");
+
 			return update_c;
 		}
 
 		// append update_stream2 to the end of update_stream1
 		void union_relation (Update_Stream update_stream1, Update_Stream update_stream2) {
-			Update_Stream update_c = Engine::update_count++;
+			print_thread_info_locked("--------------------Start Union Phase--------------------\n\n");
+//			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
-			// push task into concurrent queue
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
 				task_queue->push(partition_id);
-//				std::cout << partition_id << std::endl;
 			}
 
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < context.num_exec_threads; i++)
 				exec_threads.push_back( std::thread([=] { this->union_relation_worker(update_stream1, update_stream2, task_queue); } ));
-
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -158,6 +164,33 @@ namespace RStream {
 
 			delete task_queue;
 
+			print_thread_info_locked("--------------------Finish Union Phase--------------------\n\n");
+
+		}
+
+		Update_Stream remove_dup(Update_Stream update_stream) {
+			print_thread_info_locked("--------------------Start Remove Duplicates Phase--------------------\n\n");
+
+			Update_Stream update_c = Engine::update_count++;
+
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+			}
+
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < context.num_exec_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->remove_dup_worker(update_stream, update_c, task_queue); } ));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			delete task_queue;
+
+			print_thread_info_locked("--------------------Finish Remove Duplicates Phase--------------------\n\n");
+
+			return update_c;
 		}
 
 	private:
@@ -348,12 +381,11 @@ namespace RStream {
 		}
 
 		void set_difference_producer(Update_Stream update_stream1, Update_Stream update_stream2, global_buffer<OutUpdateType> ** buffers, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
+//			atomic_num_producers++;
 			int partition_id = -1;
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				std::cout << partition_id << std::endl;
 
 				int fd_update1 = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(update_stream1)).c_str(), O_RDONLY);
 				int fd_update2 = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(update_stream2)).c_str(), O_RDONLY);
@@ -364,8 +396,10 @@ namespace RStream {
 				long update2_file_size = io_manager::get_filesize(fd_update2);
 
 				// streaming update1
-				char * update1_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = update1_file_size / IO_SIZE + 1;
+//				char * update1_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+//				int streaming_counter = update1_file_size / IO_SIZE + 1;
+				char * update1_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(OutUpdateType));
+				int streaming_counter = update1_file_size / (IO_SIZE * sizeof(OutUpdateType)) + 1;
 
 				// Assumption: update2 can be fully loaded into memory
 				char * update2_buf = new char[update2_file_size];
@@ -382,9 +416,11 @@ namespace RStream {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = update1_file_size - IO_SIZE * (streaming_counter - 1);
+//						valid_io_size = update1_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = update1_file_size - IO_SIZE * sizeof(OutUpdateType) * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+//						valid_io_size = IO_SIZE;
+						valid_io_size = IO_SIZE * sizeof(OutUpdateType);
 
 					assert(valid_io_size % sizeof(OutUpdateType) == 0);
 
@@ -394,8 +430,8 @@ namespace RStream {
 					// streaming update1 in, do set difference
 					for(long pos = 0; pos < valid_io_size; pos += sizeof(OutUpdateType)) {
 						// get an update1
-						OutUpdateType & one_update1 = *(OutUpdateType*)(update1_buf + pos);
-						auto existed = set_of_updates2.find(one_update1);
+						OutUpdateType * one_update1 = (OutUpdateType*)(update1_buf + pos);
+						auto existed = set_of_updates2.find(*one_update1);
 
 						if(existed != set_of_updates2.end())
 							continue;
@@ -421,7 +457,6 @@ namespace RStream {
 		}
 
 		void union_relation_worker(Update_Stream update_stream1, Update_Stream update_stream2, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
 			int partition_id = -1;
 
 			// pop from queue
@@ -447,7 +482,58 @@ namespace RStream {
 				close(fd_update2);
 			}
 
-			atomic_num_producers--;
+		}
+
+		void remove_dup_worker(Update_Stream in_update_stream, Update_Stream out_update_stream, concurrent_queue<int> * task_queue) {
+			int partition_id = -1;
+
+			while(task_queue->test_pop_atomic(partition_id)) {
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0);
+
+				// get file size
+				long update_file_size = io_manager::get_filesize(fd_update);
+				char * update_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(OutUpdateType));
+				int streaming_counter = update_file_size / (IO_SIZE * sizeof(OutUpdateType)) + 1;
+
+				std::unordered_set<OutUpdateType> set_of_updates;
+
+				long valid_io_size = 0;
+				long offset = 0;
+				// for all streaming updates
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = update_file_size - IO_SIZE * sizeof(OutUpdateType) * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE * sizeof(OutUpdateType);
+
+					assert(valid_io_size % sizeof(OutUpdateType) == 0);
+					io_manager::read_from_file(fd_update, update_buf, valid_io_size, offset);
+					offset += valid_io_size;
+
+					build_update_hashset(update_buf, set_of_updates, valid_io_size);
+				}
+
+				std::vector<OutUpdateType> out_updates;
+				std::copy(set_of_updates.begin(), set_of_updates.end(), std::back_inserter(out_updates));
+				const char * file_name = (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+				char* buf = reinterpret_cast<char*>(out_updates.data());
+				write_updates_to_file(buf, file_name, out_updates.size() * sizeof(OutUpdateType));
+			}
+		}
+
+		void write_updates_to_file(char * buf, const char * file_name, size_t length) {
+			int perms = O_WRONLY | O_APPEND;
+			int fd = open(file_name, perms, S_IRWXU);
+			if(fd < 0){
+				fd = creat(file_name, S_IRWXU);
+			}
+
+			// flush buffer to update out stream
+			io_manager::write_to_file(fd, buf, length);
+			close(fd);
 		}
 
 		void build_edge_hashmap(char * edge_buf, std::vector<std::vector<VertexId>> & edge_hashmap, size_t edge_file_size, int start_vertex) {
@@ -467,8 +553,9 @@ namespace RStream {
 			// for each update
 			for(size_t pos = 0;  pos < update_file_size; pos += sizeof(OutUpdateType)) {
 				// get an update
-				OutUpdateType & one_update = *(OutUpdateType*)(update_buf + pos);
+				OutUpdateType  one_update = *(OutUpdateType*)(update_buf + pos);
 				set_of_updates.insert(one_update);
+
 			}
 		}
 
