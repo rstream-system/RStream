@@ -141,6 +141,8 @@ namespace RStream {
 		 * @param out_update_stream: which is shuffled
 		 */
 		Update_Stream shuffle_all_keys(Update_Stream in_update_stream) {
+			atomic_init();
+
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -178,6 +180,8 @@ namespace RStream {
 		}
 
 		Update_Stream collect(Update_Stream in_update_stream) {
+			atomic_init();
+
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -219,9 +223,9 @@ namespace RStream {
 		 * @param out_update_stream -output file for update stream
 		 * */
 		Update_Stream join_all_keys(Update_Stream in_update_stream) {
-
-			// each element in the tuple is 2 ints
+			atomic_init();
 			int sizeof_out_tuple = sizeof_in_tuple + sizeof(Element_In_Tuple);
+
 			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -268,12 +272,12 @@ namespace RStream {
 	private:
 		// each exec thread generates a join producer
 		void join_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
 			int partition_id = -1;
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
 				std::cout << partition_id << std::endl;
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
@@ -283,24 +287,22 @@ namespace RStream {
 				long update_file_size = io_manager::get_filesize(fd_update);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
-				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
-
-				// streaming updates
-				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = update_file_size / IO_SIZE + 1;
-
 				// edges are fully loaded into memory
-				char * edge_local_buf = new char[edge_file_size];
+//				char * edge_local_buf = new char[edge_file_size];
+				char * edge_local_buf = (char *)malloc(edge_file_size);
 				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size, 0);
 
 				// build edge hashmap
 				const int n_vertices = context.vertex_intervals[partition_id].second - context.vertex_intervals[partition_id].first + 1;
 				int vertex_start = context.vertex_intervals[partition_id].first;
 				assert(n_vertices > 0 && vertex_start >= 0);
-
-//				std::array<std::vector<VertexId>, num_vertices> edge_hashmap;
 				std::vector<Element_In_Tuple> edge_hashmap[n_vertices];
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
+
+				// streaming updates
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
+				int streaming_counter = update_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
 				long offset = 0;
@@ -310,9 +312,9 @@ namespace RStream {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+						valid_io_size = real_io_size;
 
 					assert(valid_io_size % sizeof_in_tuple == 0);
 
@@ -329,22 +331,14 @@ namespace RStream {
 						BYTE key_index = get_key_index(in_update_tuple);
 						assert(key_index >= 0 && key_index < in_update_tuple.size());
 
-//						// get neighbors of current key
-//						std::unordered_set<VertexId> neighbors = get_neighborsof_current_key(in_update_tuple, key_index);
-
 						// get vertex_id as the key to index edge hashmap
 						VertexId key = in_update_tuple.at(key_index).vertex_id;
 
-						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
-//							// check if target of this edge in edge_hashmap already existed in in_update_tuple
-//							auto existed = neighbors.find(element.vertex_id);
-//							if(existed != neighbors.end())
-//								continue;
-
+						for(Element_In_Tuple& element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
 							gen_an_out_update(in_update_tuple, element, key_index);
 
-							// remove auotomorphism, only keep one unique tuple.
+							// remove automorphism, only keep one unique tuple.
 							if(pattern::is_automorphism(in_update_tuple))
 								continue;
 
@@ -356,8 +350,8 @@ namespace RStream {
 					}
 				}
 
-				delete[] update_local_buf;
-				delete[] edge_local_buf;
+				free(update_local_buf);
+				free(edge_local_buf);
 
 				close(fd_update);
 				close(fd_edge);
@@ -373,6 +367,7 @@ namespace RStream {
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
 				std::cout << partition_id << std::endl;
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
@@ -382,24 +377,21 @@ namespace RStream {
 				long update_file_size = io_manager::get_filesize(fd_update);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
-				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
-
-				// streaming updates
-				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
-				int streaming_counter = update_file_size / real_io_size + 1;
-
 				// edges are fully loaded into memory
-				char * edge_local_buf = new char[edge_file_size];
+				char * edge_local_buf = (char *)malloc(edge_file_size);
 				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size, 0);
 
 				// build edge hashmap
 				const int n_vertices = context.vertex_intervals[partition_id].second - context.vertex_intervals[partition_id].first + 1;
 				int vertex_start = context.vertex_intervals[partition_id].first;
 				assert(n_vertices > 0 && vertex_start >= 0);
-
 				std::vector<Element_In_Tuple> edge_hashmap[n_vertices];
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
+
+				// streaming updates
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
+				int streaming_counter = update_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
 				long offset = 0;
@@ -435,7 +427,7 @@ namespace RStream {
 							// generate a new out update tuple
 							gen_an_out_update(in_update_tuple, element, key_index);
 
-							// remove auotomorphism, only keep one unique tuple.
+							// remove automorphism, only keep one unique tuple.
 							if(pattern::is_automorphism(in_update_tuple))
 								continue;
 
@@ -451,7 +443,7 @@ namespace RStream {
 				}
 
 				free(update_local_buf);
-				delete[] edge_local_buf;
+				free(edge_local_buf);
 
 				close(fd_update);
 				close(fd_edge);
@@ -468,12 +460,12 @@ namespace RStream {
 
 
 		void shuffle_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
 			int partition_id = -1;
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
 				std::cout << partition_id << std::endl;
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -481,11 +473,10 @@ namespace RStream {
 				// get file size
 				long update_file_size = io_manager::get_filesize(fd_update);
 
-				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
-
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = update_file_size / IO_SIZE + 1;
+				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
+				int streaming_counter = update_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
 				long offset = 0;
@@ -495,9 +486,9 @@ namespace RStream {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+						valid_io_size = real_io_size;
 
 					assert(valid_io_size % sizeof_in_tuple == 0);
 
@@ -514,7 +505,7 @@ namespace RStream {
 					}
 				}
 
-				delete[] update_local_buf;
+				free(update_local_buf);
 				close(fd_update);
 			}
 
@@ -524,12 +515,12 @@ namespace RStream {
 
 
 		void collect_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			atomic_num_producers++;
 			int partition_id = -1;
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
 				std::cout << partition_id << std::endl;
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -537,11 +528,10 @@ namespace RStream {
 				// get file size
 				long update_file_size = io_manager::get_filesize(fd_update);
 
-				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
-
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = update_file_size / IO_SIZE + 1;
+				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
+				int streaming_counter = update_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
 				long offset = 0;
@@ -551,9 +541,9 @@ namespace RStream {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+						valid_io_size = real_io_size;
 
 					assert(valid_io_size % sizeof_in_tuple == 0);
 
@@ -572,7 +562,7 @@ namespace RStream {
 					}
 				}
 
-				delete[] update_local_buf;
+				free(update_local_buf);
 				close(fd_update);
 			}
 
@@ -629,7 +619,7 @@ namespace RStream {
 					}
 				}
 
-				delete[] edge_local_buf;
+				free(edge_local_buf);
 				close(fd_edge);
 			}
 
@@ -723,7 +713,6 @@ namespace RStream {
 
 		// TODO: do we need to store src.label?
 		void build_edge_hashmap(char * edge_buf, std::vector<Element_In_Tuple> * edge_hashmap, size_t edge_file_size, int start_vertex) {
-
 			// for each edge
 			for(size_t pos = 0; pos < edge_file_size; pos += sizeof(LabeledEdge)) {
 				// get a labeled edge
@@ -738,24 +727,6 @@ namespace RStream {
 			int partition_id = key / context.num_vertices_per_part;
 			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
 		}
-
-
-//		std::unordered_set<VertexId> & get_neighborsof_current_key(std::vector<Element_In_Tuple> & in_update_tuple, BYTE key_index) {
-//			std::unordered_set<VertexId> neighbors;
-//			for(int i = 1; i < in_update_tuple.size(); i++) {
-//				if(i != key_index) {
-//					if(in_update_tuple.at(i).history_info == key_index) {
-//						neighbors.insert(in_update_tuple.at(i).vertex_id);
-//					}
-//				} else {
-//					BYTE history = in_update_tuple.at(i).history_info;
-//					neighbors.insert(in_update_tuple.at(history).vertex_id);
-//				}
-//
-//			}
-//
-//			return neighbors;
-//		}
 
 
 };
