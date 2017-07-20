@@ -9,7 +9,7 @@
 #define CORE_CONSTANTS_HPP_
 
 size_t BUFFER_CAPACITY = 4000000;
-long IO_SIZE = 96 * 1024 * 1024; // 24M
+long IO_SIZE = 24 * 1024 * 1024; // 24M
 long PAGE_SIZE = 4 * 1024; // 4K
 
 #endif /* CORE_CONSTANTS_HPP_ */

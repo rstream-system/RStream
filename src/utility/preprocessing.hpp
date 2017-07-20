@@ -155,6 +155,7 @@ namespace RStream {
 
 			io_manager::write_to_file(fout, buf, counter * edge_unit);
 			close(fout);
+			free(buf);
 
 			fclose(fd);
 
@@ -280,14 +281,14 @@ namespace RStream {
 		template<typename T>
 		void consumer(global_buffer<T> ** buffers_for_shuffle) {
 //			print_thread_info_locked("start a consumer... \n");
-			unsigned int counter = 0;
+			int counter = 0;
 
 			while(atomic_num_producers != 0) {
 //				int i = (atomic_chunk_id++) % num_partitions ;
 				if(counter == num_partitions)
-				counter = 0;
+					counter = 0;
 
-				unsigned int i = counter++;
+				int i = counter++;
 
 				//debugging info
 //				print_thread_info_locked("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");

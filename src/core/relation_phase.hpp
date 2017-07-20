@@ -346,14 +346,14 @@ namespace RStream {
 
 		// each writer thread generates a join_consumer
 		void consumer(Update_Stream out_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle) {
-			unsigned int counter = 0;
+			int counter = 0;
 
 			while(atomic_num_producers != 0) {
 //				int i = (atomic_partition_id++) % context.num_partitions ;
 				if(counter == context.num_partitions)
 					counter = 0;
 
-				unsigned int i = counter++;
+				int i = counter++;
 
 				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
 				global_buffer<OutUpdateType>* g_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
