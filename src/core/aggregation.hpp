@@ -10,10 +10,8 @@
 
 #include "mining_phase.hpp"
 
-typedef std::vector<Element_In_Tuple> Tuple;
-typedef std::vector<Element_In_Tuple> Quick_Pattern;
-
 namespace RStream {
+
 	class Aggregation {
 		const Engine & context;
 		std::atomic<int> atomic_num_producers;
@@ -65,6 +63,8 @@ namespace RStream {
 	private:
 
 		Update_Stream shuffle_upstream_canonicalgraph(Update_Stream in_update_stream, int sizeof_in_tuple){
+			atomic_init();
+
 			Update_Stream update_c = Engine::aggregation_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -74,12 +74,8 @@ namespace RStream {
 				task_queue->push(partition_id);
 			}
 
-			// output should be a pair of <tuples, count>
-			// tuples -- canonical pattern
-			// count -- counter for patterns
-			int sizeof_output = get_out_size(sizeof_in_tuple);
 			// allocate global buffers for shuffling
-			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_output);
+			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_in_tuple);
 
 			// exec threads will do aggregate and push result patterns into shuffle buffers
 			std::vector<std::thread> exec_threads;
@@ -89,7 +85,7 @@ namespace RStream {
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < context.num_write_threads; i++)
-				write_threads.push_back(std::thread(&MPhase::consumer, this, update_c, buffers_for_shuffle));
+				write_threads.push_back(std::thread(&Aggregation::consumer, this, update_c, buffers_for_shuffle));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -201,7 +197,7 @@ namespace RStream {
 			// write threads will flush shuffle buffer to update out stream file as long as it's full
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < context.num_write_threads; i++)
-				write_threads.push_back(std::thread(&MPhase::consumer, this, update_c, buffers_for_shuffle));
+				write_threads.push_back(std::thread(&Aggregation::consumer, this, update_c, buffers_for_shuffle));
 
 			// join all threads
 			for(auto & t : exec_threads)
@@ -281,7 +277,7 @@ namespace RStream {
 				delete[] agg_local_buf;
 
 				close(fd_update);
-				close(fd_edge);
+				close(fd_agg);
 			}
 
 			atomic_num_producers--;
@@ -490,18 +486,18 @@ namespace RStream {
 		void shuffle_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
 			char* out_cg = nullptr;
 			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ++it) {
-				Canonical_Graph& canonical_graph = it->first;
-				int s = it->second;
-
-				int hash = canonical_graph.get_hash();
-				int index = get_global_bucket_index(hash);
-
-				//get out_cf
-				//TODO
-
-				// TODO: insert
-				global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
-				global_buf->insert(out_cg);
+//				Canonical_Graph canonical_graph = it->first;
+//				int s = it->second;
+//
+//				int hash = canonical_graph.get_hash();
+//				int index = get_global_bucket_index(hash);
+//
+//				//get out_cf
+//				//TODO
+//
+//				// TODO: insert
+//				global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
+//				global_buf->insert(out_cg);
 			}
 		}
 
@@ -524,6 +520,35 @@ namespace RStream {
 				if(i >= 0){
 
 					const char * file_name = (context.filename + "." + std::to_string(i) + ".aggregate_stream_" + std::to_string(aggregation_stream)).c_str();
+					global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
+					g_buf->flush_end(file_name, i);
+
+					delete g_buf;
+				}
+				else{
+					break;
+				}
+			}
+		}
+
+		void consumer(Update_Stream out_update_stream, global_buffer_for_mining ** buffers_for_shuffle) {
+			while(atomic_num_producers != 0) {
+				int i = (++atomic_partition_id) % context.num_partitions;
+
+				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+				global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
+				g_buf->flush(file_name, i);
+
+				atomic_partition_id = atomic_partition_id % context.num_partitions;
+			}
+
+			//the last run - deal with all remaining content in buffers
+			while(true){
+				int i = --atomic_partition_number;
+
+				if(i >= 0){
+
+					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
 					global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
 

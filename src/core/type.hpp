@@ -137,6 +137,10 @@ struct Element_In_Tuple {
 	BYTE vertex_label;
 	BYTE history_info;
 
+	Element_In_Tuple(){
+
+	}
+
 	Element_In_Tuple(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
 		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(0) {
 
@@ -201,15 +205,19 @@ struct Element_In_Tuple {
 	}
 };
 
-// One tuple contains multiple elements. "size" is the num of elements in one tuple
-struct Update_Tuple {
-	std::vector<Element_In_Tuple> elements;
-};
+//// One tuple contains multiple elements. "size" is the num of elements in one tuple
+//struct Update_Tuple {
+//	std::vector<Element_In_Tuple> elements;
+//};
 
 
-struct Canonical_Graph {
+class Canonical_Graph {
 
 public:
+	Canonical_Graph(){
+
+	}
+
 	Canonical_Graph(bliss::AbstractGraph* ag, bool is_directed){
 		construct_cg(ag, is_directed);
 	}
@@ -371,6 +379,55 @@ namespace std {
 		std::size_t operator()(const Canonical_Graph& cg) const {
 			//simple hash
 			return std::hash<int>()(cg.get_hash());
+		}
+	};
+}
+
+
+class Quick_Pattern {
+
+public:
+	Quick_Pattern(){
+
+	}
+
+	~Quick_Pattern(){
+
+	}
+
+	//operator for map
+	bool operator==(const Quick_Pattern& other) const {
+		//compare edges
+		assert(tuple.size() == other.tuple.size());
+		for(unsigned int i = 0; i < tuple.size(); ++i){
+			const Element_In_Tuple & t1 = tuple[i];
+			const Element_In_Tuple & t2 = other.tuple[i];
+
+			int cmp_element = t1.cmp(t2);
+			if(cmp_element != 0){
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	unsigned int get_hash() const {
+		//TODO
+		return 0;
+	}
+
+private:
+	std::vector<Element_In_Tuple> tuple;
+
+};
+
+namespace std {
+	template<>
+	struct hash<Quick_Pattern> {
+		std::size_t operator()(const Quick_Pattern& qp) const {
+			//simple hash
+			return std::hash<int>()(qp.get_hash());
 		}
 	};
 }

@@ -626,11 +626,6 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
-		static long get_real_io_size(long io_size, int size_of_unit){
-			long real_io_size = io_size - io_size % size_of_unit;
-			assert(real_io_size % size_of_unit == 0);
-			return real_io_size;
-		}
 
 		// each writer thread generates a join_consumer
 		void consumer(Update_Stream out_update_stream, global_buffer_for_mining ** buffers_for_shuffle) {
@@ -694,12 +689,7 @@ namespace RStream {
 		}
 
 
-		static void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
-			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
-				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
-				tuple.push_back(element);
-			}
-		}
+
 
 		// key index is always stored in the first element of the vector
 		BYTE get_key_index(std::vector<Element_In_Tuple> & in_update_tuple) {
@@ -726,6 +716,20 @@ namespace RStream {
 		int get_global_buffer_index(VertexId key) {
 			int partition_id = key / context.num_vertices_per_part;
 			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
+		}
+
+	public:
+		static long get_real_io_size(long io_size, int size_of_unit){
+			long real_io_size = io_size - io_size % size_of_unit;
+			assert(real_io_size % size_of_unit == 0);
+			return real_io_size;
+		}
+
+		static void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
+			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
+				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
+				tuple.push_back(element);
+			}
 		}
 
 
