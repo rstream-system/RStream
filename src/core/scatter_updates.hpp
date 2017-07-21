@@ -26,19 +26,18 @@ namespace RStream {
 
 	public:
 
-		Scatter_Updates(Engine & e) : context(e) {
-//			atomic_num_producers = 0;
-//			atomic_partition_id = 0;
-//			atomic_partition_number = context.num_partitions;
-		};
+		Scatter_Updates(Engine & e) : context(e) {};
+
+		void atomic_init() {
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_number = context.num_partitions;
+		}
 
 		/*
 		 * given an in_update, generate an out_update and scatter
 		 * */
 		Update_Stream scatter_updates(Update_Stream in_update_stream, std::function<OutUpdateType*(InUpdateType*)> generate_one_update) {
-			atomic_num_producers = context.num_exec_threads;
-			atomic_partition_id = 0;
-			atomic_partition_number = context.num_partitions;
+			atomic_init();
 
 			Update_Stream update_c = Engine::update_count++;
 
