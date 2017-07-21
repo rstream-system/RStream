@@ -339,7 +339,7 @@ namespace RStream {
 							gen_an_out_update(in_update_tuple, element, key_index);
 
 							// remove automorphism, only keep one unique tuple.
-							if(pattern::is_automorphism(in_update_tuple))
+							if(Pattern::is_automorphism(in_update_tuple))
 								continue;
 
 							shuffle_on_all_keys(in_update_tuple, buffers_for_shuffle);
@@ -428,7 +428,7 @@ namespace RStream {
 							gen_an_out_update(in_update_tuple, element, key_index);
 
 							// remove automorphism, only keep one unique tuple.
-							if(pattern::is_automorphism(in_update_tuple))
+							if(Pattern::is_automorphism(in_update_tuple))
 								continue;
 
 							if(!filter_join(in_update_tuple)){
@@ -438,7 +438,6 @@ namespace RStream {
 
 							in_update_tuple.pop_back();
 						}
-
 					}
 				}
 
@@ -670,7 +669,6 @@ namespace RStream {
 
 					set_key_index(out_update_tuple, i);
 					char* out_update = reinterpret_cast<char*>(out_update_tuple.data());
-
 
 					int index = get_global_buffer_index(key);
 					global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);

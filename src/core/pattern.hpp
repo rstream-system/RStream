@@ -13,7 +13,7 @@
 
 //static bool opt_directed = false;
 
-class pattern {
+class Pattern {
 
 	/**
 	 * The hook function that prints the found automorphisms.

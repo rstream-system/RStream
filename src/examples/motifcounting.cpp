@@ -6,7 +6,6 @@
 // */
 //
 //#include "../core/engine.hpp"
-//#include "../core/mining_phase.hpp"
 //#include "../core/aggregation.hpp"
 //
 //#define MAXSIZE 3
