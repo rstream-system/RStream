@@ -25,7 +25,7 @@ namespace RStream {
 
 		const Engine & context;
 		std::atomic<int> atomic_num_producers;
-		std::atomic<int> atomic_partition_id;
+//		std::atomic<int> atomic_partition_id;
 		std::atomic<int> atomic_partition_number;
 
 	public:
@@ -41,10 +41,11 @@ namespace RStream {
 		virtual OutUpdateType * project_columns(InUpdateType * in_update, Edge * edge) = 0;
 //		virtual int new_key();
 
-		RPhase(Engine & e) : context(e) {
-//			atomic_num_producers = 0;
-//			atomic_partition_id = 0;
-//			atomic_partition_number = context.num_partitions;
+		RPhase(Engine & e) : context(e) {}
+
+		void atomic_init() {
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_number = context.num_partitions;
 		}
 
 		virtual ~RPhase() {}
@@ -54,9 +55,7 @@ namespace RStream {
 		 * @param out_update_stream -output file for update stream
 		 * */
 		Update_Stream join(Update_Stream in_update_stream) {
-			atomic_num_producers = context.num_exec_threads;
-			atomic_partition_id = 0;
-			atomic_partition_number = context.num_partitions;
+			atomic_init();
 
 			print_thread_info_locked("--------------------Start Join Phase--------------------\n\n");
 
@@ -102,9 +101,7 @@ namespace RStream {
 		 * result = update_stream1 - update_stream2
 		 * */
 		Update_Stream set_difference(Update_Stream update_stream1, Update_Stream update_stream2) {
-			atomic_num_producers = context.num_exec_threads;
-			atomic_partition_id = 0;
-			atomic_partition_number = context.num_partitions;
+			atomic_init();
 
 			print_thread_info_locked("--------------------Start Set Difference Phase--------------------\n\n");
 
@@ -368,9 +365,12 @@ namespace RStream {
 //					//debugging info
 //					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+//					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+
+					std::string file_name_str = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream));
 					global_buffer<OutUpdateType>* g_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
-					g_buf->flush_end(file_name, i);
+//					g_buf->flush_end(file_name, i);
+					g_buf->flush_end(file_name_str, i);
 
 					delete g_buf;
 				}
@@ -518,13 +518,19 @@ namespace RStream {
 
 				std::vector<OutUpdateType> out_updates;
 				std::copy(set_of_updates.begin(), set_of_updates.end(), std::back_inserter(out_updates));
-				const char * file_name = (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+//				const char * file_name = (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+
+				std::string file = (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_update_stream));
 				char* buf = reinterpret_cast<char*>(out_updates.data());
-				write_updates_to_file(buf, file_name, out_updates.size() * sizeof(OutUpdateType));
+				write_updates_to_file(buf, file, out_updates.size() * sizeof(OutUpdateType));
+
+				free(update_buf);
+				close(fd_update);
 			}
 		}
 
-		void write_updates_to_file(char * buf, const char * file_name, size_t length) {
+		void write_updates_to_file(char * buf, std::string file, size_t length) {
+			const char * file_name = file.c_str();
 			int perms = O_WRONLY | O_APPEND;
 			int fd = open(file_name, perms, S_IRWXU);
 			if(fd < 0){

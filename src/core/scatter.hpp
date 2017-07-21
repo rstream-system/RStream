@@ -32,22 +32,21 @@ namespace RStream {
 		const Engine& context;
 
 		std::atomic<int> atomic_num_producers;
-		std::atomic<int> atomic_partition_id;
+//		std::atomic<int> atomic_partition_id;
 		std::atomic<int> atomic_partition_number;
 
 	public:
 
-		Scatter(Engine & e) : context(e) {
-//			atomic_num_producers = 0;
-//			atomic_partition_id = 0;
-//			atomic_partition_number = context.num_partitions;
-		};
+		Scatter(Engine & e) : context(e) {};
+
+		void atomic_init() {
+			atomic_num_producers = context.num_exec_threads;
+			atomic_partition_number = context.num_partitions;
+		}
 
 		/* scatter with vertex data (for graph computation use)*/
 		Update_Stream scatter_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update) {
-			atomic_num_producers = context.num_exec_threads;
-			atomic_partition_id = 0;
-			atomic_partition_number = context.num_partitions;
+			atomic_init();
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -87,9 +86,7 @@ namespace RStream {
 
 		/* scatter without vertex data (for relational algebra use)*/
 		Update_Stream scatter_no_vertex(std::function<UpdateType*(Edge*)> generate_one_update) {
-			atomic_num_producers = context.num_exec_threads;
-			atomic_partition_id = 0;
-			atomic_partition_number = context.num_partitions;
+			atomic_init();
 
 			print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
 
@@ -389,9 +386,12 @@ namespace RStream {
 //					//debugging info
 //					print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count)).c_str();
+//					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count)).c_str();
+					std::string file_name_str = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count));
+
 					global_buffer<UpdateType>* g_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
-					g_buf->flush_end(file_name, i);
+//					g_buf->flush_end(file_name, i);
+					g_buf->flush_end(file_name_str, i);
 
 					delete g_buf;
 				}
