@@ -79,7 +79,8 @@ namespace RStream {
 
 			const std::string meta_file = _filename + ".meta";
 			if(!file_exists(meta_file)) {
-//				Preproc proc(_filename, num_vertices, num_partitions, false);
+//				Preproc proc(_filename, num_vertices, num_partitions, false, true);	// false - edge values present
+																					// true - directed/undirected
 				Preprocessing proc(_filename, num_partitions, num_vertices);
 			}
 

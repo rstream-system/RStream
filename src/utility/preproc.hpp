@@ -15,6 +15,7 @@ namespace RStream {
 		int startVertex;
 		int maxLineSize;	// len of largest line in input file
 		bool edge_vals;
+		bool undirected;
 		int edge_unit;
 
 		std::vector<int> vertLabels;
@@ -24,8 +25,8 @@ namespace RStream {
 		inline bool getEdgeType() { return edge_vals; }
 		inline int getEdgeUnit() { return edge_unit; }
 
-		Preproc(std::string& _fname, int _numVerts, int _numParts, bool _edge_vals) :
-			fname(_fname), numVerts(_numVerts), numParts(_numParts), edge_vals(_edge_vals)
+		Preproc(std::string& _fname, int _numVerts, int _numParts, bool _edge_vals, bool undirected) :
+			fname(_fname), numVerts(_numVerts), numParts(_numParts), edge_vals(_edge_vals), undirected(_undirected)
 		{
 			vertLabels = std::vector<int>(numVerts, 0);
 			vertsPerPart = numVerts / numParts;
@@ -142,8 +143,6 @@ namespace RStream {
 						strp = strtok(NULL, delims);
 						edgeVal = std::stoi(strp);
 					}
-
-					if (tgt < src) continue;	// only count edges in one direction
 
 					int tgtLab = vertLabels[tgt - startVertex];
 					writeToFile(output, src, srcLab, tgt, tgtLab, edgeVal);
