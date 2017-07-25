@@ -67,9 +67,9 @@ namespace RStream {
 
 		Engine(std::string _filename, int num_parts, int _num_vertices) : filename(_filename) {
 //			num_threads = std::thread::hardware_concurrency();
-			num_threads = 4;
+			num_threads = 1;
 			num_write_threads = 1;
-			num_exec_threads = 3;
+			num_exec_threads = 1;
 
 			num_vertices = _num_vertices;
 			num_partitions = num_parts;
@@ -79,9 +79,9 @@ namespace RStream {
 
 			const std::string meta_file = _filename + ".meta";
 			if(!file_exists(meta_file)) {
-//				Preproc proc(_filename, num_vertices, num_partitions, false, true);	// false - edge values present
+				Preproc proc(_filename, num_vertices, num_partitions, false, true);	// false - edge values present
 																					// true - directed/undirected
-				Preprocessing proc(_filename, num_partitions, num_vertices);
+//				Preprocessing proc(_filename, num_partitions, num_vertices);
 			}
 
 			// get meta data from .meta file

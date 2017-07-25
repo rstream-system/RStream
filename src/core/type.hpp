@@ -59,7 +59,7 @@ struct LabeledEdge {
 	VertexId target;
 	BYTE src_label;
 	BYTE target_label;
-	BYTE edge_label;
+//	BYTE edge_label;
 
 };
 
@@ -88,6 +88,11 @@ inline std::ostream & operator<<(std::ostream & strm, const WeightedEdge& edge){
 
 inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
 	strm << "(" << edge.src << ", " << edge.target  << ")";
+	return strm;
+}
+
+inline std::ostream & operator<<(std::ostream & strm, const LabeledEdge& edge){
+	strm << "(" << edge.src << ", " << edge.src_label << " - " << edge.target << ", " << edge.target_label << ")";
 	return strm;
 }
 

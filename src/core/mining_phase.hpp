@@ -575,7 +575,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				int fd_edge = open((context.filename + ".binary." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_edge > 0 );
 
 				// get edge file size
@@ -598,6 +598,10 @@ namespace RStream {
 					else
 						valid_io_size = real_io_size;
 
+					std::cout << real_io_size << std::endl;
+					std::cout << edge_file_size << std::endl;
+					std::cout << sizeof(LabeledEdge) << std::endl;
+					std::cout << valid_io_size << std::endl;
 					assert(valid_io_size % sizeof(LabeledEdge) == 0);
 
 					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
@@ -607,10 +611,11 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof(LabeledEdge)) {
 						// get an labeled edge
 						LabeledEdge & e = *(LabeledEdge*)(edge_local_buf + pos);
+						std::cout << e << std::endl;
 
 						std::vector<Element_In_Tuple> out_update_tuple;
 						out_update_tuple.push_back(Element_In_Tuple(e.src, 0, e.src_label));
-						out_update_tuple.push_back(Element_In_Tuple(e.target, e.edge_label, e.target_label));
+						out_update_tuple.push_back(Element_In_Tuple(e.target, 0, e.target_label));
 
 						// shuffle on both src and target
 						shuffle_on_all_keys(out_update_tuple, buffers_for_shuffle);
@@ -707,7 +712,7 @@ namespace RStream {
 				LabeledEdge e = *(LabeledEdge*)(edge_buf + pos);
 				assert(e.src >= start_vertex);
 				// e.src is the key
-				edge_hashmap[e.src - start_vertex].push_back(Element_In_Tuple(e.target, e.edge_label, e.target_label));
+				edge_hashmap[e.src - start_vertex].push_back(Element_In_Tuple(e.target, 0, e.target_label));
 			}
 		}
 

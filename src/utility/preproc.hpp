@@ -129,22 +129,22 @@ namespace RStream {
 				adj_list[len-1] = 0;
 				char delims[] = "\t ";
 				char *strp = strtok(adj_list, delims);
-				int src = std::stoi(strp);
+				VertexId src = std::stoi(strp);
 				strp = strtok(NULL, delims);
-				int srcLab = std::stoi(strp);
+				BYTE srcLab = std::stoi(strp);
 
 				// read outgoing edges and edge labels
 				// and write them to binary file
 				while ((strp = strtok(NULL, delims)) != NULL) {
-					int tgt = std::stoi(strp);
-					int edgeVal = -1;
+					VertexId tgt = std::stoi(strp);
+					BYTE edgeVal = 0;
 
 					if (edge_vals) {		// if there are edge values read them
 						strp = strtok(NULL, delims);
 						edgeVal = std::stoi(strp);
 					}
 
-					int tgtLab = vertLabels[tgt - startVertex];
+					BYTE tgtLab = (BYTE) vertLabels[tgt - startVertex];
 					writeToFile(output, src, srcLab, tgt, tgtLab, edgeVal);
 				}
 
@@ -159,13 +159,13 @@ namespace RStream {
 			std::cout << "Closing input file..." << std::endl;
 		}
 
-		void writeToFile(FILE* output, int src, int srcLab, int tgt, int tgtLab, int edgeVal)
+		void writeToFile(FILE* output, VertexId src, BYTE srcLab, VertexId tgt, BYTE tgtLab, BYTE edgeVal)
 		{
-			fwrite((const void*) &src, sizeof(int), 1, output);
-			fwrite((const void*) &srcLab, sizeof(int), 1, output);
-			fwrite((const void*) &tgt, sizeof(int), 1, output);
-			fwrite((const void*) &tgtLab, sizeof(int), 1, output);
-			if (edge_vals) fwrite((const void*) &edgeVal, sizeof(int), 1, output);
+			fwrite((const void*) &src, sizeof(VertexId), 1, output);
+			fwrite((const void*) &srcLab, sizeof(BYTE), 1, output);
+			fwrite((const void*) &tgt, sizeof(VertexId), 1, output);
+			fwrite((const void*) &tgtLab, sizeof(BYTE), 1, output);
+			if (edge_vals) fwrite((const void*) &edgeVal, sizeof(BYTE), 1, output);
 		}
 
 		void write_meta_file()
