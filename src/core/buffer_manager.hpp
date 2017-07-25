@@ -90,6 +90,10 @@ namespace RStream {
 			return count == 0;
 		}
 
+		inline size_t get_sizeoftuple(){
+			return sizeof_tuple;
+		}
+
 	};
 
 	// global buffer for shuffling, accessing by multithreads

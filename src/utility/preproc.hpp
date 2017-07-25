@@ -25,7 +25,7 @@ namespace RStream {
 		inline bool getEdgeType() { return edge_vals; }
 		inline int getEdgeUnit() { return edge_unit; }
 
-		Preproc(std::string& _fname, int _numVerts, int _numParts, bool _edge_vals, bool undirected) :
+		Preproc(std::string& _fname, int _numVerts, int _numParts, bool _edge_vals, bool _undirected) :
 			fname(_fname), numVerts(_numVerts), numParts(_numParts), edge_vals(_edge_vals), undirected(_undirected)
 		{
 			vertLabels = std::vector<int>(numVerts, 0);

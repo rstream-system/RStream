@@ -218,6 +218,11 @@ public:
 
 	}
 
+	Canonical_Graph(std::vector<Element_In_Tuple>& tuple, unsigned int num_vertices, unsigned int hash_v)
+		: tuple(tuple), number_of_vertices(num_vertices), hash_value(hash_v) {
+
+	}
+
 	Canonical_Graph(bliss::AbstractGraph* ag, bool is_directed){
 		construct_cg(ag, is_directed);
 	}
@@ -259,17 +264,21 @@ public:
 		return 0;
 	}
 
-	unsigned int get_hash() const {
+	inline unsigned int get_hash() const {
 		return hash_value;
 	}
 
-	unsigned int get_number_vertices() const {
+	inline unsigned int get_number_vertices() const {
 		return number_of_vertices;
 	}
 
 	//operator for map
 	bool operator==(const Canonical_Graph& other) const {
 		return cmp(other) == 0;
+	}
+
+	inline std::vector<Element_In_Tuple> get_tuple() const {
+		return tuple;
 	}
 
 
@@ -391,6 +400,10 @@ public:
 
 	}
 
+//	Quick_Pattern(std::vector<Element_In_Tuple>& t){
+//		tuple = t;
+//	}
+
 	~Quick_Pattern(){
 
 	}
@@ -415,6 +428,14 @@ public:
 	unsigned int get_hash() const {
 		//TODO
 		return 0;
+	}
+
+	void push(Element_In_Tuple& element){
+		tuple.push_back(element);
+	}
+
+	inline std::vector<Element_In_Tuple> get_tuple() const {
+		return tuple;
 	}
 
 private:

@@ -288,7 +288,15 @@ namespace RStream {
 		}
 
 		bool filter_aggregate(std::vector<Element_In_Tuple> & update_tuple, std::unordered_map<Canonical_Graph, int>& map, int threshold){
+			std::vector<Element_In_Tuple> quick_pattern(update_tuple.size());
+			// turn tuple to quick pattern
+			Pattern::turn_quick_pattern_pure(update_tuple, quick_pattern);
+			Canonical_Graph* cf = Pattern::turn_canonical_graph(quick_pattern, false);
 
+			assert(map.find(*cf) != map.end());
+			bool r = map[*cf] < threshold;
+			delete cf;
+			return r;
 		}
 
 		Aggregation_Stream aggregate_local(Update_Stream in_update_stream, int sizeof_in_tuple) {
@@ -335,8 +343,7 @@ namespace RStream {
 		}
 
 		static int get_out_size(int sizeof_in_tuple){
-			//TODO: sizeof(int) + ?
-			return sizeof(int);
+			return sizeof_in_tuple + sizeof(unsigned int) * 2 + sizeof(int);
 		}
 
 		Aggregation_Stream aggregate_global(Aggregation_Stream in_agg_stream, int sizeof_in_agg) {
@@ -403,11 +410,28 @@ namespace RStream {
 		}
 
 		void aggregate_on_canonical_graph(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::pair<Canonical_Graph, int>& in_agg_pair){
-
+			if(canonical_graphs_aggregation.find(in_agg_pair.first) != canonical_graphs_aggregation.end()){
+				canonical_graphs_aggregation[in_agg_pair.first] = canonical_graphs_aggregation[in_agg_pair.first] + in_agg_pair.second;
+			}
+			else{
+				canonical_graphs_aggregation[in_agg_pair.first] = in_agg_pair.second;
+			}
 		}
 
-		void get_an_in_agg_pair(char * update_local_buf, std::pair<Canonical_Graph, int> & agg_pair, int sizeof_in_tuple){
+		void get_an_in_agg_pair(char * update_local_buf, std::pair<Canonical_Graph, int> & agg_pair, int sizeof_in_agg){
+			std::vector<Element_In_Tuple> tuple;
+			for(unsigned int index = 0; index < sizeof_in_agg - sizeof(unsigned int) * 2 - sizeof(int); index += sizeof(Element_In_Tuple)){
+				Element_In_Tuple element = *(Element_In_Tuple*)(update_local_buf + index);
+				tuple.push_back(element);
+			}
+			unsigned int num_of_vertices = *(unsigned int*)(update_local_buf + (sizeof_in_agg - sizeof(unsigned int) * 2 - sizeof(int)));
+			unsigned int hash_value = *(unsigned int*)(update_local_buf + (sizeof_in_agg - sizeof(unsigned int) - sizeof(int)));
+			Canonical_Graph cg(tuple, num_of_vertices, hash_value);
 
+			int support = *(unsigned int*)(update_local_buf + (sizeof_in_agg - sizeof(int)));
+
+			agg_pair.first = cg;
+			agg_pair.second = support;
 		}
 
 		void write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, const char* file_name){
@@ -458,8 +482,9 @@ namespace RStream {
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						// turn tuple to quick pattern
-						Pattern::turn_quick_pattern_sideffect(in_update_tuple);
-						aggregate_on_quick_pattern(quick_patterns_aggregation, in_update_tuple);
+						Quick_Pattern quick_pattern;
+						Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern);
+						aggregate_on_quick_pattern(quick_patterns_aggregation, quick_pattern);
 					}
 
 				}
@@ -477,30 +502,56 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
-		void aggregate_on_quick_pattern(std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation, std::vector<Element_In_Tuple>& in_update_tuple){
+		void aggregate_on_quick_pattern(std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation,Quick_Pattern& quick_pattern){
+			if(quick_patterns_aggregation.find(quick_pattern) != quick_patterns_aggregation.end()){
+				quick_patterns_aggregation[quick_pattern] = quick_patterns_aggregation[quick_pattern] + 1;
+			}
+			else{
+				quick_patterns_aggregation[quick_pattern] = 1;
+			}
 
 		}
 
 		void aggregate_on_canonical_graph(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation){
+			for(auto it = quick_patterns_aggregation.begin(); it != quick_patterns_aggregation.end(); ++it){
+				std::vector<Element_In_Tuple> sub_graph = (*it).first.get_tuple();
+				int s = (*it).second;
+				Canonical_Graph* cg = Pattern::turn_canonical_graph(sub_graph, false);
 
+				if(canonical_graphs_aggregation.find(*cg) != canonical_graphs_aggregation.end()){
+					canonical_graphs_aggregation[*cg] = canonical_graphs_aggregation[*cg] + s;
+				}
+				else{
+					canonical_graphs_aggregation[*cg] = s;
+				}
+
+				delete cg;
+			}
 		}
 
 
 		void shuffle_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
-			char* out_cg = nullptr;
 			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ++it) {
-//				Canonical_Graph canonical_graph = it->first;
-//				int s = it->second;
-//
-//				int hash = canonical_graph.get_hash();
-//				int index = get_global_bucket_index(hash);
-//
-//				//get out_cf
-//				//TODO
-//
-//				// TODO: insert
-//				global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
-//				global_buf->insert(out_cg);
+				Canonical_Graph canonical_graph = it->first;
+				int s = it->second;
+
+				int hash = canonical_graph.get_hash();
+				int index = get_global_bucket_index(hash);
+				global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
+
+				char* out_cg = (char *)malloc(global_buf->get_sizeoftuple());
+				size_t s_vector = global_buf->get_sizeoftuple()- sizeof(unsigned int) * 2 - sizeof(int);
+				std::memcpy(out_cg, reinterpret_cast<char*>(canonical_graph.get_tuple().data()), s_vector);
+				unsigned int num_vertices = canonical_graph.get_number_vertices();
+				std::memcpy(out_cg + s_vector, &num_vertices, sizeof(unsigned int));
+				unsigned int hash_value = canonical_graph.get_hash();
+				std::memcpy(out_cg + s_vector + sizeof(unsigned int), &hash_value, sizeof(unsigned int));
+
+				std::memcpy(out_cg + s_vector + sizeof(unsigned int) * 2, &s, sizeof(int));
+
+				// TODO: insert
+				global_buf->insert(out_cg);
+				delete out_cg;
 			}
 		}
 
