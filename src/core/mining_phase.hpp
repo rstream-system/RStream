@@ -583,7 +583,8 @@ namespace RStream {
 
 				// streaming edges
 				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				long real_io_size = get_real_io_size(IO_SIZE, sizeof(LabeledEdge));
+				int size_of_unit = sizeof(LabeledEdge) - 2;
+				long real_io_size = get_real_io_size(IO_SIZE, size_of_unit);
 				int streaming_counter = edge_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
@@ -600,15 +601,15 @@ namespace RStream {
 
 					std::cout << real_io_size << std::endl;
 					std::cout << edge_file_size << std::endl;
-					std::cout << sizeof(LabeledEdge) << std::endl;
+					std::cout << size_of_unit << std::endl;
 					std::cout << valid_io_size << std::endl;
-					assert(valid_io_size % sizeof(LabeledEdge) == 0);
+					assert(valid_io_size % size_of_unit == 0);
 
 					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
 
 					// for each streaming
-					for(long pos = 0; pos < valid_io_size; pos += sizeof(LabeledEdge)) {
+					for(long pos = 0; pos < valid_io_size; pos += size_of_unit) {
 						// get an labeled edge
 						LabeledEdge & e = *(LabeledEdge*)(edge_local_buf + pos);
 						std::cout << e << std::endl;

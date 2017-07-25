@@ -162,10 +162,10 @@ namespace RStream {
 		void writeToFile(FILE* output, VertexId src, BYTE srcLab, VertexId tgt, BYTE tgtLab, BYTE edgeVal)
 		{
 			fwrite((const void*) &src, sizeof(VertexId), 1, output);
-			fwrite((const void*) &srcLab, sizeof(BYTE), 1, output);
 			fwrite((const void*) &tgt, sizeof(VertexId), 1, output);
+			fwrite((const void*) &srcLab, sizeof(BYTE), 1, output);
 			fwrite((const void*) &tgtLab, sizeof(BYTE), 1, output);
-			if (edge_vals) fwrite((const void*) &edgeVal, sizeof(BYTE), 1, output);
+//			if (edge_vals) fwrite((const void*) &edgeVal, sizeof(BYTE), 1, output);
 		}
 
 		void write_meta_file()

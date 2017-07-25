@@ -20,6 +20,7 @@ typedef unsigned Aggregation_Stream;
 typedef int VertexId;
 typedef float Weight;
 typedef unsigned char BYTE;
+//typedef unsigned int BYTE;
 
 struct Edge {
 	VertexId src;
@@ -59,8 +60,6 @@ struct LabeledEdge {
 	VertexId target;
 	BYTE src_label;
 	BYTE target_label;
-//	BYTE edge_label;
-
 };
 
 struct WeightedEdge {
