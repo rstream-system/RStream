@@ -353,8 +353,11 @@ namespace RStream {
 				int i = counter++;
 
 				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+				std::string file_name_str = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream));
+
 				global_buffer<OutUpdateType>* g_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
-				g_buf->flush(file_name, i);
+//				g_buf->flush(file_name, i);
+				g_buf->flush(file_name_str, i);
 			}
 
 			//the last run - deal with all remaining content in buffers
@@ -520,9 +523,9 @@ namespace RStream {
 				std::copy(set_of_updates.begin(), set_of_updates.end(), std::back_inserter(out_updates));
 //				const char * file_name = (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
 
-				std::string file = (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_update_stream));
+				std::string file_name_str = (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_update_stream));
 				char* buf = reinterpret_cast<char*>(out_updates.data());
-				write_updates_to_file(buf, file, out_updates.size() * sizeof(OutUpdateType));
+				write_updates_to_file(buf, file_name_str, out_updates.size() * sizeof(OutUpdateType));
 
 				free(update_buf);
 				close(fd_update);

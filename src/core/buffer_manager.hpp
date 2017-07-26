@@ -154,6 +154,37 @@ namespace RStream {
 //			}
 		}
 
+		void flush(std::string file_name_str, const int i) {
+					std::unique_lock<std::mutex> lock(mutex);
+
+					if(is_full()){
+						const char * file_name = file_name_str.c_str();
+
+						int perms = O_WRONLY | O_APPEND;
+						int fd = open(file_name, perms, S_IRWXU);
+						if(fd < 0){
+							fd = creat(file_name, S_IRWXU);
+						}
+						// flush buffer to update out stream
+						char * b = (char *) buf;
+						io_manager::write_to_file(fd, b, capacity * sizeof(T));
+						close(fd);
+
+						count = 0;
+						not_full.notify_all();
+
+		//				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+					}
+
+					//debugging info
+		//			if(is_full()){
+		//				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+		//			}
+		//			else{
+		//				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + std::string(file_name) + "\n");
+		//			}
+				}
+
 		void flush_end(const char * file_name, const int i) {
 			std::unique_lock<std::mutex> lock(mutex);
 //			if(!is_empty()){

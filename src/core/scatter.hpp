@@ -374,8 +374,11 @@ namespace RStream {
 //				print_thread_info("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
 				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count)).c_str();
+				std::string file_name_str = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count));
+
 				global_buffer<UpdateType>* g_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
-				g_buf->flush(file_name, i);
+//				g_buf->flush(file_name, i);
+				g_buf->flush(file_name_str, i);
 			}
 
 			//the last run - deal with all remaining content in buffers
