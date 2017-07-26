@@ -91,7 +91,7 @@ inline std::ostream & operator<<(std::ostream & strm, const Edge& edge){
 }
 
 inline std::ostream & operator<<(std::ostream & strm, const LabeledEdge& edge){
-	strm << "(" << edge.src << ", " << edge.src_label << " - " << edge.target << ", " << edge.target_label << ")";
+	strm << "(" << edge.src << ", " << (int)edge.src_label << " - " << edge.target << ", " << (int)edge.target_label << ")";
 	return strm;
 }
 

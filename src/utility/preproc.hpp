@@ -31,7 +31,7 @@ namespace RStream {
 			vertLabels = std::vector<int>(numVerts, 0);
 			vertsPerPart = numVerts / numParts;
 
-			edge_unit = (edge_vals) ? sizeof(int) * 5 : sizeof(int) * 4;
+			edge_unit = (edge_vals) ? sizeof(VertexId) * 2 + sizeof(BYTE) * 3 : sizeof(VertexId) * 2 + sizeof(BYTE) * 2;
 
 			getVertValues();
 

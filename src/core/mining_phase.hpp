@@ -583,7 +583,7 @@ namespace RStream {
 
 				// streaming edges
 				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int size_of_unit = sizeof(LabeledEdge) - 2;
+				int size_of_unit = context.edge_unit;
 				long real_io_size = get_real_io_size(IO_SIZE, size_of_unit);
 				int streaming_counter = edge_file_size / real_io_size + 1;
 
