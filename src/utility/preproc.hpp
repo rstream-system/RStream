@@ -29,9 +29,9 @@ namespace RStream {
 			fname(_fname), numVerts(_numVerts), numParts(_numParts), edge_vals(_edge_vals), undirected(_undirected)
 		{
 			vertLabels = std::vector<int>(numVerts, 0);
-			vertsPerPart = numVerts / numParts;
+			vertsPerPart = std::ceil((float)numVerts / (float)numParts);
 
-			edge_unit = (edge_vals) ? sizeof(VertexId) * 2 + sizeof(BYTE) * 3 : sizeof(VertexId) * 2 + sizeof(BYTE) * 2;
+			edge_unit = (edge_vals) ? sizeof(int) * 5 : sizeof(int) * 4;
 
 			getVertValues();
 
@@ -112,7 +112,7 @@ namespace RStream {
 			char* adj_list = new char[maxLineSize+1];
 			while (fgets(adj_list, maxLineSize+1, input) != NULL) {
 				int len = strlen(adj_list);
-				if (count > vertsPerPart) {		// if number of verts reached
+				if (count == vertsPerPart) {		// if number of verts reached
 					fclose(output);				// close file and make new partition
 					std::cout << "Closing binary file..." << std::endl;
 					name = fname + ".binary." + std::to_string((long long)++part);
