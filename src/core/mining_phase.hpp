@@ -718,7 +718,7 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(VertexId key) {
-			int partition_id = key / context.num_vertices_per_part;
+			int partition_id = (key - 1) / context.num_vertices_per_part;
 			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
 		}
 
