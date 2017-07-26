@@ -181,7 +181,7 @@ namespace RStream {
 						meta_file << start << "\t" << end << std::endl;
 					}
 					else {
-						end = start + vertsPerPart;
+						end = start + vertsPerPart-1;
 						meta_file << start << "\t" << end << std::endl;
 						start = end + 1;
 					}
