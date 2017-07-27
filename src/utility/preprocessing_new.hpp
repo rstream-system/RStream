@@ -181,8 +181,7 @@ namespace RStream {
 			edgeType = (int)EdgeType::Labeled;
 			edge_unit = sizeof(VertexId) * 2 + sizeof(BYTE) * 2;
 
-			std::cout << "Getting vertex values..." << std::endl;
-			FILE *fd = fopen(input.c_str(), "r");
+			FILE* fd = fopen(input.c_str(), "r");
 			assert(fd != NULL);
 			
 			char buf[2048], delims[] = "\t ";
@@ -197,7 +196,8 @@ namespace RStream {
 					val = (BYTE)(std::stoi(strtok(NULL, delims)));
 					
 					if (count == 0) startVertex = vert;
-					vertLabels[count++] = val;
+					vertLabels.push_back(val);
+					count++;
 				}
 
 				size += len;
@@ -212,7 +212,7 @@ namespace RStream {
 
 			fd = fopen(input.c_str(), "r");
 			assert(fd != NULL);
-			FILE* output = fopen((input + "binary").c_str(), "wb");
+			FILE* output = fopen((input + ".binary").c_str(), "wb");
 			assert(output != NULL);
 			char* adj_list = new char[maxsize+1];
 			while (fgets(adj_list, maxsize+1, fd) != NULL) {
