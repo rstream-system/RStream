@@ -9,7 +9,7 @@
 #include "../core/engine.hpp"
 #include "../core/mining_phase.hpp"
 
-#define MAXSIZE 3
+#define MAXSIZE 4
 
 using namespace RStream;
 
@@ -56,19 +56,26 @@ int main(int argc, char **argv) {
 
 	//init: get the edges stream
 	Update_Stream up_stream_shuffled = mPhase.init_shuffle_all_keys();
+	std::cout << "finish init-shuffling." << std::endl;
+
 	Update_Stream up_stream_non_shuffled;
 	Update_Stream clique_stream;
 
 	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
 	for(int i = 1; i < max_iterations; ++i){
+		std::cout << "at iteration " << i << std::endl;
 		//join on all keys
 		up_stream_non_shuffled = mPhase.join_mining(up_stream_shuffled);
+		std::cout << "finish joining." << std::endl;
 		//collect cliques
 		clique_stream = mPhase.collect(up_stream_non_shuffled);
+		std::cout << "finish collecting." << std::endl;
 		//print out cliques
 		mPhase.printout_upstream(clique_stream);
+		std::cout << "finish printing." << std::endl;
 		//shuffle for next join
 		up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled);
+		std::cout << "finish shuffling.\n\n" << std::endl;
 	}
 
 }

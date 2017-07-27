@@ -360,6 +360,12 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
+		static void printout_edgehashmap(std::vector<Element_In_Tuple>* edge_hashmap, VertexId n_vertices){
+			for(int i = 0; i < n_vertices; ++i){
+				std::cout << i << ": " << edge_hashmap[i] << std::endl;
+			}
+		}
+
 		// each exec thread generates a join producer
 		void join_mining_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
 			int partition_id = -1;
@@ -370,7 +376,7 @@ namespace RStream {
 				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
-				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				int fd_edge = open((context.filename + ".binary." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_update > 0 && fd_edge > 0 );
 
 				// get file size
@@ -382,11 +388,13 @@ namespace RStream {
 				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size, 0);
 
 				// build edge hashmap
-				const int n_vertices = context.vertex_intervals[partition_id].second - context.vertex_intervals[partition_id].first + 1;
-				int vertex_start = context.vertex_intervals[partition_id].first;
+				VertexId n_vertices = context.vertex_intervals[partition_id].second - context.vertex_intervals[partition_id].first + 1;
+				VertexId vertex_start = context.vertex_intervals[partition_id].first;
 				assert(n_vertices > 0 && vertex_start >= 0);
 				std::vector<Element_In_Tuple> edge_hashmap[n_vertices];
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
+				//for debugging
+				printout_edgehashmap(edge_hashmap, n_vertices);
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
@@ -415,6 +423,7 @@ namespace RStream {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
 						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						std::cout << in_update_tuple << std::endl;
 
 						// get key index
 						BYTE key_index = get_key_index(in_update_tuple);
@@ -426,19 +435,21 @@ namespace RStream {
 						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
 							gen_an_out_update(in_update_tuple, element, key_index);
+							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
+								<< ", " << filter_join(in_update_tuple) << std::endl;
 
 							// remove automorphism, only keep one unique tuple.
-							if(Pattern::is_automorphism(in_update_tuple))
-								continue;
-
-							if(!filter_join(in_update_tuple)){
+							if(!Pattern::is_automorphism(in_update_tuple) && !filter_join(in_update_tuple)){
 								assert(partition_id == get_global_buffer_index(key));
 								insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
 							}
 
 							in_update_tuple.pop_back();
 						}
+
+						std::cout << std::endl;
 					}
+//					assert(false);
 				}
 
 				free(update_local_buf);
@@ -450,6 +461,7 @@ namespace RStream {
 
 			atomic_num_producers--;
 		}
+
 
 		void insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
 			char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
@@ -557,6 +569,7 @@ namespace RStream {
 
 						if(!filter_collect(in_update_tuple)){
 							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
+							std::cout << "remained: " << in_update_tuple << std::endl;
 						}
 					}
 				}
@@ -619,7 +632,8 @@ namespace RStream {
 						out_update_tuple.push_back(Element_In_Tuple(e.target, 0, e.target_label));
 
 						// shuffle on both src and target
-						shuffle_on_all_keys(out_update_tuple, buffers_for_shuffle);
+						if(!Pattern::is_automorphism(out_update_tuple))
+							shuffle_on_all_keys(out_update_tuple, buffers_for_shuffle);
 
 					}
 				}
@@ -708,10 +722,9 @@ namespace RStream {
 		// TODO: do we need to store src.label?
 		void build_edge_hashmap(char * edge_buf, std::vector<Element_In_Tuple> * edge_hashmap, size_t edge_file_size, int start_vertex) {
 			// for each edge
-			for(size_t pos = 0; pos < edge_file_size; pos += sizeof(LabeledEdge)) {
+			for(size_t pos = 0; pos < edge_file_size; pos += context.edge_unit) {
 				// get a labeled edge
 				LabeledEdge e = *(LabeledEdge*)(edge_buf + pos);
-				assert(e.src >= start_vertex);
 				// e.src is the key
 				edge_hashmap[e.src - start_vertex].push_back(Element_In_Tuple(e.target, 0, e.target_label));
 			}

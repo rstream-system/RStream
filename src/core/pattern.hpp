@@ -51,9 +51,19 @@ public:
 
 
 	static bool is_automorphism(std::vector<Element_In_Tuple> & sub_graph) {
-		assert(sub_graph.size() > 2);
-
+		assert(sub_graph.size() >= 2);
 		Element_In_Tuple last_tuple = sub_graph.back();
+
+		//check with the first element
+		if(last_tuple.vertex_id < sub_graph.front().vertex_id){
+			return true;
+		}
+
+		//check loop edge
+		if(last_tuple.vertex_id == sub_graph[sub_graph[last_tuple.history_info].history_info].vertex_id){
+			return true;
+		}
+
 		std::pair<VertexId, VertexId> added_edge;
 		getEdge(sub_graph, sub_graph.size() - 1, added_edge);
 
@@ -70,7 +80,7 @@ public:
 			std::pair<VertexId, VertexId> edge;
 			getEdge(sub_graph, index, edge);
 			int cmp = compare(added_edge, edge);
-			assert(cmp != 0);
+//			assert(cmp != 0);
 			if(cmp <= 0){
 				return true;
 			}
