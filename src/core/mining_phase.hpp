@@ -265,7 +265,23 @@ namespace RStream {
 
 
 		void printout_upstream(Update_Stream in_update_stream){
+			std::cout << "Number of tuples in "<< in_update_stream << ": \t" << get_count(in_update_stream) << std::endl;
+		}
 
+		int get_count(Update_Stream in_update_stream){
+			int count_total = 0;
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0);
+
+				// get file size
+				long update_file_size = io_manager::get_filesize(fd_update);
+
+				count_total += update_file_size / sizeof_in_tuple;
+			}
+
+			return count_total;
 		}
 
 
@@ -393,8 +409,8 @@ namespace RStream {
 				assert(n_vertices > 0 && vertex_start >= 0);
 				std::vector<Element_In_Tuple> edge_hashmap[n_vertices];
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
-				//for debugging
-				printout_edgehashmap(edge_hashmap, n_vertices);
+//				//for debugging
+//				printout_edgehashmap(edge_hashmap, n_vertices);
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
@@ -423,7 +439,7 @@ namespace RStream {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
 						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
-						std::cout << in_update_tuple << std::endl;
+//						std::cout << in_update_tuple << std::endl;
 
 						// get key index
 						BYTE key_index = get_key_index(in_update_tuple);
@@ -435,8 +451,8 @@ namespace RStream {
 						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
 							gen_an_out_update(in_update_tuple, element, key_index);
-							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
-								<< ", " << filter_join(in_update_tuple) << std::endl;
+//							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
+//								<< ", " << filter_join(in_update_tuple) << std::endl;
 
 							// remove automorphism, only keep one unique tuple.
 							if(!Pattern::is_automorphism(in_update_tuple) && !filter_join(in_update_tuple)){
@@ -447,9 +463,8 @@ namespace RStream {
 							in_update_tuple.pop_back();
 						}
 
-						std::cout << std::endl;
+//						std::cout << std::endl;
 					}
-//					assert(false);
 				}
 
 				free(update_local_buf);
@@ -612,10 +627,10 @@ namespace RStream {
 					else
 						valid_io_size = real_io_size;
 
-					std::cout << real_io_size << std::endl;
-					std::cout << edge_file_size << std::endl;
-					std::cout << size_of_unit << std::endl;
-					std::cout << valid_io_size << std::endl;
+//					std::cout << real_io_size << std::endl;
+//					std::cout << edge_file_size << std::endl;
+//					std::cout << size_of_unit << std::endl;
+//					std::cout << valid_io_size << std::endl;
 					assert(valid_io_size % size_of_unit == 0);
 
 					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
@@ -625,7 +640,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += size_of_unit) {
 						// get an labeled edge
 						LabeledEdge & e = *(LabeledEdge*)(edge_local_buf + pos);
-						std::cout << e << std::endl;
+//						std::cout << e << std::endl;
 
 						std::vector<Element_In_Tuple> out_update_tuple;
 						out_update_tuple.push_back(Element_In_Tuple(e.src, 0, e.src_label));
