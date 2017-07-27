@@ -217,9 +217,10 @@ inline std::ostream & operator<<(std::ostream & strm, const Element_In_Tuple& el
 
 inline std::ostream & operator<<(std::ostream & strm, const std::vector<Element_In_Tuple>& tuple){
 	strm << "(";
-	for(auto it = tuple.begin(); it != tuple.end(); ++it){
+	for(auto it = tuple.begin(); it != tuple.end() - 1; ++it){
 		strm << (*it) << ", ";
 	}
+	strm << tuple.back();
 	strm << ")";
 	return strm;
 }
@@ -406,6 +407,11 @@ namespace std {
 	};
 }
 
+inline std::ostream & operator<<(std::ostream & strm, const Canonical_Graph& cg){
+	strm << "{" << cg.get_tuple() << "; " << cg.get_number_vertices() << "; " << cg.get_hash() << "}";
+	return strm;
+}
+
 
 class Quick_Pattern {
 
@@ -465,6 +471,11 @@ namespace std {
 			return std::hash<int>()(qp.get_hash());
 		}
 	};
+}
+
+inline std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_pattern){
+	strm << quick_pattern.get_tuple();
+	return strm;
 }
 
 

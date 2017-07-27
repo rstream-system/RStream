@@ -315,6 +315,7 @@ namespace RStream {
 			// tuples -- canonical pattern
 			// count -- counter for patterns
 			int sizeof_output = get_out_size(sizeof_in_tuple);
+			std::cout << "size_of_in_tuple = " << sizeof_in_tuple << ", size_of_agg = " << sizeof_output << std::endl;
 			// allocate global buffers for shuffling
 			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_output);
 
@@ -480,12 +481,18 @@ namespace RStream {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						std::cout << "in_update: \t" << in_update_tuple << std::endl;
 
 						// turn tuple to quick pattern
 						Quick_Pattern quick_pattern;
 						Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern);
+						std::cout << "quick_pattern: \t" << quick_pattern << std::endl;
+						std::cout << std::endl;
 						aggregate_on_quick_pattern(quick_patterns_aggregation, quick_pattern);
 					}
+
+					//for debugging
+					printout_quickpattern_aggmap(quick_patterns_aggregation);
 
 				}
 
@@ -502,7 +509,16 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
-		void aggregate_on_quick_pattern(std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation,Quick_Pattern& quick_pattern){
+		//for debugging only
+		void printout_quickpattern_aggmap(std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation){
+			std::cout << "quick pattern map: \n";
+			for(auto it = quick_patterns_aggregation.begin(); it != quick_patterns_aggregation.end(); ++it){
+				std::cout << it->first << " --> " << it->second << std::endl;
+			}
+			std::cout << std::endl;
+		}
+
+		void aggregate_on_quick_pattern(std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation, Quick_Pattern& quick_pattern){
 			if(quick_patterns_aggregation.find(quick_pattern) != quick_patterns_aggregation.end()){
 				quick_patterns_aggregation[quick_pattern] = quick_patterns_aggregation[quick_pattern] + 1;
 			}

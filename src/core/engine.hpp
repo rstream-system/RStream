@@ -69,7 +69,7 @@ namespace RStream {
 //			num_threads = std::thread::hardware_concurrency();
 			num_threads = 1;
 			num_write_threads = 1;
-			num_exec_threads = 3;
+			num_exec_threads = 1;
 
 			num_vertices = _num_vertices;
 			num_partitions = num_parts;
