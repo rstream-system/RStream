@@ -32,6 +32,9 @@ namespace RStream {
 	    else if(c == EdgeType::WITH_WEIGHT){
 	    	o << "WITH_WEIGHT";
 	    }
+	    else if(c == EdgeType::Labeled) {
+	    	o << "LabeledEdge";
+	    }
 	    else{
 	    	std::cout << "wrong edge type!!!" << std::endl;
 	    	throw std::exception();
@@ -315,7 +318,9 @@ namespace RStream {
 					assert(t != NULL);
 
 					edge_unit = atoi(t);
-				} else if(counter == 1) {
+				}
+				// second line for num_vertices and num_vertices_per_part
+				else if(counter == 1) {
 					num_vertices = atoi(t);
 					t = strtok(NULL, delims);
 					assert(t != NULL);
