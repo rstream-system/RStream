@@ -109,13 +109,6 @@ namespace RStream {
 //				std::cout << "partition " << i << " , start: " << vertex_intervals[i].first << " , end: " << vertex_intervals[i].second << std::endl;
 		}
 
-		static void reset_upstream_counter(Update_Stream start) {
-			// delete all tmp files
-			for(Update_Stream index = start; index < update_count; index++) {
-
-			}
-		}
-
 		~Engine(){
 //			delete[] vertex_intervals;
 		}

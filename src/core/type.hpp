@@ -28,8 +28,9 @@ enum class FORMAT {
 };
 
 enum class EdgeType {
-		NO_WEIGHT = 0,
-		WITH_WEIGHT = 1,
+	NO_WEIGHT = 0,
+	WITH_WEIGHT = 1,
+	Labeled = 2
 };
 
 struct Edge {
@@ -219,10 +220,20 @@ struct Element_In_Tuple {
 	}
 };
 
-//// One tuple contains multiple elements. "size" is the num of elements in one tuple
-//struct Update_Tuple {
-//	std::vector<Element_In_Tuple> elements;
-//};
+inline std::ostream & operator<<(std::ostream & strm, const Element_In_Tuple& element){
+	strm << "[" << element.vertex_id << ", " << (int)element.key_index << ", " << (int)element.edge_label << ", "
+			<< (int)element.vertex_label << ", " << (int)element.history_info << "]";
+	return strm;
+}
+
+inline std::ostream & operator<<(std::ostream & strm, const std::vector<Element_In_Tuple>& tuple){
+	strm << "(";
+	for(auto it = tuple.begin(); it != tuple.end(); ++it){
+		strm << (*it) << ", ";
+	}
+	strm << ")";
+	return strm;
+}
 
 
 class Canonical_Graph {
