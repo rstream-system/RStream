@@ -169,8 +169,68 @@ namespace RStream {
 		};
 
 		void convert_adjlist() {
+			std::cout << "Getting vertex values..." << std::endl;
+			FILE *input = fopen(input.c_str(), "r");
+			assert(input != NULL);
+			
+			char buf[2048], delims[] = "\t ";
+			VertexId vert,  startVertex;
+			BYTE val;
+			int count = 0, size = 0, maxsize = 0;
+			std::vector<BYTE> vertLabels;
+			while (fgets(buf, 2048, input) != NULL) {
+				int len = strlen(buf);
+				if (size == 0) {
+					vert = std::stoi(strtok(line, delims));
+					val = (BYTE)(std::stoi(strtok(NULL, delims)));
+					
+					if (count == 0) startVertex = vert;
+					vertLabels[count++] = val;
+				}
 
-		};
+				size += len;
+				if (buf[len-1] == '\n') {
+					maxsize = std::max(size, maxsize);
+					size = 0;
+				}
+			}
+			fclose(input);
+			numVertices = count;
+			minVertexId = startVertex;
+
+			FILE* input = fopen(input.c_str(), "r");
+			assert(input != NULL);
+			FILE* output = fopen(input.c_str(), "wb");
+			assert(output != NULL);
+			char* adj_list = new char[maxsize+1];
+			while (fgets(adj_list, maxsize+1, input) != NULL) {
+				int len = strlen(adj_list);
+				adj_list[len-1] = 0;
+				VertexId src = std::stoi(strtok(adj_list, delims));
+				BYTE srcLab = (BYTE)(std::stoi(strtok(NULL, delims)));
+
+				std::set<VertexId> neighbors;
+				char* strp;
+				while ((strp = strtok(NULL, delims)) != NULL) {
+					VertexId tgt = std::stoi(strp);
+					if (src == tgt) continue;
+					neighbors.insert(tgt-startVertex);
+				}
+
+				maxVertexId = src;
+				src -= startVertex;
+				for (std::set<BYTE>::iterator iter = neighbors.begin(); iter != neighbors.end(); iter++) {
+					BYTE = tgtLab = vertLabels[*iter];
+					fwrite((const void*) &src, sizeof(VertexId), 1, output);
+					fwrite((const void*) &tgt, sizeof(VertexId), 1, output);
+					fwrite((const void*) &srcLab, sizeof(BYTE), 1, output);
+					fwrite((const void*) &tgtlab, sizeof(BYTE), 1, output);
+				}
+			}
+
+			fclose(input);
+			fclose(ouput);
+		}
 
 		template<typename T>
 		void partition_on_vertices() {
