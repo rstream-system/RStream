@@ -15,13 +15,14 @@
 #include "type.hpp"
 #include "constants.hpp"
 #include "../utility/preprocessing.hpp"
+#include "../utility/preprocessing_new.hpp"
 #include "../utility/preproc.hpp"
 
 namespace RStream {
-	enum class EdgeType {
-		NO_WEIGHT = 0,
-		WITH_WEIGHT = 1,
-	};
+//	enum class EdgeType {
+//		NO_WEIGHT = 0,
+//		WITH_WEIGHT = 1,
+//	};
 
 	std::ostream& operator<<(std::ostream& o, EdgeType c)
 	{
@@ -65,23 +66,25 @@ namespace RStream {
 		static unsigned update_count;
 		static unsigned aggregation_count;
 
-		Engine(std::string _filename, int num_parts, int _num_vertices) : filename(_filename) {
+		Engine(std::string _filename, int num_parts, int input_format) : filename(_filename) {
 //			num_threads = std::thread::hardware_concurrency();
-			num_threads = 1;
+			num_threads = 4;
 			num_write_threads = 1;
 			num_exec_threads = 1;
 
-			num_vertices = _num_vertices;
 			num_partitions = num_parts;
-			num_vertices_per_part = num_vertices / num_partitions;
+
+//			num_vertices = _num_vertices;
+//			num_partitions = num_parts;
+//			num_vertices_per_part = num_vertices / num_partitions;
 //			Preprocessing proc(_filename, num_parts, num_vertices);
 
 
 			const std::string meta_file = _filename + ".meta";
 			if(!file_exists(meta_file)) {
-				Preproc proc(_filename, num_vertices, num_partitions, false, true);	// false - edge values present
-																					// true - directed/undirected
+//				Preproc proc(_filename, num_vertices, num_partitions, false);
 //				Preprocessing proc(_filename, num_partitions, num_vertices);
+				Preprocessing_new proc(filename, num_parts, input_format);
 			}
 
 			// get meta data from .meta file
@@ -93,6 +96,8 @@ namespace RStream {
 //			vertex_unit = 8;
 //			num_vertices_per_part = proc.getNumVerPerPartition();
 
+			std::cout << "Input format: " << (input_format) << std::endl;
+			std::cout << "Number of vertices: " << num_vertices << std::endl;
 			std::cout << "Number of partitions: " << num_partitions << std::endl;
 			std::cout << "Edge type: " << edge_type << std::endl;
 			std::cout << "Number of bytes per edge: " << edge_unit << std::endl;
@@ -310,6 +315,12 @@ namespace RStream {
 					assert(t != NULL);
 
 					edge_unit = atoi(t);
+				} else if(counter == 1) {
+					num_vertices = atoi(t);
+					t = strtok(NULL, delims);
+					assert(t != NULL);
+
+					num_vertices_per_part = atoi(t);
 				} else {
 					assert(counter <= (num_partitions + 1));
 					start = atoi(t);
