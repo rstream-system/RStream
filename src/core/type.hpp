@@ -22,6 +22,16 @@ typedef float Weight;
 typedef unsigned char BYTE;
 //typedef unsigned int BYTE;
 
+enum class FORMAT {
+	EdgeList,
+	AdjList
+};
+
+enum class EdgeType {
+		NO_WEIGHT = 0,
+		WITH_WEIGHT = 1,
+};
+
 struct Edge {
 	VertexId src;
 	VertexId target;
