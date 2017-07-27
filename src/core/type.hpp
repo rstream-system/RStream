@@ -71,6 +71,9 @@ struct LabeledEdge {
 	VertexId target;
 	BYTE src_label;
 	BYTE target_label;
+
+	LabeledEdge(VertexId _src, VertexId _target, BYTE _src_label, BYTE _target_label) : src(_src), target(_target), src_label(_src_label), target_label(_target_label) {}
+	LabeledEdge() : src(0), target(0), src_label(0), target_label(0) {}
 };
 
 struct WeightedEdge {

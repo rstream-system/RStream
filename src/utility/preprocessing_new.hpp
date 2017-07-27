@@ -66,6 +66,9 @@ namespace RStream {
 			} else if(format == (int)FORMAT::AdjList) {
 				std::cout << "start to convert adj list file..." << std::endl;
 				convert_adjlist();
+				std::cout << "convert adj list file done." << std::endl;
+				std::cout << "start to partition on vertices..." << std::endl;
+				partition_on_vertices<LabeledEdge>();
 			}
 
 		}
@@ -168,20 +171,25 @@ namespace RStream {
 			fclose(fd);
 		};
 
+		// note: vertex id always starts with 0
+		// (int)src, (int)target, (BYTE)src_label, (BYTE)target_label
 		void convert_adjlist() {
+			edgeType = (int)EdgeType::Labeled;
+			edge_unit = sizeof(VertexId) * 2 + sizeof(BYTE) * 2;
+
 			std::cout << "Getting vertex values..." << std::endl;
-			FILE *input = fopen(input.c_str(), "r");
-			assert(input != NULL);
+			FILE *fd = fopen(input.c_str(), "r");
+			assert(fd != NULL);
 			
 			char buf[2048], delims[] = "\t ";
 			VertexId vert,  startVertex;
 			BYTE val;
 			int count = 0, size = 0, maxsize = 0;
 			std::vector<BYTE> vertLabels;
-			while (fgets(buf, 2048, input) != NULL) {
+			while (fgets(buf, 2048, fd) != NULL) {
 				int len = strlen(buf);
 				if (size == 0) {
-					vert = std::stoi(strtok(line, delims));
+					vert = std::stoi(strtok(buf, delims));
 					val = (BYTE)(std::stoi(strtok(NULL, delims)));
 					
 					if (count == 0) startVertex = vert;
@@ -194,16 +202,16 @@ namespace RStream {
 					size = 0;
 				}
 			}
-			fclose(input);
+			fclose(fd);
 			numVertices = count;
 			minVertexId = startVertex;
 
-			FILE* input = fopen(input.c_str(), "r");
-			assert(input != NULL);
-			FILE* output = fopen(input.c_str(), "wb");
+			fd = fopen(input.c_str(), "r");
+			assert(fd != NULL);
+			FILE* output = fopen((input + "binary").c_str(), "wb");
 			assert(output != NULL);
 			char* adj_list = new char[maxsize+1];
-			while (fgets(adj_list, maxsize+1, input) != NULL) {
+			while (fgets(adj_list, maxsize+1, fd) != NULL) {
 				int len = strlen(adj_list);
 				adj_list[len-1] = 0;
 				VertexId src = std::stoi(strtok(adj_list, delims));
@@ -219,17 +227,18 @@ namespace RStream {
 
 				maxVertexId = src;
 				src -= startVertex;
-				for (std::set<BYTE>::iterator iter = neighbors.begin(); iter != neighbors.end(); iter++) {
-					BYTE = tgtLab = vertLabels[*iter];
+				for (std::set<VertexId>::iterator iter = neighbors.begin(); iter != neighbors.end(); iter++) {
+					BYTE tgtLab = vertLabels[*iter];
+					VertexId tgt = *iter;
 					fwrite((const void*) &src, sizeof(VertexId), 1, output);
 					fwrite((const void*) &tgt, sizeof(VertexId), 1, output);
 					fwrite((const void*) &srcLab, sizeof(BYTE), 1, output);
-					fwrite((const void*) &tgtlab, sizeof(BYTE), 1, output);
+					fwrite((const void*) &tgtLab, sizeof(BYTE), 1, output);
 				}
 			}
 
-			fclose(input);
-			fclose(ouput);
+			fclose(fd);
+			fclose(output);
 		}
 
 		template<typename T>
@@ -322,6 +331,7 @@ namespace RStream {
 			char * local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 			VertexId src = 0, dst = 0;
 			Weight weight = 0.0f;
+			BYTE src_label, dst_label;
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(one_task)){
@@ -341,6 +351,10 @@ namespace RStream {
 					} else if(typeid(T) == typeid(WeightedEdge)) {
 						weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
 						data = new WeightedEdge(src, dst, weight);
+					} else if(typeid(T) == typeid(LabeledEdge)) {
+						src_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2);
+						dst_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2 + sizeof(BYTE));
+						data = new LabeledEdge(src, dst, src_label, dst_label);
 					}
 
 					int index = get_index_partition_vertices(src);

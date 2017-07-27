@@ -38,7 +38,8 @@ private:
 };
 
 int main(int argc, char **argv) {
-	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 6);
+//	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 6);
+	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 1);
 
 	MC mPhase(e);
 	Aggregation agg(e);
