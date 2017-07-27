@@ -254,7 +254,7 @@ namespace RStream {
 
 			// get file size
 			long file_size = io_manager::get_filesize(fd);
-			int streaming_counter = file_size / IO_SIZE + 1;
+			int streaming_counter = file_size / (IO_SIZE * sizeof(T)) + 1;
 			long valid_io_size = 0;
 			long offset = 0;
 
@@ -263,9 +263,11 @@ namespace RStream {
 			for(int counter = 0; counter < streaming_counter; counter++) {
 				if(counter == streaming_counter - 1)
 					// TODO: potential overflow?
-					valid_io_size = file_size - IO_SIZE * (streaming_counter - 1);
+//					valid_io_size = file_size - IO_SIZE * (streaming_counter - 1);
+					valid_io_size = file_size - IO_SIZE * sizeof(T) * (streaming_counter - 1);
 				else
-					valid_io_size = IO_SIZE;
+//					valid_io_size = IO_SIZE;
+					valid_io_size = IO_SIZE * sizeof(T);
 
 				task_queue->push(std::make_tuple(fd, offset, valid_io_size));
 				offset += valid_io_size;
@@ -344,50 +346,76 @@ namespace RStream {
 				length = std::get<2>(one_task);
 
 				char * local_buf = (char*)memalign(PAGE_SIZE, IO_SIZE * sizeof(T));
-				int streaming_counter = length / (IO_SIZE * sizeof(T)) + 1;
+//				int streaming_counter = length / (IO_SIZE * sizeof(T)) + 1;
 
 				assert((length % sizeof(T)) == 0);
+				io_manager::read_from_file(fd, local_buf, length, offset);
 
-				long valid_io_size = 0;
-				long off = offset;
-				// for all streaming
-				for(int counter = 0; counter < streaming_counter; counter++) {
-					if(counter == streaming_counter - 1)
-						// TODO: potential overflow?
-						valid_io_size = length - IO_SIZE * sizeof(T) * (streaming_counter - 1);
-					else
-						valid_io_size = IO_SIZE * sizeof(T);
+				for(long pos = 0; pos < length; pos += sizeof(T)) {
+					src = *(VertexId*)(local_buf + pos);
+					dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
+					assert(src >= 0 && src < numVertices && dst >= 0 && dst < numVertices);
 
-					assert(valid_io_size % sizeof(T) == 0);
-
-					io_manager::read_from_file(fd, local_buf, length, off);
-					off += valid_io_size;
-
-					for(long pos = 0; pos < valid_io_size; pos += sizeof(T)) {
-						src = *(VertexId*)(local_buf + pos);
-						dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
-						assert(src >= 0 && src < numVertices && dst >= 0 && dst < numVertices);
-
-						void * data = nullptr;
-						if(typeid(T) == typeid(Edge)) {
-							data = new Edge(src, dst);
-						} else if(typeid(T) == typeid(WeightedEdge)) {
-							weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
-							data = new WeightedEdge(src, dst, weight);
-						} else if(typeid(T) == typeid(LabeledEdge)) {
-							src_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2);
-							dst_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2 + sizeof(BYTE));
-							data = new LabeledEdge(src, dst, src_label, dst_label);
-						}
-
-						int index = get_index_partition_vertices(src);
-
-						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
-						global_buf->insert((T*)data, index);
-
+					void * data = nullptr;
+					if(typeid(T) == typeid(Edge)) {
+						data = new Edge(src, dst);
+					} else if(typeid(T) == typeid(WeightedEdge)) {
+						weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
+						data = new WeightedEdge(src, dst, weight);
+					} else if(typeid(T) == typeid(LabeledEdge)) {
+						src_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2);
+						dst_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2 + sizeof(BYTE));
+						data = new LabeledEdge(src, dst, src_label, dst_label);
 					}
 
+					int index = get_index_partition_vertices(src);
+
+					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+					global_buf->insert((T*)data, index);
+
 				}
+
+
+//				long valid_io_size = 0;
+//				long off = offset;
+//				// for all streaming
+//				for(int counter = 0; counter < streaming_counter; counter++) {
+//					if(counter == streaming_counter - 1)
+//						// TODO: potential overflow?
+//						valid_io_size = length - IO_SIZE * sizeof(T) * (streaming_counter - 1);
+//					else
+//						valid_io_size = IO_SIZE * sizeof(T);
+//
+//					assert(valid_io_size % sizeof(T) == 0);
+//
+//					io_manager::read_from_file(fd, local_buf, length, off);
+//					off += valid_io_size;
+//
+//					for(long pos = 0; pos < valid_io_size; pos += sizeof(T)) {
+//						src = *(VertexId*)(local_buf + pos);
+//						dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
+//						assert(src >= 0 && src < numVertices && dst >= 0 && dst < numVertices);
+//
+//						void * data = nullptr;
+//						if(typeid(T) == typeid(Edge)) {
+//							data = new Edge(src, dst);
+//						} else if(typeid(T) == typeid(WeightedEdge)) {
+//							weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
+//							data = new WeightedEdge(src, dst, weight);
+//						} else if(typeid(T) == typeid(LabeledEdge)) {
+//							src_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2);
+//							dst_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2 + sizeof(BYTE));
+//							data = new LabeledEdge(src, dst, src_label, dst_label);
+//						}
+//
+//						int index = get_index_partition_vertices(src);
+//
+//						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+//						global_buf->insert((T*)data, index);
+//
+//					}
+//
+//				}
 
 			}
 
