@@ -49,6 +49,22 @@ void print_thread_info_locked(const std::string & info){
 //	}
 //}
 
+std::string generate_log_del(const std::string& i_string, int level){
+	std::string idenote ("===================================================");
+	std::string pdenote ("-----------------------------------");
+	std::string space (" ");
+
+	if(level == 1){
+		return idenote + space + i_string + space + idenote;
+	}
+	if(level == 2){
+		return pdenote + space + i_string + space + pdenote;
+	}
+
+	return nullptr;
+}
+
+
 }
 
 #endif /* SRC_PRINT_HPP_ */
