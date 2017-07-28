@@ -17,7 +17,7 @@ namespace RStream {
 		static long count(Update_Stream result, int sizeof_an_item, Engine & context) {
 			long res = 0;
 
-			for(unsigned int i = 0; i < context.num_partitions; i++) {
+			for(int i = 0; i < context.num_partitions; i++) {
 				int fd_update = open((context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(result)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
 				res += io_manager::get_filesize(fd_update);

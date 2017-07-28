@@ -285,7 +285,10 @@ namespace RStream {
 //								std::cout << *out_update << std::endl;
 
 								// insert into shuffle buffer accordingly
-								int index = get_global_buffer_index(out_update);
+//								int index = get_global_buffer_index(out_update);
+								int index = meta_info::get_index(out_update->target, context);
+								assert(index >= 0);
+
 								global_buffer<OutUpdateType>* global_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
 								global_buf->insert(out_update, index);
 
@@ -567,35 +570,35 @@ namespace RStream {
 
 			}
 		}
-
-		int get_global_buffer_index(OutUpdateType* new_update) {
-//			return new_update->target / context.num_vertices_per_part;
-			int partition_id = new_update->target / context.num_vertices_per_part;
-			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
-
-//			int target = new_update->target;
 //
-//			int lb = 0, ub = context.num_partitions;
-//			int i = (lb + ub) / 2;
+//		int get_global_buffer_index(OutUpdateType* new_update) {
+////			return new_update->target / context.num_vertices_per_part;
+//			int partition_id = new_update->target / context.num_vertices_per_part;
+//			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
 //
-//			while(true){
-////				int c = context.vertex_intervals[i];
-//				if(i == 0){
-//					return 0;
-//				}
-////				int p = context.vertex_intervals[i - 1];
-//				if(c >= target && p < target){
-//					return i;
-//				}
-//				else if(c > target){
-//					ub = i;
-//				}
-//				else if(c < target){
-//					lb = i;
-//				}
-//				i = (lb + ub) / 2;
-//			}
-		}
+////			int target = new_update->target;
+////
+////			int lb = 0, ub = context.num_partitions;
+////			int i = (lb + ub) / 2;
+////
+////			while(true){
+//////				int c = context.vertex_intervals[i];
+////				if(i == 0){
+////					return 0;
+////				}
+//////				int p = context.vertex_intervals[i - 1];
+////				if(c >= target && p < target){
+////					return i;
+////				}
+////				else if(c > target){
+////					ub = i;
+////				}
+////				else if(c < target){
+////					lb = i;
+////				}
+////				i = (lb + ub) / 2;
+////			}
+//		}
 
 	};
 }
