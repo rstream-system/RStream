@@ -14,6 +14,7 @@
 #include "concurrent_queue.hpp"
 #include "type.hpp"
 #include "constants.hpp"
+#include "meta_info.hpp"
 
 namespace RStream {
 	template <typename VertexDataType, typename UpdateType>
@@ -326,7 +327,11 @@ namespace RStream {
 	//					std::cout << update_info->target << std::endl;
 
 						// insert into shuffle buffer accordingly
-						int index = get_global_buffer_index(update_info);
+//						int index = get_global_buffer_index(update_info);
+
+						int index = meta_info::get_index(update_info->target, context);
+						assert(index >= 0);
+
 						global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
 						global_buf->insert(update_info, index);
 					}

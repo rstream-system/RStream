@@ -32,6 +32,9 @@ namespace RStream {
 	    else if(c == EdgeType::WITH_WEIGHT){
 	    	o << "WITH_WEIGHT";
 	    }
+	    else if(c == EdgeType::Labeled) {
+	    	o << "LabeledEdge";
+	    }
 	    else{
 	    	std::cout << "wrong edge type!!!" << std::endl;
 	    	throw std::exception();
@@ -66,25 +69,25 @@ namespace RStream {
 		static unsigned update_count;
 		static unsigned aggregation_count;
 
-		Engine(std::string _filename, int num_parts, int _num_vertices) : filename(_filename) {
+//		Engine(std::string _filename, int num_parts, int _num_vertices) : filename(_filename) {
+		Engine(std::string _filename, int num_parts, int input_format) : filename(_filename) {
 //			num_threads = std::thread::hardware_concurrency();
 			num_threads = 4;
 			num_write_threads = 1;
-			num_exec_threads = 1;
+			num_exec_threads = 3;
 
 			num_partitions = num_parts;
 
-			num_vertices = _num_vertices;
-			num_partitions = num_parts;
-			num_vertices_per_part = num_vertices / num_partitions;
+//			num_vertices = _num_vertices;
+//			num_partitions = num_parts;
+//			num_vertices_per_part = num_vertices / num_partitions;
 //			Preprocessing proc(_filename, num_parts, num_vertices);
-
 
 			const std::string meta_file = _filename + ".meta";
 			if(!file_exists(meta_file)) {
-				Preproc proc(_filename, num_vertices, num_partitions, false, false);
+//				Preproc proc(_filename, num_vertices, num_partitions, false, false);
 //				Preprocessing proc(_filename, num_partitions, num_vertices);
-//				Preprocessing_new proc(filename, num_parts, input_format);
+				Preprocessing_new proc(filename, num_parts, input_format);
 			}
 
 			// get meta data from .meta file
@@ -316,14 +319,14 @@ namespace RStream {
 
 					edge_unit = atoi(t);
 				}
-//				else if(counter == 1) {
-////					num_vertices = atoi(t);
-//					t = strtok(NULL, delims);
-//					assert(t != NULL);
-//
-//					num_vertices_per_part = atoi(t);
-//				}
-				else {
+				// second line for num_vertices and num_vertices_per_part
+				else if(counter == 1) {
+					num_vertices = atoi(t);
+					t = strtok(NULL, delims);
+					assert(t != NULL);
+
+					num_vertices_per_part = atoi(t);
+				} else {
 					assert(counter <= (num_partitions + 1));
 					start = atoi(t);
 					t = strtok(NULL, delims);

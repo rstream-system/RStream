@@ -30,6 +30,8 @@ namespace RStream {
 		std::atomic<int> atomic_partition_number;
 		int num_exec_threads;
 		int num_write_threads;
+		std::vector<int> degree;
+		std::vector<std::pair<VertexId, VertexId>> intervals;
 
 	public:
 		Preprocessing_new(std::string & _input, int _num_partitioins, int _format) : input(_input), format(_format),minVertexId(INT_MAX), maxVertexId(INT_MIN),
@@ -58,6 +60,10 @@ namespace RStream {
 					std::cout << "start to partition on vertices..." << std::endl;
 					partition_on_vertices<Edge>();
 					std::cout << "partition on vertices done." << std::endl;
+
+//					std::cout << "start to partition on edges..." << std::endl;
+//					partition_on_edges<Edge>();
+//					std::cout << "partition on edges done." << std::endl;
 				}
 
 				std::cout << "gen partition done!" << std::endl;
@@ -68,8 +74,10 @@ namespace RStream {
 				convert_adjlist();
 				std::cout << "convert adj list file done." << std::endl;
 				std::cout << "start to partition on vertices..." << std::endl;
-
 				partition_on_vertices<LabeledEdge>();
+
+//				std::cout << "start to partition on edges..." << std::endl;
+//				partition_on_edges<LabeledEdge>();
 
 				std::cout << "gen partition done!" << std::endl;
 				write_meta_file();
@@ -106,6 +114,7 @@ namespace RStream {
 				maxVertexId = std::max(maxVertexId, to);
 			}
 			numVertices = maxVertexId - minVertexId + 1;
+			degree = std::vector<int>(numVertices);
 
 			fclose(fd);
 			fd = fopen(input.c_str(), "r");
@@ -126,6 +135,8 @@ namespace RStream {
 				to -= minVertexId;
 
 				if(from == to) continue;
+
+				degree.at(from)++;
 
 				void * data = nullptr;
 				Weight val;
@@ -209,6 +220,7 @@ namespace RStream {
 			fclose(fd);
 			numVertices = count;
 			minVertexId = startVertex;
+			degree = std::vector<int>(numVertices);
 
 			fd = fopen(input.c_str(), "r");
 			assert(fd != NULL);
@@ -231,6 +243,8 @@ namespace RStream {
 
 				maxVertexId = src;
 				src -= startVertex;
+				degree.at(src) = neighbors.size();
+
 				for (std::set<VertexId>::iterator iter = neighbors.begin(); iter != neighbors.end(); iter++) {
 					BYTE tgtLab = vertLabels[*iter];
 					VertexId tgt = *iter;
@@ -248,6 +262,28 @@ namespace RStream {
 		template<typename T>
 		void partition_on_vertices() {
 			vertices_per_partition = numVertices / numPartitions;
+
+			VertexId intvalStart = 0, intvalEnd = 0;
+
+			// gen vertex interval info
+			for(int i = 0; i < numPartitions; i++) {
+				// last partition
+				if(i == numPartitions - 1) {
+//					end = start + numVertices - vertices_per_partition * (numPartitions - 1) - 1;
+//					meta_file << start << "\t" << end << "\n";
+
+					intvalEnd = intvalStart + numVertices - vertices_per_partition * (numPartitions - 1) - 1;
+					intervals.push_back(std::make_pair(intvalStart, intvalEnd));
+				} else {
+//					end = start + vertices_per_partition - 1;
+//					meta_file << start << "\t" << end << "\n";
+//					start = end + 1;
+
+					intvalEnd = intvalStart + vertices_per_partition - 1;
+					intervals.push_back(std::make_pair(intvalStart, intvalEnd));
+					intvalStart = intvalEnd + 1;
+				}
+			}
 
 			int fd = open((input + ".binary").c_str(), O_RDONLY);
 			assert(fd > 0 );
@@ -277,7 +313,7 @@ namespace RStream {
 
 			std::vector<std::thread> exec_threads;
 			for(int i = 0; i < num_exec_threads; i++)
-				exec_threads.push_back( std::thread([=] { this->producer<T>(buffers_for_shuffle, task_queue); } ));
+				exec_threads.push_back( std::thread([=] { this->producer_partition_on_vertices<T>(buffers_for_shuffle, task_queue); } ));
 
 			std::vector<std::thread> write_threads;
 			for(int i = 0; i < num_write_threads; i++)
@@ -296,7 +332,79 @@ namespace RStream {
 
 		};
 
+		template <typename T>
 		void partition_on_edges() {
+			int fd = open((input + ".binary").c_str(), O_RDONLY);
+			assert(fd > 0 );
+
+			// get file size
+			long file_size = io_manager::get_filesize(fd);
+			// get num of edges
+			long numEdges = file_size / sizeof(T);
+			long edges_per_part = numEdges / numPartitions;
+
+			long counter = 0;
+			VertexId intvalStart = 0;
+
+			// gen vertex interval info
+			for(unsigned int i = 0; i < degree.size(); i++) {
+				counter += degree.at(i);
+				if(counter > edges_per_part) {
+					intervals.push_back(std::make_pair(intvalStart, i - 1));
+					intvalStart = i;
+					counter = 0;
+
+				}
+				if(intervals.size() == numPartitions - 1) {
+					intervals.push_back(std::make_pair(i, degree.size() - 1));
+				}
+			}
+			assert(intervals.size() == numPartitions);
+
+			for(unsigned int i = 0; i < intervals.size(); i++) {
+				std::cout << "interval " << i << " [ " << intervals.at(i).first << " , " << intervals.at(i).second << " ]" << std::endl;
+			}
+
+			int streaming_counter = file_size / (IO_SIZE * sizeof(T)) + 1;
+			long valid_io_size = 0;
+			long offset = 0;
+
+			concurrent_queue<std::tuple<int, long, long>> * task_queue = new concurrent_queue<std::tuple<int, long, long>>(65536);
+			// <fd, offset, length>
+			for(int counter = 0; counter < streaming_counter; counter++) {
+				if(counter == streaming_counter - 1)
+					// TODO: potential overflow?
+//					valid_io_size = file_size - IO_SIZE * (streaming_counter - 1);
+					valid_io_size = file_size - IO_SIZE * sizeof(T) * (streaming_counter - 1);
+				else
+//					valid_io_size = IO_SIZE;
+					valid_io_size = IO_SIZE * sizeof(T);
+
+				task_queue->push(std::make_tuple(fd, offset, valid_io_size));
+				offset += valid_io_size;
+			}
+
+			global_buffer<T> ** buffers_for_shuffle = buffer_manager<T>::get_global_buffers(numPartitions);
+
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < num_exec_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->producer_partition_on_edges<T>(buffers_for_shuffle, task_queue); } ));
+
+			std::vector<std::thread> write_threads;
+			for(int i = 0; i < num_write_threads; i++)
+				write_threads.push_back(std::thread(&Preprocessing_new::consumer<T>, this, buffers_for_shuffle));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			for(auto &t : write_threads)
+				t.join();
+
+			delete[] buffers_for_shuffle;
+			delete task_queue;
+			close(fd);
+
 
 		};
 
@@ -307,16 +415,19 @@ namespace RStream {
 				meta_file << numVertices << "\t" << vertices_per_partition << "\n";
 
 				VertexId start = 0, end = 0;
-				for(int i = 0; i < numPartitions; i++) {
-					// last partition
-					if(i == numPartitions - 1) {
-						end = start + numVertices - vertices_per_partition * (numPartitions - 1) - 1;
-						meta_file << start << "\t" << end << "\n";
-					} else {
-						end = start + vertices_per_partition - 1;
-						meta_file << start << "\t" << end << "\n";
-						start = end + 1;
-					}
+//				for(int i = 0; i < numPartitions; i++) {
+//					// last partition
+//					if(i == numPartitions - 1) {
+//						end = start + numVertices - vertices_per_partition * (numPartitions - 1) - 1;
+//						meta_file << start << "\t" << end << "\n";
+//					} else {
+//						end = start + vertices_per_partition - 1;
+//						meta_file << start << "\t" << end << "\n";
+//						start = end + 1;
+//					}
+//				}
+				for(unsigned int i = 0; i < intervals.size(); i++) {
+					meta_file << intervals.at(i).first << "\t" << intervals.at(i).second << "\n";
 				}
 
 			} else {
@@ -329,15 +440,15 @@ namespace RStream {
 
 	private:
 		template<typename T>
-		void producer(global_buffer<T> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long> > * task_queue) {
+		void producer_partition_on_vertices(global_buffer<T> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long> > * task_queue) {
 			int fd = -1;
 			long offset = 0, length = 0;
 			auto one_task = std::make_tuple(fd, offset, length);
 
-			char * local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 			VertexId src = 0, dst = 0;
 			Weight weight = 0.0f;
 			BYTE src_label, dst_label;
+			char * local_buf = (char*)memalign(PAGE_SIZE, IO_SIZE * sizeof(T));
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(one_task)){
@@ -345,7 +456,7 @@ namespace RStream {
 				offset = std::get<1>(one_task);
 				length = std::get<2>(one_task);
 
-				char * local_buf = (char*)memalign(PAGE_SIZE, IO_SIZE * sizeof(T));
+//				char * local_buf = (char*)memalign(PAGE_SIZE, IO_SIZE * sizeof(T));
 //				int streaming_counter = length / (IO_SIZE * sizeof(T)) + 1;
 
 				assert((length % sizeof(T)) == 0);
@@ -424,6 +535,60 @@ namespace RStream {
 		}
 
 		template<typename T>
+		void producer_partition_on_edges(global_buffer<T> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long> > * task_queue) {
+			int fd = -1;
+			long offset = 0, length = 0;
+			auto one_task = std::make_tuple(fd, offset, length);
+
+			VertexId src = 0, dst = 0;
+			Weight weight = 0.0f;
+			BYTE src_label, dst_label;
+			char * local_buf = (char*)memalign(PAGE_SIZE, IO_SIZE * sizeof(T));
+
+			// pop from queue
+			while(task_queue->test_pop_atomic(one_task)){
+				fd = std::get<0>(one_task);
+				offset = std::get<1>(one_task);
+				length = std::get<2>(one_task);
+
+//				char * local_buf = (char*)memalign(PAGE_SIZE, IO_SIZE * sizeof(T));
+//				int streaming_counter = length / (IO_SIZE * sizeof(T)) + 1;
+
+				assert((length % sizeof(T)) == 0);
+				io_manager::read_from_file(fd, local_buf, length, offset);
+
+				for(long pos = 0; pos < length; pos += sizeof(T)) {
+					src = *(VertexId*)(local_buf + pos);
+					dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
+					assert(src >= 0 && src < numVertices && dst >= 0 && dst < numVertices);
+
+					void * data = nullptr;
+					if(typeid(T) == typeid(Edge)) {
+						data = new Edge(src, dst);
+					} else if(typeid(T) == typeid(WeightedEdge)) {
+						weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
+						data = new WeightedEdge(src, dst, weight);
+					} else if(typeid(T) == typeid(LabeledEdge)) {
+						src_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2);
+						dst_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2 + sizeof(BYTE));
+						data = new LabeledEdge(src, dst, src_label, dst_label);
+					}
+
+					int index = get_index_partition_edges(src);
+					assert(index >= 0);
+
+					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+					global_buf->insert((T*)data, index);
+
+				}
+
+			}
+
+			free(local_buf);
+			atomic_num_producers--;
+		}
+
+		template<typename T>
 		void consumer(global_buffer<T> ** buffers_for_shuffle) {
 			int counter = 0;
 
@@ -457,6 +622,16 @@ namespace RStream {
 
 			int partition_id = src/ vertices_per_partition;
 			return partition_id < (numPartitions - 1) ? partition_id : (numPartitions - 1);
+		}
+
+		int get_index_partition_edges(int src) {
+			for(unsigned int i = 0; i < intervals.size(); i++) {
+				std::pair<VertexId, VertexId> interval = intervals.at(i);
+				if(src >= interval.first && src <= interval.second)
+					return i;
+			}
+
+			return -1;
 		}
 
 	};

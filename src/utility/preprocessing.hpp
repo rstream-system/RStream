@@ -126,7 +126,6 @@ namespace RStream {
 					pos += edge_unit;
 					edge_type = 0;
 				}
-				delete data;
 
 				counter++;
 
