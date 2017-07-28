@@ -13,6 +13,7 @@
 #include "concurrent_queue.hpp"
 #include "constants.hpp"
 
+#include "meta_info.hpp"
 #include "pattern.hpp"
 
 namespace RStream {
@@ -423,11 +424,11 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				std::cout << partition_id << std::endl;
+				std::cout << "partition at join-mining: " << partition_id << std::endl;
 				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
-				int fd_edge = open((context.filename + ".binary." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_update > 0 && fd_edge > 0 );
 
 				// get file size
@@ -637,7 +638,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				int fd_edge = open((context.filename + ".binary." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_edge > 0 );
 
 				// get edge file size
@@ -699,7 +700,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				int fd_edge = open((context.filename + ".binary." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_edge > 0 );
 
 				// get edge file size
@@ -763,7 +764,7 @@ namespace RStream {
 			while(atomic_num_producers != 0) {
 				int i = (++atomic_partition_id) % context.num_partitions;
 
-				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+				std::string file_name (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream));
 				global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
 
@@ -776,7 +777,7 @@ namespace RStream {
 
 				if(i >= 0){
 
-					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+					std::string file_name (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream));
 					global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
 
@@ -843,8 +844,9 @@ namespace RStream {
 		}
 
 		int get_global_buffer_index(VertexId key) {
-			int partition_id = (key - 1) / context.num_vertices_per_part;
-			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
+//			int partition_id = (key - 1) / context.num_vertices_per_part;
+//			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
+			return meta_info::get_index(key, context);
 		}
 
 	public:

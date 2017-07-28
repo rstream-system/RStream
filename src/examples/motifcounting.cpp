@@ -39,8 +39,7 @@
 //};
 //
 //int main(int argc, char **argv) {
-//	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 6);
-////	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 1);
+//	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 1);
 //	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 //
 //	MC mPhase(e);

@@ -65,7 +65,7 @@ namespace RStream {
 		Update_Stream shuffle_upstream_canonicalgraph(Update_Stream in_update_stream, int sizeof_in_tuple){
 			atomic_init();
 
-			Update_Stream update_c = Engine::aggregation_count++;
+			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 
@@ -105,7 +105,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				std::cout << "partition: " << partition_id << std::endl;
+				std::cout << "partition at shuffle-canonical: " << partition_id << std::endl;
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -226,7 +226,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				std::cout << "partition: " << partition_id << std::endl;
+				std::cout << "partition at aggregate-filter: " << partition_id << std::endl;
 				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
@@ -244,6 +244,7 @@ namespace RStream {
 				//build hashmap for aggregation tuples
 				std::unordered_map<Canonical_Graph, int> map;
 				build_aggmap(map, agg_local_buf, agg_file_size, sizeof_agg);
+				printout_cg_aggmap(map);
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
@@ -273,6 +274,9 @@ namespace RStream {
 						std::vector<Element_In_Tuple> in_update_tuple;
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
+						//for debugging
+						std::cout << in_update_tuple << " --> " << filter_aggregate(in_update_tuple, map, threshold) << std::endl;
+
 						if(!filter_aggregate(in_update_tuple, map, threshold)){
 							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
 						}
@@ -290,18 +294,27 @@ namespace RStream {
 			atomic_num_producers--;
 		}
 
-		void build_aggmap(std::unordered_map<Canonical_Graph, int>& map, char* agg_local_buf, int agg_file_size, int sizeof_agg){
+		void build_aggmap(std::unordered_map<Canonical_Graph, int>& map, char* agg_local_buf, long agg_file_size, int sizeof_agg){
+			assert(agg_file_size % sizeof_agg == 0);
+			for(long pos = 0; pos < agg_file_size; pos += sizeof_agg){
+				//read aggregation pair
+				std::pair<Canonical_Graph, int> in_agg_pair;
+				get_an_in_agg_pair(agg_local_buf + pos, in_agg_pair, sizeof_agg);
 
+				assert(map.find(in_agg_pair.first) == map.end());
+				map.insert(in_agg_pair);
+			}
 		}
 
 		bool filter_aggregate(std::vector<Element_In_Tuple> & update_tuple, std::unordered_map<Canonical_Graph, int>& map, int threshold){
-			std::vector<Element_In_Tuple> quick_pattern(update_tuple.size());
 			// turn tuple to quick pattern
+			Quick_Pattern quick_pattern;
 			Pattern::turn_quick_pattern_pure(update_tuple, quick_pattern);
-			Canonical_Graph* cf = Pattern::turn_canonical_graph(quick_pattern, false);
+			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
+			Canonical_Graph* cf = Pattern::turn_canonical_graph(sub_graph, false);
 
 			assert(map.find(*cf) != map.end());
-			bool r = map[*cf] < threshold;
+			bool r = (map[*cf] < threshold);
 			delete cf;
 			return r;
 		}
@@ -366,7 +379,7 @@ namespace RStream {
 
 			// exec threads will do aggregate and push result patterns into shuffle buffers
 			std::vector<std::thread> exec_threads;
-			for(int i = 0; i < context.num_exec_threads; i++)
+			for(int i = 0; i < context.num_write_threads; i++)
 				exec_threads.push_back( std::thread([=] { this->aggregate_global_per_thread(in_agg_stream, task_queue, sizeof_in_agg, aggreg_c); } ));
 
 			// join all threads
@@ -383,7 +396,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				std::cout << partition_id << std::endl;
+				std::cout << "partition at aggregate-global: " << partition_id << std::endl;
 
 				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
 				assert(fd_agg > 0);
@@ -409,7 +422,7 @@ namespace RStream {
 					aggregate_on_canonical_graph(canonical_graphs_aggregation, in_agg_pair);
 				}
 
-				const char * file_name = (context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(out_agg_stream)).c_str();
+				std::string file_name (context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(out_agg_stream));
 				write_canonical_aggregation(canonical_graphs_aggregation, file_name, sizeof_in_agg);
 
 				free(agg_local_buf);
@@ -428,27 +441,36 @@ namespace RStream {
 		}
 
 		void get_an_in_agg_pair(char * update_local_buf, std::pair<Canonical_Graph, int> & agg_pair, int sizeof_in_agg){
-			std::vector<Element_In_Tuple> tuple;
+			std::vector<Element_In_Tuple>& tuple = agg_pair.first.get_tuple();
 			for(unsigned int index = 0; index < sizeof_in_agg - sizeof(unsigned int) * 2 - sizeof(int); index += sizeof(Element_In_Tuple)){
 				Element_In_Tuple element = *(Element_In_Tuple*)(update_local_buf + index);
 				tuple.push_back(element);
 			}
 			unsigned int num_of_vertices = *(unsigned int*)(update_local_buf + (sizeof_in_agg - sizeof(unsigned int) * 2 - sizeof(int)));
+			agg_pair.first.set_number_vertices(num_of_vertices);
 			unsigned int hash_value = *(unsigned int*)(update_local_buf + (sizeof_in_agg - sizeof(unsigned int) - sizeof(int)));
-			Canonical_Graph cg(tuple, num_of_vertices, hash_value);
+			agg_pair.first.set_hash_value(hash_value);
 
 			int support = *(unsigned int*)(update_local_buf + (sizeof_in_agg - sizeof(int)));
-
-			agg_pair.first = cg;
 			agg_pair.second = support;
+
 		}
 
-		void write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, const char* file_name, unsigned int sizeof_in_agg){
+		void write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::string& file_name, unsigned int sizeof_in_agg){
+			//for debugging
 			printout_cg_aggmap(canonical_graphs_aggregation);
+
+			//write empty buffer to an empty file
+			if(canonical_graphs_aggregation.empty()){
+				char* buf = (char *)malloc(0);
+				write_buf_to_file(file_name.c_str(), buf, 0);
+				free(buf);
+				return;
+			}
 
 			//assert size equality
 			if(!canonical_graphs_aggregation.empty()){
-				assert(sizeof_in_agg == ((*canonical_graphs_aggregation.begin()).first.get_tuple().size() * sizeof(Element_In_Tuple) + sizeof(unsigned int) * 2 + sizeof(int)));
+				assert(sizeof_in_agg == ((*canonical_graphs_aggregation.begin()).first.get_tuple_const().size() * sizeof(Element_In_Tuple) + sizeof(unsigned int) * 2 + sizeof(int)));
 			}
 
 			char * local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
@@ -468,7 +490,8 @@ namespace RStream {
 					offset = 0;
 
 					//write to file
-					write_buf_to_file(file_name, local_buf, real_io_size);
+//					std::cout << "write to file " << file_name << std::endl;
+					write_buf_to_file(file_name.c_str(), local_buf, real_io_size);
 				}
 				else{
 					assert(false);
@@ -477,9 +500,11 @@ namespace RStream {
 
 			//deal with remaining buffer
 			if(offset != 0){
-				write_buf_to_file(file_name, local_buf, offset);
+//				std::cout << "write to file " << file_name << std::endl;
+				write_buf_to_file(file_name.c_str(), local_buf, offset);
 			}
 
+			free(local_buf);
 		}
 
 		static void write_buf_to_file(const char* file_name, char * local_buf, size_t fsize){
@@ -499,7 +524,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				std::cout << partition_id << std::endl;
+				std::cout << "partition at aggregate-local: " << partition_id << std::endl;
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -535,7 +560,7 @@ namespace RStream {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
-//						std::cout << "in_update: \t" << in_update_tuple << std::endl;
+						std::cout << "in_update: \t" << in_update_tuple << std::endl;
 
 						// turn tuple to quick pattern
 						Quick_Pattern quick_pattern;
@@ -624,7 +649,7 @@ namespace RStream {
 //				std::cout << "hash: \t" << hash << ", \tindex: \t" << index << std::endl;
 				global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
 
-				char* out_cg = convert_to_bytes(global_buf->get_sizeoftuple(), (*it));
+				char* out_agg_pair = convert_to_bytes(global_buf->get_sizeoftuple(), (*it));
 //				int s = it->second;
 //				char* out_cg = (char *)malloc(global_buf->get_sizeoftuple());
 //				size_t s_vector = global_buf->get_sizeoftuple()- sizeof(unsigned int) * 2 - sizeof(int);
@@ -637,8 +662,8 @@ namespace RStream {
 //				std::memcpy(out_cg + s_vector + sizeof(unsigned int) * 2, &s, sizeof(int));
 
 				// TODO: insert
-				global_buf->insert(out_cg);
-				delete out_cg;
+				global_buf->insert(out_agg_pair);
+				delete out_agg_pair;
 			}
 		}
 
@@ -648,7 +673,7 @@ namespace RStream {
 
 			char* out_cg = (char *)malloc(sizeof_agg_pair);
 			size_t s_vector = sizeof_agg_pair- sizeof(unsigned int) * 2 - sizeof(int);
-			std::memcpy(out_cg, reinterpret_cast<char*>(canonical_graph.get_tuple().data()), s_vector);
+			std::memcpy(out_cg, reinterpret_cast<char*>(canonical_graph.get_tuple_const().data()), s_vector);
 			unsigned int num_vertices = canonical_graph.get_number_vertices();
 			std::memcpy(out_cg + s_vector, &num_vertices, sizeof(unsigned int));
 			unsigned int hash_value = canonical_graph.get_hash();
@@ -664,7 +689,7 @@ namespace RStream {
 			while(atomic_num_producers != 0) {
 				int i = (++atomic_partition_id) % context.num_partitions;
 
-				const char * file_name = (context.filename + "." + std::to_string(i) + ".aggregate_stream_" + std::to_string(aggregation_stream)).c_str();
+				std::string file_name (context.filename + "." + std::to_string(i) + ".aggregate_stream_" + std::to_string(aggregation_stream));
 				global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
 
@@ -677,7 +702,7 @@ namespace RStream {
 
 				if(i >= 0){
 
-					const char * file_name = (context.filename + "." + std::to_string(i) + ".aggregate_stream_" + std::to_string(aggregation_stream)).c_str();
+					std::string file_name (context.filename + "." + std::to_string(i) + ".aggregate_stream_" + std::to_string(aggregation_stream));
 					global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
 
@@ -693,7 +718,7 @@ namespace RStream {
 			while(atomic_num_producers != 0) {
 				int i = (++atomic_partition_id) % context.num_partitions;
 
-				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+				std::string file_name (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream));
 				global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 				g_buf->flush(file_name, i);
 
@@ -706,7 +731,7 @@ namespace RStream {
 
 				if(i >= 0){
 
-					const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream)).c_str();
+					std::string file_name (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream));
 					global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
 

@@ -293,7 +293,7 @@ namespace RStream {
 				//debugging info
 //				print_thread_info_locked("as a consumer dealing with buffer[" + std::to_string(i) + "]\n");
 
-				const char * file_name = (input + "." + std::to_string(i)).c_str();
+				std::string file_name (input + "." + std::to_string(i));
 				global_buffer<T>* g_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, num_partitions, i);
 				g_buf->flush(file_name, i);
 			}
