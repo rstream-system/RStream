@@ -1,4 +1,4 @@
-
+//
 //
 ///*
 // * cliquefinding.cpp
@@ -51,32 +51,33 @@
 //
 //int main(int argc, char **argv) {
 //	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 6);
-//	std::cout << "finish preprocessing." << std::endl;
+//	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 //
 //	MC mPhase(e);
 //
 //	//init: get the edges stream
+//	std::cout << generate_log_del(std::string("init-shuffling"), 1) << std::endl;
 //	Update_Stream up_stream_shuffled = mPhase.init_shuffle_all_keys();
-//	std::cout << "finish init-shuffling." << std::endl;
 //
 //	Update_Stream up_stream_non_shuffled;
 //	Update_Stream clique_stream;
 //
 //	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
 //	for(int i = 1; i < max_iterations; ++i){
-//		std::cout << "at iteration " << i << std::endl;
+//		std::cout << "\n\n" << generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
+//
 //		//join on all keys
+//		std::cout << "\n" << generate_log_del(std::string("joining"), 2) << std::endl;
 //		up_stream_non_shuffled = mPhase.join_mining(up_stream_shuffled);
-//		std::cout << "finish joining." << std::endl;
 //		//collect cliques
+//		std::cout << "\n" << generate_log_del(std::string("collecting"), 2) << std::endl;
 //		clique_stream = mPhase.collect(up_stream_non_shuffled);
-//		std::cout << "finish collecting." << std::endl;
 //		//print out cliques
+//		std::cout << "\n" << generate_log_del(std::string("printing"), 2) << std::endl;
 //		mPhase.printout_upstream(clique_stream);
-//		std::cout << "finish printing." << std::endl;
 //		//shuffle for next join
+//		std::cout << "\n" << generate_log_del(std::string("shuffling"), 2) << std::endl;
 //		up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled);
-//		std::cout << "finish shuffling.\n\n" << std::endl;
 //	}
 //
 //}

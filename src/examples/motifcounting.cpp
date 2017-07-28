@@ -40,32 +40,34 @@ private:
 int main(int argc, char **argv) {
 //	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 6);
 	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 1);
+	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 
 	MC mPhase(e);
 	Aggregation agg(e);
 
 	//init: get the edges stream
+	std::cout << generate_log_del(std::string("init-shuffling"), 1) << std::endl;
 	Update_Stream up_stream_shuffled = mPhase.init_shuffle_all_keys();
-	std::cout << "finish init-shuffling." << std::endl;
 
 	Update_Stream up_stream_non_shuffled;
 	Aggregation_Stream agg_stream;
 
 	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
 	for(int i = 1; i < max_iterations; ++i){
-		std::cout << "at iteration " << i << std::endl;
+		std::cout << "\n\n" << generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
+
 		//join on all keys
+		std::cout << "\n" << generate_log_del(std::string("joining"), 2) << std::endl;
 		up_stream_non_shuffled = mPhase.join_mining(up_stream_shuffled);
-		std::cout << "finish joining." << std::endl;
 		//aggregate
+		std::cout << "\n" << generate_log_del(std::string("aggregating"), 2) << std::endl;
 		agg_stream = agg.aggregate(up_stream_non_shuffled, mPhase.sizeof_in_tuple);
-		std::cout << "finish aggregating." << std::endl;
 		//print out counts info
+		std::cout << "\n" << generate_log_del(std::string("printing"), 2) << std::endl;
 		agg.printout_aggstream(agg_stream);
-		std::cout << "finish printing." << std::endl;
 		//shuffle for next join
+		std::cout << "\n" << generate_log_del(std::string("shuffling"), 2) << std::endl;
 		up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled);
-		std::cout << "finish shuffling." << std::endl;
 	}
 
 }

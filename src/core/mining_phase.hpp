@@ -584,7 +584,7 @@ namespace RStream {
 
 						if(!filter_collect(in_update_tuple)){
 							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
-							std::cout << "remained: " << in_update_tuple << std::endl;
+							std::cerr << "remained: " << in_update_tuple << std::endl;
 						}
 					}
 				}

@@ -34,16 +34,20 @@ public:
 
 		//read graph from tuple
 		ag = readGraph(sub_graph, is_directed);
+//		std::cout << "done read." << std::endl;
 
 		//turn to canonical form
 		bliss::AbstractGraph* cf = turnCanonical(ag);
+//		std::cout << "done turn." << std::endl;
 
 		delete ag;
+		ag = 0;
 		return cf;
 	}
 
 	static Canonical_Graph* turn_canonical_graph(std::vector<Element_In_Tuple> & sub_graph, const bool is_directed){
 		bliss::AbstractGraph* cf_bliss = turn_canonical_graph_bliss(sub_graph, is_directed);
+//		std::cout << "done bliss." << std::endl;
 		Canonical_Graph* cf = new Canonical_Graph(cf_bliss, is_directed);
 		delete cf_bliss;
 		return cf;
@@ -198,9 +202,14 @@ private:
 			Element_In_Tuple tuple = sub_graph[index];
 			vertices[tuple.vertex_id] = tuple.vertex_label;
 		}
+//		//for debugging only
+//		for(auto it = vertices.begin(); it != vertices.end(); ++it){
+//			std::cout << it->first << ": " << (int)it->second << std::endl;
+//		}
 
 		//construct graph
 		const unsigned int number_vertices = vertices.size();
+		assert(!opt_directed);
 		if(opt_directed){
 			g = new bliss::Digraph(vertices.size());
 		}
@@ -210,7 +219,8 @@ private:
 
 		//set vertices
 		for(unsigned int i = 0; i < number_vertices; ++i){
-			g->change_color(i, vertices[i + 1]);
+//			std::cout << i << ": " << (unsigned int)vertices[i + 1] << std::endl;
+			g->change_color(i, (unsigned int)vertices[i + 1]);
 		}
 
 		//read edges
@@ -233,7 +243,7 @@ private:
 		//permute to canonical form
 		bliss::AbstractGraph* cf = ag->permute(cl);
 
-		delete[] cl;
+//		delete[] cl;
 		return cf;
 	}
 
