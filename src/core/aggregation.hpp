@@ -105,7 +105,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				std::cout << partition_id << std::endl;
+				std::cout << "partition: " << partition_id << std::endl;
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -141,6 +141,9 @@ namespace RStream {
 						std::vector<Element_In_Tuple> in_update_tuple;
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
+//						//for debugging only
+//						std::cout << "tuple: " << in_update_tuple << std::endl;
+
 						shuffle_on_canonical(in_update_tuple, buffers_for_shuffle);
 					}
 
@@ -155,17 +158,21 @@ namespace RStream {
 		}
 
 		void shuffle_on_canonical(std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining ** buffers_for_shuffle){
-			std::vector<Element_In_Tuple> quick_pattern(in_update_tuple.size());
 			// turn tuple to quick pattern
+			Quick_Pattern quick_pattern;
 			Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern);
-			Canonical_Graph* cf = Pattern::turn_canonical_graph(quick_pattern, false);
+			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
+			Canonical_Graph* cf = Pattern::turn_canonical_graph(sub_graph, false);
 
-			int hash = cf->get_hash();
-			int index = get_global_bucket_index(hash);
+			unsigned int hash = cf->get_hash();
+			unsigned int index = get_global_bucket_index(hash);
 			delete cf;
 
 			//get tuple
 			insert_tuple_to_buffer(index, in_update_tuple, buffers_for_shuffle);
+
+			//for debugging only
+			std::cout << "tuple: " << in_update_tuple << " ==> " << index << std::endl;
 		}
 
 		void insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
@@ -219,7 +226,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				std::cout << partition_id << std::endl;
+				std::cout << "partition: " << partition_id << std::endl;
 				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
@@ -403,7 +410,7 @@ namespace RStream {
 				}
 
 				const char * file_name = (context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(out_agg_stream)).c_str();
-				write_canonical_aggregation(canonical_graphs_aggregation, file_name);
+				write_canonical_aggregation(canonical_graphs_aggregation, file_name, sizeof_in_agg);
 
 				free(agg_local_buf);
 				close(fd_agg);
@@ -436,8 +443,54 @@ namespace RStream {
 			agg_pair.second = support;
 		}
 
-		void write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, const char* file_name){
+		void write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, const char* file_name, unsigned int sizeof_in_agg){
 			printout_cg_aggmap(canonical_graphs_aggregation);
+
+			//assert size equality
+			if(!canonical_graphs_aggregation.empty()){
+				assert(sizeof_in_agg == ((*canonical_graphs_aggregation.begin()).first.get_tuple().size() * sizeof(Element_In_Tuple) + sizeof(unsigned int) * 2 + sizeof(int)));
+			}
+
+			char * local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+			long real_io_size = MPhase::get_real_io_size(IO_SIZE, sizeof_in_agg);
+			long offset = 0;
+			long index = 0;
+
+			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ++it){
+				if(offset < real_io_size){
+					char* out_agg_pair = convert_to_bytes(sizeof_in_agg, *it);
+					std::memcpy(local_buf + index, out_agg_pair, sizeof_in_agg);
+					free(out_agg_pair);
+					index += sizeof_in_agg;
+					offset += sizeof_in_agg;
+				}
+				else if (offset == real_io_size){
+					offset = 0;
+
+					//write to file
+					write_buf_to_file(file_name, local_buf, real_io_size);
+				}
+				else{
+					assert(false);
+				}
+			}
+
+			//deal with remaining buffer
+			if(offset != 0){
+				write_buf_to_file(file_name, local_buf, offset);
+			}
+
+		}
+
+		static void write_buf_to_file(const char* file_name, char * local_buf, size_t fsize){
+			int perms = O_WRONLY | O_APPEND;
+			int fd = open(file_name, perms, S_IRWXU);
+			if(fd < 0){
+				fd = creat(file_name, S_IRWXU);
+			}
+			// flush buffer to update out stream
+			io_manager::write_to_file(fd, local_buf, fsize);
+			close(fd);
 		}
 
 
@@ -565,27 +618,45 @@ namespace RStream {
 		void shuffle_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, global_buffer_for_mining ** buffers_for_shuffle){
 			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ++it) {
 				Canonical_Graph canonical_graph = it->first;
-				int s = it->second;
 
 				unsigned int hash = canonical_graph.get_hash();
 				unsigned int index = get_global_bucket_index(hash);
 //				std::cout << "hash: \t" << hash << ", \tindex: \t" << index << std::endl;
 				global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
 
-				char* out_cg = (char *)malloc(global_buf->get_sizeoftuple());
-				size_t s_vector = global_buf->get_sizeoftuple()- sizeof(unsigned int) * 2 - sizeof(int);
-				std::memcpy(out_cg, reinterpret_cast<char*>(canonical_graph.get_tuple().data()), s_vector);
-				unsigned int num_vertices = canonical_graph.get_number_vertices();
-				std::memcpy(out_cg + s_vector, &num_vertices, sizeof(unsigned int));
-				unsigned int hash_value = canonical_graph.get_hash();
-				std::memcpy(out_cg + s_vector + sizeof(unsigned int), &hash_value, sizeof(unsigned int));
-
-				std::memcpy(out_cg + s_vector + sizeof(unsigned int) * 2, &s, sizeof(int));
+				char* out_cg = convert_to_bytes(global_buf->get_sizeoftuple(), (*it));
+//				int s = it->second;
+//				char* out_cg = (char *)malloc(global_buf->get_sizeoftuple());
+//				size_t s_vector = global_buf->get_sizeoftuple()- sizeof(unsigned int) * 2 - sizeof(int);
+//				std::memcpy(out_cg, reinterpret_cast<char*>(canonical_graph.get_tuple().data()), s_vector);
+//				unsigned int num_vertices = canonical_graph.get_number_vertices();
+//				std::memcpy(out_cg + s_vector, &num_vertices, sizeof(unsigned int));
+//				unsigned int hash_value = canonical_graph.get_hash();
+//				std::memcpy(out_cg + s_vector + sizeof(unsigned int), &hash_value, sizeof(unsigned int));
+//
+//				std::memcpy(out_cg + s_vector + sizeof(unsigned int) * 2, &s, sizeof(int));
 
 				// TODO: insert
 				global_buf->insert(out_cg);
 				delete out_cg;
 			}
+		}
+
+		static char* convert_to_bytes(size_t sizeof_agg_pair, std::pair<const Canonical_Graph, int>& it_pair){
+			Canonical_Graph canonical_graph = it_pair.first;
+			int s = it_pair.second;
+
+			char* out_cg = (char *)malloc(sizeof_agg_pair);
+			size_t s_vector = sizeof_agg_pair- sizeof(unsigned int) * 2 - sizeof(int);
+			std::memcpy(out_cg, reinterpret_cast<char*>(canonical_graph.get_tuple().data()), s_vector);
+			unsigned int num_vertices = canonical_graph.get_number_vertices();
+			std::memcpy(out_cg + s_vector, &num_vertices, sizeof(unsigned int));
+			unsigned int hash_value = canonical_graph.get_hash();
+			std::memcpy(out_cg + s_vector + sizeof(unsigned int), &hash_value, sizeof(unsigned int));
+
+			std::memcpy(out_cg + s_vector + sizeof(unsigned int) * 2, &s, sizeof(int));
+
+			return out_cg;
 		}
 
 		// each writer thread generates a join_consumer
