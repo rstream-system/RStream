@@ -68,7 +68,11 @@ namespace RStream {
 				convert_adjlist();
 				std::cout << "convert adj list file done." << std::endl;
 				std::cout << "start to partition on vertices..." << std::endl;
+
 				partition_on_vertices<LabeledEdge>();
+
+				std::cout << "gen partition done!" << std::endl;
+				write_meta_file();
 			}
 
 		}
@@ -177,8 +181,7 @@ namespace RStream {
 			edgeType = (int)EdgeType::Labeled;
 			edge_unit = sizeof(VertexId) * 2 + sizeof(BYTE) * 2;
 
-			std::cout << "Getting vertex values..." << std::endl;
-			FILE *fd = fopen(input.c_str(), "r");
+			FILE* fd = fopen(input.c_str(), "r");
 			assert(fd != NULL);
 			
 			char buf[2048], delims[] = "\t ";
@@ -193,7 +196,8 @@ namespace RStream {
 					val = (BYTE)(std::stoi(strtok(NULL, delims)));
 					
 					if (count == 0) startVertex = vert;
-					vertLabels[count++] = val;
+					vertLabels.push_back(val);
+					count++;
 				}
 
 				size += len;
@@ -208,7 +212,7 @@ namespace RStream {
 
 			fd = fopen(input.c_str(), "r");
 			assert(fd != NULL);
-			FILE* output = fopen((input + "binary").c_str(), "wb");
+			FILE* output = fopen((input + ".binary").c_str(), "wb");
 			assert(output != NULL);
 			char* adj_list = new char[maxsize+1];
 			while (fgets(adj_list, maxsize+1, fd) != NULL) {
@@ -250,7 +254,7 @@ namespace RStream {
 
 			// get file size
 			long file_size = io_manager::get_filesize(fd);
-			int streaming_counter = file_size / IO_SIZE + 1;
+			int streaming_counter = file_size / (IO_SIZE * sizeof(T)) + 1;
 			long valid_io_size = 0;
 			long offset = 0;
 
@@ -259,9 +263,11 @@ namespace RStream {
 			for(int counter = 0; counter < streaming_counter; counter++) {
 				if(counter == streaming_counter - 1)
 					// TODO: potential overflow?
-					valid_io_size = file_size - IO_SIZE * (streaming_counter - 1);
+//					valid_io_size = file_size - IO_SIZE * (streaming_counter - 1);
+					valid_io_size = file_size - IO_SIZE * sizeof(T) * (streaming_counter - 1);
 				else
-					valid_io_size = IO_SIZE;
+//					valid_io_size = IO_SIZE;
+					valid_io_size = IO_SIZE * sizeof(T);
 
 				task_queue->push(std::make_tuple(fd, offset, valid_io_size));
 				offset += valid_io_size;
@@ -339,8 +345,13 @@ namespace RStream {
 				offset = std::get<1>(one_task);
 				length = std::get<2>(one_task);
 
+				char * local_buf = (char*)memalign(PAGE_SIZE, IO_SIZE * sizeof(T));
+//				int streaming_counter = length / (IO_SIZE * sizeof(T)) + 1;
+
+				assert((length % sizeof(T)) == 0);
 				io_manager::read_from_file(fd, local_buf, length, offset);
-				for(long pos = 0; pos < length; pos += edge_unit) {
+
+				for(long pos = 0; pos < length; pos += sizeof(T)) {
 					src = *(VertexId*)(local_buf + pos);
 					dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
 					assert(src >= 0 && src < numVertices && dst >= 0 && dst < numVertices);
@@ -363,6 +374,48 @@ namespace RStream {
 					global_buf->insert((T*)data, index);
 
 				}
+
+
+//				long valid_io_size = 0;
+//				long off = offset;
+//				// for all streaming
+//				for(int counter = 0; counter < streaming_counter; counter++) {
+//					if(counter == streaming_counter - 1)
+//						// TODO: potential overflow?
+//						valid_io_size = length - IO_SIZE * sizeof(T) * (streaming_counter - 1);
+//					else
+//						valid_io_size = IO_SIZE * sizeof(T);
+//
+//					assert(valid_io_size % sizeof(T) == 0);
+//
+//					io_manager::read_from_file(fd, local_buf, length, off);
+//					off += valid_io_size;
+//
+//					for(long pos = 0; pos < valid_io_size; pos += sizeof(T)) {
+//						src = *(VertexId*)(local_buf + pos);
+//						dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
+//						assert(src >= 0 && src < numVertices && dst >= 0 && dst < numVertices);
+//
+//						void * data = nullptr;
+//						if(typeid(T) == typeid(Edge)) {
+//							data = new Edge(src, dst);
+//						} else if(typeid(T) == typeid(WeightedEdge)) {
+//							weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
+//							data = new WeightedEdge(src, dst, weight);
+//						} else if(typeid(T) == typeid(LabeledEdge)) {
+//							src_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2);
+//							dst_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2 + sizeof(BYTE));
+//							data = new LabeledEdge(src, dst, src_label, dst_label);
+//						}
+//
+//						int index = get_index_partition_vertices(src);
+//
+//						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+//						global_buf->insert((T*)data, index);
+//
+//					}
+//
+//				}
 
 			}
 
