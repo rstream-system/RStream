@@ -56,13 +56,30 @@
 #include <cstring>
 #include <malloc.h>
 
+#include <sys/time.h>
+#include <sys/resource.h>
+
 //#include <boost/asio/io_service.hpp>
 //#include <boost/bind.hpp>
 //#include <boost/thread/thread.hpp>
 
-#include "../utility/Printer.hpp"
+//#include "../utility/Printer.hpp"
 
+typedef uint32_t uint32;
+typedef int32_t int32;
 
+#if !(__APPLE__ & __MACH__)
+typedef uint64_t uint64;
+typedef int64_t int64;
+#else
+typedef size_t uint64;
+typedef size_t int64;
+#endif
+
+typedef uint16_t uint16;
+typedef int16_t int16;
+typedef int8_t int8;
+typedef uint8_t uint8;
 
 
 #endif /* SRC_COMMON_RSTREAMCOMMON_HPP_ */

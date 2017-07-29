@@ -9,6 +9,7 @@
 
 #include "../core/engine.hpp"
 #include "../core/mining_phase.hpp"
+#include "../utility/ResourceManager.hpp"
 
 #define MAXSIZE 4
 
@@ -53,6 +54,8 @@ int main(int argc, char **argv) {
 	Engine e("/home/icuzzq/Workspace/git/RStream/input/citeseer.graph", 6, 1);
 	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 
+	ResourceManager rm;
+
 	MC mPhase(e);
 
 	//init: get the edges stream
@@ -79,6 +82,13 @@ int main(int argc, char **argv) {
 		std::cout << "\n" << generate_log_del(std::string("shuffling"), 2) << std::endl;
 		up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled);
 	}
+
+	//print out resource usage
+	std::cout << "\n\n";
+	std::cout << "------------------------------ resource usage ------------------------------" << std::endl;
+	std::cout << rm.result() << std::endl;
+	std::cout << "------------------------------ resource usage ------------------------------" << std::endl;
+	std::cout << "\n\n";
 
 }
 

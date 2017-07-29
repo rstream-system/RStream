@@ -5,8 +5,8 @@
  *      Author: icuzzq
  */
 
-#ifndef SRC_EXAMPLES_BASEAPPLICATION_HPP_
-#define SRC_EXAMPLES_BASEAPPLICATION_HPP_
+#ifndef SRC_APPS_BASEAPPLICATION_HPP_
+#define SRC_APPS_BASEAPPLICATION_HPP_
 
 
 #include "../core/engine.hpp"
@@ -24,4 +24,4 @@ public:
 }
 
 
-#endif /* SRC_EXAMPLES_BASEAPPLICATION_HPP_ */
+#endif /* SRC_APPS_BASEAPPLICATION_HPP_ */

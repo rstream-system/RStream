@@ -8,8 +8,8 @@
 #ifndef UTILITY_PREPROCESSING_NEW_HPP_
 #define UTILITY_PREPROCESSING_NEW_HPP_
 
-#include <iostream>
-#include <climits>
+//#include <iostream>
+//#include <climits>
 
 namespace RStream {
 	class Preprocessing_new {

@@ -14,9 +14,9 @@
 #include "concurrent_queue.hpp"
 #include "type.hpp"
 #include "constants.hpp"
-#include "../utility/preprocessing.hpp"
-#include "../utility/preprocessing_new.hpp"
-#include "../utility/preproc.hpp"
+#include "../preprocessor/preprocessing.hpp"
+#include "../preprocessor/preprocessing_new.hpp"
+#include "../preprocessor/preproc.hpp"
 
 namespace RStream {
 //	enum class EdgeType {

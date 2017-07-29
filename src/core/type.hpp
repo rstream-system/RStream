@@ -9,6 +9,7 @@
 #define CORE_TYPE_HPP_
 
 #include "../common/RStreamCommon.hpp"
+#include "../utility/Printer.hpp"
 
 #include "defs.hh"
 #include "graph.hh"
