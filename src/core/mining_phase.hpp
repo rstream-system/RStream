@@ -80,8 +80,12 @@ namespace RStream {
 			for(auto & t : exec_threads)
 				t.join();
 
+//			std::cout << "finish producers." << std::endl;
+
 			for(auto &t : write_threads)
 				t.join();
+
+//			std::cout << "finish consumers." << std::endl;
 
 			delete[] buffers_for_shuffle;
 			delete task_queue;
@@ -446,12 +450,14 @@ namespace RStream {
 				std::vector<Element_In_Tuple> edge_hashmap[n_vertices];
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
 //				//for debugging
+//				std::cout << "finish edge hash building" << std::endl;
 //				printout_edgehashmap(edge_hashmap, n_vertices);
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
 				int streaming_counter = update_file_size / real_io_size + 1;
+//				std::cout << "streaming counter: " << streaming_counter << std::endl;
 
 				long valid_io_size = 0;
 				long offset = 0;
@@ -511,6 +517,8 @@ namespace RStream {
 			}
 
 			atomic_num_producers--;
+
+//			std::cout << "end producer." << std::endl;
 		}
 
 
@@ -620,7 +628,7 @@ namespace RStream {
 
 						if(!filter_collect(in_update_tuple)){
 							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
-							std::cerr << "remained: " << in_update_tuple << std::endl;
+//							std::cerr << "remained: " << in_update_tuple << std::endl;
 						}
 					}
 				}
@@ -707,8 +715,8 @@ namespace RStream {
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
 				// streaming edges
-				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 				int size_of_unit = context.edge_unit;
+				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 				long real_io_size = get_real_io_size(IO_SIZE, size_of_unit);
 				int streaming_counter = edge_file_size / real_io_size + 1;
 
@@ -776,7 +784,6 @@ namespace RStream {
 				int i = --atomic_partition_number;
 
 				if(i >= 0){
-
 					std::string file_name (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(out_update_stream));
 					global_buffer_for_mining* g_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, i);
 					g_buf->flush_end(file_name, i);
@@ -839,7 +846,7 @@ namespace RStream {
 				// get a labeled edge
 				LabeledEdge e = *(LabeledEdge*)(edge_buf + pos);
 				// e.src is the key
-				edge_hashmap[e.src - start_vertex].push_back(Element_In_Tuple(e.target, 0, e.target_label));
+				edge_hashmap[e.src - start_vertex].push_back(Element_In_Tuple(e.target, (BYTE)0, e.target_label));
 			}
 		}
 

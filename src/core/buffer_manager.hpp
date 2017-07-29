@@ -81,6 +81,7 @@ namespace RStream {
 				close(fd);
 
 				count = 0;
+				index = 0;
 				not_full.notify_all();
 			}
 		}
