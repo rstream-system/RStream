@@ -37,8 +37,11 @@ namespace RStream {
 //			JoinResultType(InUpdateType u, VertexId t) : old_update(u), target(t) {};
 //		};
 
-		virtual bool filter(InUpdateType * update, Edge * edge) = 0;
-		virtual OutUpdateType * project_columns(InUpdateType * in_update, Edge * edge) = 0;
+//		virtual bool filter(InUpdateType * update, Edge * edge) = 0;
+//		virtual OutUpdateType * project_columns(InUpdateType * in_update, Edge * edge) = 0;
+		virtual bool filter(InUpdateType * update, VertexId edge_src, VertexId edge_dst) = 0;
+		virtual OutUpdateType * project_columns(InUpdateType * in_update, VertexId edge_src, VertexId edge_dst) = 0;
+
 //		virtual int new_key();
 
 		RPhase(Engine & e) : context(e) {}
@@ -273,13 +276,15 @@ namespace RStream {
 
 						// update.target is edge.src, the key to index edge_hashmap
 						for(VertexId target : edge_hashmap[update->target - vertex_start]) {
-							Edge * e = new Edge(update->target, target);
-							if(!filter(update, e)) {
+//							Edge * e = new Edge(update->target, target);
+//							if(!filter(update, e)) {
+							if(!filter(update, update->target, target)) {
 	//							NewUpdateType * new_update = new NewUpdateType(update, target);
 
 								//TODO: generate join result
 //								char* join_result = reinterpret_cast<char*>(&update);
-								OutUpdateType * out_update = project_columns(update, e);
+//								OutUpdateType * out_update = project_columns(update, e);
+								OutUpdateType * out_update = project_columns(update, update->target, target);
 //								std::cout << *e << std::endl;
 //								std::cout << *update << std::endl;
 //								std::cout << *out_update << std::endl;
@@ -295,7 +300,7 @@ namespace RStream {
 								delete out_update;
 
 							}
-							delete e;
+//							delete e;
 						}
 
 					}
