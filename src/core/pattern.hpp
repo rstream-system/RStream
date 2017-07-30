@@ -120,7 +120,7 @@ public:
 
 			for(unsigned int i = 0; i < sub_graph.size(); i++) {
 				Element_In_Tuple old_tuple = sub_graph[i];
-				Element_In_Tuple * new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, old_tuple.edge_label, old_tuple.vertex_label, old_tuple.history_info);
+				Element_In_Tuple * new_tuple = new Element_In_Tuple(old_tuple.vertex_id, (BYTE)0, old_tuple.edge_label, old_tuple.vertex_label, old_tuple.history_info);
 
 				VertexId old_id = new_tuple->vertex_id;
 				auto iterator = map.find(old_id);

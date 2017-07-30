@@ -9,6 +9,7 @@
 #define CORE_TYPE_HPP_
 
 #include "../common/RStreamCommon.hpp"
+#include "../utility/Printer.hpp"
 
 #include "defs.hh"
 #include "graph.hh"
@@ -230,6 +231,11 @@ inline std::ostream & operator<<(std::ostream & strm, const Element_In_Tuple& el
 }
 
 inline std::ostream & operator<<(std::ostream & strm, const std::vector<Element_In_Tuple>& tuple){
+	if(tuple.empty()){
+		strm << "(empty)";
+		return strm;
+	}
+
 	strm << "(";
 	for(auto it = tuple.begin(); it != tuple.end() - 1; ++it){
 		strm << (*it) << ", ";
@@ -243,14 +249,14 @@ inline std::ostream & operator<<(std::ostream & strm, const std::vector<Element_
 class Canonical_Graph {
 
 public:
-	Canonical_Graph(){
+	Canonical_Graph() : number_of_vertices(0), hash_value(0){
 
 	}
 
-	Canonical_Graph(std::vector<Element_In_Tuple>& tuple, unsigned int num_vertices, unsigned int hash_v)
-		: tuple(tuple), number_of_vertices(num_vertices), hash_value(hash_v) {
-
-	}
+//	Canonical_Graph(std::vector<Element_In_Tuple>& tuple, unsigned int num_vertices, unsigned int hash_v)
+//		: tuple(tuple), number_of_vertices(num_vertices), hash_value(hash_v) {
+//
+//	}
 
 	Canonical_Graph(bliss::AbstractGraph* ag, bool is_directed){
 		construct_cg(ag, is_directed);
@@ -306,8 +312,20 @@ public:
 		return cmp(other) == 0;
 	}
 
-	inline std::vector<Element_In_Tuple> get_tuple() const {
+	inline std::vector<Element_In_Tuple>& get_tuple() {
 		return tuple;
+	}
+
+	inline std::vector<Element_In_Tuple> get_tuple_const() const {
+		return tuple;
+	}
+
+	inline void set_number_vertices(unsigned int num_vertices) {
+		number_of_vertices = num_vertices;
+	}
+
+	inline void set_hash_value(unsigned int hash) {
+		hash_value = hash;
 	}
 
 
@@ -426,7 +444,7 @@ namespace std {
 }
 
 inline std::ostream & operator<<(std::ostream & strm, const Canonical_Graph& cg){
-	strm << "{" << cg.get_tuple() << "; " << cg.get_number_vertices() << "; " << cg.get_hash() << "}";
+	strm << "{" << cg.get_tuple_const() << "; " << cg.get_number_vertices() << "; " << cg.get_hash() << "}";
 	return strm;
 }
 
