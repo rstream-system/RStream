@@ -15,6 +15,8 @@
 #include "graph.hh"
 #include "timer.hh"
 #include "utils.hh"
+#include "bignum.hh"
+#include "uintseqhash.hh"
 
 typedef unsigned Update_Stream;
 typedef unsigned Aggregation_Stream;
@@ -483,7 +485,21 @@ public:
 
 	unsigned int get_hash() const {
 		//TODO
-		return 0;
+		bliss::UintSeqHash h;
+
+		h.update(tuple.size());
+
+		//hash vertex labels and edges
+		for(unsigned int i = 0; i < tuple.size(); ++i){
+			auto element = tuple[i];
+			h.update(element.vertex_id);
+			h.update(element.vertex_label);
+			h.update(element.history_info);
+		}
+
+		return h.get_value();
+
+//		return 0;
 	}
 
 	void push(Element_In_Tuple& element){

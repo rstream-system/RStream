@@ -12,7 +12,7 @@
 //#include "../utility/ResourceManager.hpp"
 //
 //
-//#define MAXSIZE 4
+//#define MAXSIZE 5
 //
 //using namespace RStream;
 //

@@ -105,7 +105,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				std::cout << "partition at shuffle-canonical: " << partition_id << std::endl;
+				print_thread_info_locked("as a (shuffle-upstream-on-canonical) producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -226,8 +226,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				std::cout << "partition at aggregate-filter: " << partition_id << std::endl;
-				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + "\n");
+				print_thread_info_locked("as a (aggregate-filter) producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(agg_stream)).c_str(), O_RDONLY);
@@ -396,7 +395,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				std::cout << "partition at aggregate-global: " << partition_id << std::endl;
+				print_thread_info_locked("as a (aggregate-global) worker dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
 				assert(fd_agg > 0);
@@ -524,7 +523,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				std::cout << "partition at aggregate-local: " << partition_id << std::endl;
+				print_thread_info_locked("as a (aggregate-local) producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
