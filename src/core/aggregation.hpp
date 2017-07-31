@@ -171,8 +171,8 @@ namespace RStream {
 			//get tuple
 			insert_tuple_to_buffer(index, in_update_tuple, buffers_for_shuffle);
 
-			//for debugging only
-			std::cout << "tuple: " << in_update_tuple << " ==> " << index << std::endl;
+//			//for debugging only
+//			std::cout << "tuple: " << in_update_tuple << " ==> " << index << std::endl;
 		}
 
 		void insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
@@ -244,7 +244,7 @@ namespace RStream {
 				//build hashmap for aggregation tuples
 				std::unordered_map<Canonical_Graph, int> map;
 				build_aggmap(map, agg_local_buf, agg_file_size, sizeof_agg);
-				printout_cg_aggmap(map);
+//				printout_cg_aggmap(map);
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
@@ -274,8 +274,8 @@ namespace RStream {
 						std::vector<Element_In_Tuple> in_update_tuple;
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
-						//for debugging
-						std::cout << in_update_tuple << " --> " << filter_aggregate(in_update_tuple, map, threshold) << std::endl;
+//						//for debugging
+//						std::cout << in_update_tuple << " --> " << filter_aggregate(in_update_tuple, map, threshold) << std::endl;
 
 						if(!filter_aggregate(in_update_tuple, map, threshold)){
 							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
@@ -560,7 +560,7 @@ namespace RStream {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
-						std::cout << "in_update: \t" << in_update_tuple << std::endl;
+//						std::cout << "in_update: \t" << in_update_tuple << std::endl;
 
 						// turn tuple to quick pattern
 						Quick_Pattern quick_pattern;

@@ -73,11 +73,11 @@ namespace RStream {
 				std::cout << "start to convert adj list file..." << std::endl;
 				convert_adjlist();
 				std::cout << "convert adj list file done." << std::endl;
-				std::cout << "start to partition on vertices..." << std::endl;
-				partition_on_vertices<LabeledEdge>();
+//				std::cout << "start to partition on vertices..." << std::endl;
+//				partition_on_vertices<LabeledEdge>();
 
-//				std::cout << "start to partition on edges..." << std::endl;
-//				partition_on_edges<LabeledEdge>();
+				std::cout << "start to partition on edges..." << std::endl;
+				partition_on_edges<LabeledEdge>();
 
 				std::cout << "gen partition done!" << std::endl;
 				write_meta_file();

@@ -1,4 +1,4 @@
-
+//
 ///*
 // * motifcounting.cpp
 // *
@@ -8,8 +8,9 @@
 //
 //#include "../core/engine.hpp"
 //#include "../core/aggregation.hpp"
+//#include "../utility/ResourceManager.hpp"
 //
-//#define MAXSIZE 3
+//#define MAXSIZE 4
 //
 //using namespace RStream;
 //
@@ -39,8 +40,10 @@
 //};
 //
 //int main(int argc, char **argv) {
-//	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_mining.txt", 3, 1);
+//	Engine e("/home/icuzzq/Workspace/git/RStream/input/citeseer.graph", 4, 1);
 //	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
+//
+//	ResourceManager rm;
 //
 //	MC mPhase(e);
 //	Aggregation agg(e);
@@ -70,10 +73,17 @@
 //		up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled);
 //	}
 //
+//	//print out resource usage
+//	std::cout << "\n\n";
+//	std::cout << "------------------------------ resource usage ------------------------------" << std::endl;
+//	std::cout << rm.result() << std::endl;
+//	std::cout << "------------------------------ resource usage ------------------------------" << std::endl;
+//	std::cout << "\n\n";
+//
 //}
 //
 //
 //
 //
 //
-
+//
