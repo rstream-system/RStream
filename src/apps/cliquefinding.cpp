@@ -11,7 +11,8 @@
 //#include "../core/mining_phase.hpp"
 //#include "../utility/ResourceManager.hpp"
 //
-//#define MAXSIZE 3
+//
+//#define MAXSIZE 4
 //
 //using namespace RStream;
 //
@@ -51,7 +52,7 @@
 //};
 //
 //int main(int argc, char **argv) {
-//	Engine e("/home/icuzzq/Workspace/git/RStream/input/mico.graph", 4, 1);
+//	Engine e("/home/icuzzq/Workspace/git/RStream/input/citeseer.graph", 6, 1);
 //	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 //
 //	ResourceManager rm;

@@ -60,18 +60,22 @@
 //	R1(Engine & e) : RPhase(e) {};
 //	~R1(){};
 //
-//	bool filter(RInUpdate_TriC * update, Edge * edge) {
+////	bool filter(RInUpdate_TriC * update, Edge * edge) {
+//	bool filter(RInUpdate_TriC * update, VertexId edge_src, VertexId edge_dst) {
 ////		if(update->src > update->target || edge->src > edge->target) return true;
 ////		return false;
 //
-//		if(update->src < update->target && edge->src < edge->target)
+////		if(update->src < update->target && edge->src < edge->target)
+//		if(update->src < update->target && edge_src < edge_dst)
 //			return false;
 //
 //		return true;
 //	}
 //
-//	ROutUpdate_TriC * project_columns(RInUpdate_TriC * in_update, Edge * edge) {
-//		ROutUpdate_TriC * new_update = new ROutUpdate_TriC(edge->target, in_update->src, in_update->target);
+////	ROutUpdate_TriC * project_columns(RInUpdate_TriC * in_update, Edge * edge) {
+//	ROutUpdate_TriC * project_columns(RInUpdate_TriC * in_update, VertexId edge_src, VertexId edge_dst) {
+////		ROutUpdate_TriC * new_update = new ROutUpdate_TriC(edge->target, in_update->src, in_update->target);
+//		ROutUpdate_TriC * new_update = new ROutUpdate_TriC(edge_dst, in_update->src, in_update->target);
 //		return new_update;
 //	}
 //};
@@ -81,12 +85,16 @@
 //	R2(Engine & e) : RPhase(e) {};
 //	~R2(){};
 //
-//	bool filter(ROutUpdate_TriC * update, Edge * edge) {
-//		if(update->src1 != edge->target) return true;
+////	bool filter(ROutUpdate_TriC * update, Edge * edge) {
+//	bool filter(ROutUpdate_TriC * update, VertexId edge_src, VertexId edge_dst) {
+////		if(update->src1 != edge->target) return true;
+//		if(update->src1 != edge_dst) return true;
 //		return false;
 //	}
 //
-//	ROutUpdate_TriC * project_columns(ROutUpdate_TriC * in_update, Edge * edge) {
+////	ROutUpdate_TriC * project_columns(ROutUpdate_TriC * in_update, Edge * edge) {
+//	ROutUpdate_TriC * project_columns(ROutUpdate_TriC * in_update, VertexId edge_src, VertexId edge_dst) {
+////		ROutUpdate_TriC * new_update = new ROutUpdate_TriC(in_update->target, in_update->src1, in_update->src2);
 //		ROutUpdate_TriC * new_update = new ROutUpdate_TriC(in_update->target, in_update->src1, in_update->src2);
 //		return new_update;
 //	}
@@ -151,7 +159,7 @@
 ////
 ////	std::cout << "Triangle Counting : " << Global_Info::count(out_stream_2, sizeof(ROutUpdate_TriC), e) << std::endl;
 //}
-
-
-
-
+//
+//
+//
+//

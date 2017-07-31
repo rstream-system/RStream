@@ -37,8 +37,11 @@ namespace RStream {
 //			JoinResultType(InUpdateType u, VertexId t) : old_update(u), target(t) {};
 //		};
 
-		virtual bool filter(InUpdateType * update, Edge * edge) = 0;
-		virtual OutUpdateType * project_columns(InUpdateType * in_update, Edge * edge) = 0;
+//		virtual bool filter(InUpdateType * update, Edge * edge) = 0;
+//		virtual OutUpdateType * project_columns(InUpdateType * in_update, Edge * edge) = 0;
+		virtual bool filter(InUpdateType * update, VertexId edge_src, VertexId edge_dst) = 0;
+		virtual OutUpdateType * project_columns(InUpdateType * in_update, VertexId edge_src, VertexId edge_dst) = 0;
+
 //		virtual int new_key();
 
 		RPhase(Engine & e) : context(e) {}
@@ -61,12 +64,43 @@ namespace RStream {
 
 			Update_Stream update_c = Engine::update_count++;
 
-			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
-
+//			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
 			// push task into concurrent queue
+//			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+//				task_queue->push(partition_id);
+//			}
+
+
+			std::vector<std::pair<long, std::tuple<int, long, long>>> tasks;
+			concurrent_queue<std::tuple<int, long, long>> * task_queue = new concurrent_queue<std::tuple<int, long, long>>(MAX_QUEUE_SIZE);
+
+			// divide in update stream into smaller chuncks, to get better workload balance
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
-				task_queue->push(partition_id);
-//				std::cout << partition_id << std::endl;
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				long update_size = io_manager::get_filesize(fd_update);
+				int streaming_counter = update_size / (CHUNK_SIZE * sizeof(InUpdateType)) + 1;
+				assert((update_size % sizeof(InUpdateType)) == 0);
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						valid_io_size = update_size - IO_SIZE * sizeof(InUpdateType) * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE * sizeof(InUpdateType);
+
+					tasks.push_back(std::make_pair(valid_io_size, std::make_tuple(partition_id, offset, valid_io_size)));
+					offset += valid_io_size;
+				}
+
+			}
+
+			// sort tasks on size, larger size has a higher priority to run
+			std::sort(tasks.begin(), tasks.end());
+			for(int i = tasks.size() - 1; i >= 0; i--) {
+				task_queue->push(tasks.at(i).second);
 			}
 
 			// allocate global buffers for shuffling
@@ -192,27 +226,37 @@ namespace RStream {
 
 	private:
 		// each exec thread generates a join producer
-		void join_producer(Update_Stream in_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+//		void join_producer(Update_Stream in_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+		void join_producer(Update_Stream in_update_stream, global_buffer<OutUpdateType> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue) {
 //			atomic_num_producers++;
 			int partition_id = -1;
+			long chunk_offset = 0, chunk_size = 0;
+			auto one_task = std::make_tuple(partition_id, chunk_offset, chunk_size);
 
 			for(unsigned int i = 0; i < context.num_partitions; i++) {
 				assert(buffers_for_shuffle[i]->get_capacity() == BUFFER_CAPACITY);
 			}
 
 			// pop from queue
-			while(task_queue->test_pop_atomic(partition_id)){
+//			while(task_queue->test_pop_atomic(partition_id)){
+			while(task_queue->test_pop_atomic(one_task)){
+				partition_id = std::get<0>(one_task);
+				chunk_offset = std::get<1>(one_task);
+				chunk_size = std::get<2>(one_task);
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_update > 0 && fd_edge > 0 );
 
 				// get file size
-				long update_file_size = io_manager::get_filesize(fd_update);
+//				long update_file_size = io_manager::get_filesize(fd_update);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
+//				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
+//						+ " of update size " + std::to_string(update_file_size) + ", edge file size " + std::to_string(edge_file_size) + "\n");
+
 				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
-						+ " of update size " + std::to_string(update_file_size) + ", edge file size " + std::to_string(edge_file_size) + "\n");
+										+ " of update size " + std::to_string(chunk_size) + ", edge file size " + std::to_string(edge_file_size) + "\n");
 
 				// read from files to thread local buffer
 //				char * update_local_buf = new char[update_file_size];
@@ -223,8 +267,10 @@ namespace RStream {
 //				int streaming_counter = update_file_size / IO_SIZE + 1;
 
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(InUpdateType));
-				int streaming_counter = update_file_size / (IO_SIZE * sizeof(InUpdateType)) + 1;
-				assert((update_file_size % sizeof(InUpdateType)) == 0);
+//				int streaming_counter = update_file_size / (IO_SIZE * sizeof(InUpdateType)) + 1;
+//				assert((update_file_size % sizeof(InUpdateType)) == 0);
+				int streaming_counter = chunk_size / (IO_SIZE * sizeof(InUpdateType)) + 1;
+				assert((chunk_size % sizeof(InUpdateType)) == 0);
 
 				// edges are fully loaded into memory
 				char * edge_local_buf = new char[edge_file_size];
@@ -254,7 +300,8 @@ namespace RStream {
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
 //						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
-						valid_io_size = update_file_size - IO_SIZE * sizeof(InUpdateType) * (streaming_counter - 1);
+//						valid_io_size = update_file_size - IO_SIZE * sizeof(InUpdateType) * (streaming_counter - 1);
+						valid_io_size = chunk_size - IO_SIZE * sizeof(InUpdateType) * (streaming_counter - 1);
 					else
 //						valid_io_size = IO_SIZE;
 						valid_io_size = IO_SIZE * sizeof(InUpdateType);
@@ -263,7 +310,8 @@ namespace RStream {
 					print_thread_info_locked(std::to_string(counter) + "th streaming, start join of size "
 							+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 
-					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
+//					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
+					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, chunk_offset + offset);
 					offset += valid_io_size;
 
 					// streaming updates in, do hash join
@@ -273,13 +321,15 @@ namespace RStream {
 
 						// update.target is edge.src, the key to index edge_hashmap
 						for(VertexId target : edge_hashmap[update->target - vertex_start]) {
-							Edge * e = new Edge(update->target, target);
-							if(!filter(update, e)) {
+//							Edge * e = new Edge(update->target, target);
+//							if(!filter(update, e)) {
+							if(!filter(update, update->target, target)) {
 	//							NewUpdateType * new_update = new NewUpdateType(update, target);
 
 								//TODO: generate join result
 //								char* join_result = reinterpret_cast<char*>(&update);
-								OutUpdateType * out_update = project_columns(update, e);
+//								OutUpdateType * out_update = project_columns(update, e);
+								OutUpdateType * out_update = project_columns(update, update->target, target);
 //								std::cout << *e << std::endl;
 //								std::cout << *update << std::endl;
 //								std::cout << *out_update << std::endl;
@@ -295,7 +345,7 @@ namespace RStream {
 								delete out_update;
 
 							}
-							delete e;
+//							delete e;
 						}
 
 					}
