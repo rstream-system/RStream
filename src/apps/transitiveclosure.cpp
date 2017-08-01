@@ -66,16 +66,20 @@
 //		TC(Engine & e) : RPhase(e) {};
 //		~TC(){};
 //
-//		bool filter(In_Update_TC * update, Edge * edge) {
+////		bool filter(In_Update_TC * update, Edge * edge) {
+//		bool filter(In_Update_TC * update, VertexId edge_src, VertexId edge_target) {
 //			// Do NOT add self edge
-//			if(update->src == edge->target)
+////			if(update->src == edge->target)
+//			if(update->src == edge_target)
 //				return true;
 //
 //			return false;
 //		}
 //
-//		Out_Update_TC * project_columns(In_Update_TC * in_update, Edge * edge) {
-//			Out_Update_TC * new_update = new Out_Update_TC(in_update->src, edge->target);
+////		Out_Update_TC * project_columns(In_Update_TC * in_update, Edge * edge) {
+//		Out_Update_TC * project_columns(In_Update_TC * in_update, VertexId edge_src, VertexId edge_target) {
+////			Out_Update_TC * new_update = new Out_Update_TC(in_update->src, edge->target);
+//			Out_Update_TC * new_update = new Out_Update_TC(in_update->src, edge_target);
 //			return new_update;
 //		}
 //};
