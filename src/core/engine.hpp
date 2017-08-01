@@ -74,7 +74,7 @@ namespace RStream {
 //			num_threads = std::thread::hardware_concurrency();
 			num_threads = 4;
 			num_write_threads = 1;
-			num_exec_threads = 3;
+			num_exec_threads = 4;
 
 			num_partitions = num_parts;
 
@@ -114,6 +114,20 @@ namespace RStream {
 
 		~Engine(){
 //			delete[] vertex_intervals;
+		}
+
+		//clean files added by Zhiqiang
+		void clean_files(){
+			//delete .binary
+			FileUtil::delete_file(filename + ".binary");
+
+			//delete .meta
+			FileUtil::delete_file(filename + ".meta");
+
+			//delete partitions
+			for(int i = 0; i < num_partitions; ++i){
+				FileUtil::delete_file(filename + "." + std::to_string(i));
+			}
 		}
 
 //		void preprocess(){

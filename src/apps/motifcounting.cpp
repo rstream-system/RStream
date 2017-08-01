@@ -10,7 +10,7 @@
 #include "../core/aggregation.hpp"
 #include "../utility/ResourceManager.hpp"
 
-#define MAXSIZE 4
+#define MAXSIZE 3
 
 using namespace RStream;
 
@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 	ResourceManager rm;
 
 	MC mPhase(e);
-	Aggregation agg(e);
+	Aggregation agg(e, false);
 
 	//init: get the edges stream
 	std::cout << generate_log_del(std::string("init-shuffling"), 1) << std::endl;
@@ -62,16 +62,27 @@ int main(int argc, char **argv) {
 		//join on all keys
 		std::cout << "\n" << generate_log_del(std::string("joining"), 2) << std::endl;
 		up_stream_non_shuffled = mPhase.join_mining(up_stream_shuffled);
+		mPhase.delete_upstream(up_stream_shuffled);
 		//aggregate
 		std::cout << "\n" << generate_log_del(std::string("aggregating"), 2) << std::endl;
 		agg_stream = agg.aggregate(up_stream_non_shuffled, mPhase.sizeof_in_tuple);
 		//print out counts info
 		std::cout << "\n" << generate_log_del(std::string("printing"), 2) << std::endl;
 		agg.printout_aggstream(agg_stream);
+		agg.delete_aggstream(agg_stream);
 		//shuffle for next join
 		std::cout << "\n" << generate_log_del(std::string("shuffling"), 2) << std::endl;
 		up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled);
+		mPhase.delete_upstream(up_stream_non_shuffled);
 	}
+	//clean remaining stream files
+	std::cout << std::endl;
+	mPhase.delete_upstream(up_stream_shuffled);
+
+	//delete all generated files
+	std::cout << "\n\n" << generate_log_del(std::string("cleaning"), 1) << std::endl;
+	e.clean_files();
+
 
 	//print out resource usage
 	std::cout << "\n\n";

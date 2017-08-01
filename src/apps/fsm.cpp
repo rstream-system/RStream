@@ -9,8 +9,8 @@
 //#include "../core/aggregation.hpp"
 //#include "../utility/ResourceManager.hpp"
 //
-//#define MAXSIZE 3
-//#define THRESHOLD 1000
+//#define MAXSIZE 5
+//#define THRESHOLD 300
 //
 //using namespace RStream;
 //
@@ -48,7 +48,7 @@
 //	ResourceManager rm;
 //
 //	MC mPhase(e);
-//	Aggregation agg(e);
+//	Aggregation agg(e, true);
 //
 //	//get the non-shuffled edges stream
 //	std::cout << generate_log_del(std::string("init"), 1) << std::endl;

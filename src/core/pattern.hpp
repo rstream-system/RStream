@@ -112,8 +112,7 @@ public:
 //		}
 //
 //	}
-
-
+//
 //	static void turn_quick_pattern_pure(std::vector<Element_In_Tuple> & sub_graph, std::vector<Element_In_Tuple> & graph_quick_pattern) {
 //			std::unordered_map<VertexId, VertexId> map;
 //			VertexId new_id = 1;
@@ -138,30 +137,33 @@ public:
 //
 //		}
 
-	static void turn_quick_pattern_pure(std::vector<Element_In_Tuple> & sub_graph, Quick_Pattern & graph_quick_pattern) {
-			std::unordered_map<VertexId, VertexId> map;
-			VertexId new_id = 1;
+	static void turn_quick_pattern_pure(std::vector<Element_In_Tuple> & sub_graph, Quick_Pattern & graph_quick_pattern, bool label_flag) {
+		std::unordered_map<VertexId, VertexId> map;
+		VertexId new_id = 1;
 
-			for(unsigned int i = 0; i < sub_graph.size(); i++) {
-				Element_In_Tuple old_tuple = sub_graph[i];
-				Element_In_Tuple * new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, old_tuple.edge_label, old_tuple.vertex_label, old_tuple.history_info);
-//				Element_In_Tuple * new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, (BYTE)0, old_tuple.history_info);
+		for(unsigned int i = 0; i < sub_graph.size(); i++) {
+			Element_In_Tuple old_tuple = sub_graph[i];
 
-				VertexId old_id = new_tuple->vertex_id;
-				auto iterator = map.find(old_id);
-				if(iterator == map.end()) {
-					new_tuple->set_vertex_id(new_id);
-					map[old_id] = new_id++;
+			Element_In_Tuple * new_tuple;
+			if(label_flag)
+				new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, old_tuple.vertex_label, old_tuple.history_info);
+			else
+				new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, (BYTE)0, old_tuple.history_info);
 
-				} else {
-					new_tuple->set_vertex_id(iterator->second);
-				}
+			VertexId old_id = new_tuple->vertex_id;
+			auto iterator = map.find(old_id);
+			if(iterator == map.end()) {
+				new_tuple->set_vertex_id(new_id);
+				map[old_id] = new_id++;
 
-				graph_quick_pattern.push(*new_tuple);
-				delete new_tuple;
+			} else {
+				new_tuple->set_vertex_id(iterator->second);
 			}
 
+			graph_quick_pattern.push(*new_tuple);
+			delete new_tuple;
 		}
+	}
 
 
 private:

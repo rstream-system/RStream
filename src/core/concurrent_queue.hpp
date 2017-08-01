@@ -17,6 +17,8 @@ namespace RStream {
 		std::mutex mutex;
 
 	public:
+		concurrent_queue() {}
+
 		concurrent_queue(const size_t _capacity) {}
 
 //		inline bool isEmpty(){

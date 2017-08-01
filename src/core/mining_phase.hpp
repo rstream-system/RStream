@@ -46,6 +46,8 @@ namespace RStream {
 			atomic_partition_number = context.num_partitions;
 		}
 
+
+
 		/** join update stream with edge stream to generate non-shuffled update stream
 		 * @param in_update_stream: which is shuffled
 		 * @param out_update_stream: which is non-shuffled
@@ -56,12 +58,13 @@ namespace RStream {
 
 			Update_Stream update_c = Engine::update_count++;
 
-			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			// push task into concurrent queue
+//			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+//				task_queue->push(partition_id);
+//			}
 
-			// push task into concurrent queue
-			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
-				task_queue->push(partition_id);
-			}
+			concurrent_queue<std::tuple<int, long, long>>* task_queue = divide_tasks(context.num_partitions, context.filename, in_update_stream, sizeof_in_tuple, CHUNK_SIZE);
 
 			// allocate global buffers for shuffling
 			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_out_tuple);
@@ -185,12 +188,13 @@ namespace RStream {
 
 			Update_Stream update_c = Engine::update_count++;
 
-			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			// push task into concurrent queue
+//			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+//				task_queue->push(partition_id);
+//			}
 
-			// push task into concurrent queue
-			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
-				task_queue->push(partition_id);
-			}
+			concurrent_queue<std::tuple<int, long, long>>* task_queue = divide_tasks(context.num_partitions, context.filename, in_update_stream, sizeof_in_tuple, CHUNK_SIZE);
 
 			// allocate global buffers for shuffling
 			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_in_tuple);
@@ -224,12 +228,13 @@ namespace RStream {
 
 			Update_Stream update_c = Engine::update_count++;
 
-			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			// push task into concurrent queue
+//			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+//				task_queue->push(partition_id);
+//			}
 
-			// push task into concurrent queue
-			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
-				task_queue->push(partition_id);
-			}
+			concurrent_queue<std::tuple<int, long, long>>* task_queue = divide_tasks(context.num_partitions, context.filename, in_update_stream, sizeof_in_tuple, CHUNK_SIZE);
 
 			// allocate global buffers for shuffling
 			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_in_tuple);
@@ -268,12 +273,13 @@ namespace RStream {
 
 			Update_Stream update_c = Engine::update_count++;
 
-			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			// push task into concurrent queue
+//			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+//				task_queue->push(partition_id);
+//			}
 
-			// push task into concurrent queue
-			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
-				task_queue->push(partition_id);
-			}
+			concurrent_queue<std::tuple<int, long, long>>* task_queue = divide_tasks(context.num_partitions, context.filename, in_update_stream, sizeof_in_tuple, CHUNK_SIZE);
 
 			// allocate global buffers for shuffling
 			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_out_tuple);
@@ -308,6 +314,12 @@ namespace RStream {
 			std::cout << "Number of tuples in "<< in_update_stream << ": \t" << get_count(in_update_stream) << std::endl;
 		}
 
+		void delete_upstream(Update_Stream in_update_stream){
+			delete_upstream_static(in_update_stream, context.num_partitions, context.filename);
+		}
+
+
+	private:
 		int get_count(Update_Stream in_update_stream){
 			int count_total = 0;
 			// push task into concurrent queue
@@ -325,25 +337,25 @@ namespace RStream {
 		}
 
 
-	private:
 		// each exec thread generates a join producer
-		void join_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			int partition_id = -1;
+		void join_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue) {
+			std::tuple<int, long, long> task_id (-1, -1, -1);
 
 			// pop from queue
-			while(task_queue->test_pop_atomic(partition_id)){
-				print_thread_info_locked("as a (join-all-keys) producer dealing with partition " + std::to_string(partition_id) + "\n");
+			while(task_queue->test_pop_atomic(task_id)){
+				int partition_id = std::get<0>(task_id);
+				long offset_task = std::get<1>(task_id);
+				long size_task = std::get<2>(task_id);
+				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				print_thread_info_locked("as a (join-all-keys) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+
+
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
-				assert(fd_update > 0 && fd_edge > 0 );
-
-				// get file size
-				long update_file_size = io_manager::get_filesize(fd_update);
+				assert(fd_edge > 0);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
 				// edges are fully loaded into memory
-//				char * edge_local_buf = new char[edge_file_size];
 				char * edge_local_buf = (char *)malloc(edge_file_size);
 				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size, 0);
 
@@ -354,13 +366,21 @@ namespace RStream {
 				std::vector<Element_In_Tuple> edge_hashmap[n_vertices];
 				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, vertex_start);
 
+
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0);
+				// get file size
+//				long update_file_size = io_manager::get_filesize(fd_update);
+				long update_file_size = size_task;
+
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
 				int streaming_counter = update_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
-				long offset = 0;
+//				long offset = 0;
+				long offset = offset_task;
 
 				// for all streaming updates
 				for(int counter = 0; counter < streaming_counter; counter++) {
@@ -421,20 +441,23 @@ namespace RStream {
 			}
 		}
 
+
 		// each exec thread generates a join producer
-		void join_mining_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			int partition_id = -1;
+		void join_mining_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue) {
+			std::tuple<int, long, long> task_id (-1, -1, -1);
 
 			// pop from queue
-			while(task_queue->test_pop_atomic(partition_id)){
-				print_thread_info_locked("as a (join-mining) producer dealing with partition " + std::to_string(partition_id) + "\n");
+			while(task_queue->test_pop_atomic(task_id)){
+				int partition_id = std::get<0>(task_id);
+				long offset_task = std::get<1>(task_id);
+				long size_task = std::get<2>(task_id);
+				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				print_thread_info_locked("as a (join-mining) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+
+
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
-				assert(fd_update > 0 && fd_edge > 0 );
-
-				// get file size
-				long update_file_size = io_manager::get_filesize(fd_update);
+				assert(fd_edge > 0);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
 				// edges are fully loaded into memory
@@ -451,6 +474,14 @@ namespace RStream {
 //				std::cout << "finish edge hash building" << std::endl;
 //				printout_edgehashmap(edge_hashmap, n_vertices);
 
+
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0);
+
+				// get file size
+//				long update_file_size = io_manager::get_filesize(fd_update);
+				long update_file_size = size_task;
+
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
@@ -458,7 +489,8 @@ namespace RStream {
 //				std::cout << "streaming counter: " << streaming_counter << std::endl;
 
 				long valid_io_size = 0;
-				long offset = 0;
+//				long offset = 0;
+				long offset = offset_task;
 
 				// for all streaming updates
 				for(int counter = 0; counter < streaming_counter; counter++) {
@@ -527,18 +559,24 @@ namespace RStream {
 		}
 
 
-		void shuffle_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			int partition_id = -1;
+		void shuffle_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue) {
+			std::tuple<int, long, long> task_id (-1, -1, -1);
 
 			// pop from queue
-			while(task_queue->test_pop_atomic(partition_id)){
-				print_thread_info_locked("as a (shuffle-all-keys) producer dealing with partition " + std::to_string(partition_id) + "\n");
+			while(task_queue->test_pop_atomic(task_id)){
+				int partition_id = std::get<0>(task_id);
+				long offset_task = std::get<1>(task_id);
+				long size_task = std::get<2>(task_id);
+				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
+
+				print_thread_info_locked("as a (shuffle-all-keys) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
 
 				// get file size
-				long update_file_size = io_manager::get_filesize(fd_update);
+//				long update_file_size = io_manager::get_filesize(fd_update);
+				long update_file_size = size_task;
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
@@ -546,7 +584,8 @@ namespace RStream {
 				int streaming_counter = update_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
-				long offset = 0;
+//				long offset = 0;
+				long offset = offset_task;
 
 				// for all streaming updates
 				for(int counter = 0; counter < streaming_counter; counter++) {
@@ -581,18 +620,24 @@ namespace RStream {
 		}
 
 
-		void collect_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			int partition_id = -1;
+		void collect_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue) {
+			std::tuple<int, long, long> task_id (-1, -1, -1);
 
 			// pop from queue
-			while(task_queue->test_pop_atomic(partition_id)){
-				print_thread_info_locked("as a (collect) producer dealing with partition " + std::to_string(partition_id) + "\n");
+			while(task_queue->test_pop_atomic(task_id)){
+				int partition_id = std::get<0>(task_id);
+				long offset_task = std::get<1>(task_id);
+				long size_task = std::get<2>(task_id);
+				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
+
+				print_thread_info_locked("as a (collect) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
 
 				// get file size
-				long update_file_size = io_manager::get_filesize(fd_update);
+//				long update_file_size = io_manager::get_filesize(fd_update);
+				long update_file_size = size_task;
 
 				// streaming updates
 				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
@@ -600,7 +645,8 @@ namespace RStream {
 				int streaming_counter = update_file_size / real_io_size + 1;
 
 				long valid_io_size = 0;
-				long offset = 0;
+//				long offset = 0;
+				long offset = offset_task;
 
 				// for all streaming updates
 				for(int counter = 0; counter < streaming_counter; counter++) {
@@ -857,6 +903,46 @@ namespace RStream {
 		}
 
 	public:
+		static concurrent_queue<std::tuple<int, long, long>>* divide_tasks(const int num_partitions, const std::string& filename, Update_Stream update_stream, int sizeof_in_tuple,
+				 long chunk_unit){
+			long real_chunk_unit = get_real_io_size(chunk_unit, sizeof_in_tuple);
+			std::vector<std::tuple<int, long, long>> tasks;
+
+			// divide in update stream into smaller chunks, to get better workload balance
+			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
+				int fd_update = open((filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(update_stream)).c_str(), O_RDONLY);
+				long update_size = io_manager::get_filesize(fd_update);
+
+				int chunk_counter = update_size / real_chunk_unit + 1;
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				for(int counter = 0; counter < chunk_counter; counter++) {
+					// last streaming
+					if(counter == chunk_counter - 1)
+						valid_io_size = update_size - real_chunk_unit * (chunk_counter - 1);
+					else
+						valid_io_size = real_chunk_unit;
+
+					tasks.push_back(std::make_tuple(partition_id, offset, valid_io_size));
+					offset += valid_io_size;
+				}
+			}
+
+			std::sort(tasks.begin(), tasks.end(), task_comparator);
+
+			concurrent_queue<std::tuple<int, long, long>> * task_queue = new concurrent_queue<std::tuple<int, long, long>>();
+			for(auto it = tasks.begin(); it != tasks.end(); ++it){
+				task_queue->push(*it);
+			}
+			return task_queue;
+		}
+
+		static bool task_comparator(std::tuple<int, long, long> t1, std::tuple<int, long, long> t2){
+			return std::get<2>(t1) > std::get<2>(t2);
+		}
+
 		static long get_real_io_size(long io_size, int size_of_unit){
 			long real_io_size = io_size - io_size % size_of_unit;
 			assert(real_io_size % size_of_unit == 0);
@@ -869,6 +955,18 @@ namespace RStream {
 				tuple.push_back(element);
 			}
 		}
+
+		static std::string get_string_task_tuple(std::tuple<int, long, long>& task_id){
+			return "<" + std::to_string(std::get<0>(task_id)) + ", " + std::to_string(std::get<1>(task_id)) + ", " + std::to_string(std::get<2>(task_id)) + ">";
+		}
+
+		static void delete_upstream_static(Update_Stream in_update_stream, const int num_partitions, const std::string& file_name){
+			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
+				std::string filename = file_name + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream);
+				FileUtil::delete_file(filename);
+			}
+		}
+
 
 
 };
