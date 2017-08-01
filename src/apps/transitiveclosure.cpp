@@ -151,16 +151,19 @@
 ////
 //		// tmp with dup = update2
 //		Update_Stream tmp = triangle_counting.join(delta_tc);
+//		Global_Info::delete_upstream(delta_tc, e);
 ////		std::cout << "join delta_tc with update_stream" << delta_tc << ", gen update_stream" << tmp << std::endl;
 ////		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, tmp);
 //
 //		// out without dup = update3
 //		Update_Stream out = triangle_counting.remove_dup(tmp);
+//		Global_Info::delete_upstream(tmp, e);
 ////		std::cout << "remove dup with update_stream" << tmp << ", gen update_stream" << out << std::endl;
 ////		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, out);
 //
 //		// delta with set diff = update4
 //		Update_Stream delta = triangle_counting.set_difference(out, tc);
+//		Global_Info::delete_upstream(out, e);
 ////		std::cout << "set diff with update_stream" << out << " and update_stream" << tc << ", gen update_stream" << delta << std::endl;
 ////		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, delta);
 //
