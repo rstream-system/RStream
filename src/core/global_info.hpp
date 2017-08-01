@@ -28,6 +28,13 @@ namespace RStream {
 
 			return res / sizeof_an_item;
 		}
+
+		static void delete_upstream(Update_Stream in_update_stream, Engine & context){
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				std::string filename = context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream);
+				FileUtil::delete_file(filename);
+			}
+		}
 	};
 }
 

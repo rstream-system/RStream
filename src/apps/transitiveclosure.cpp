@@ -133,6 +133,7 @@
 ////	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 //	Engine e("/home/kai/workspace/rstream_data/random/test2.graph", 3, 300);
 //
+//	auto start = std::chrono::high_resolution_clock::now();
 //	//scatter phase first to generate updates
 //	// update0
 //	Scatter<BaseVertex, In_Update_TC> scatter_edges(e);
@@ -150,16 +151,19 @@
 ////
 //		// tmp with dup = update2
 //		Update_Stream tmp = triangle_counting.join(delta_tc);
+//		Global_Info::delete_upstream(delta_tc, e);
 ////		std::cout << "join delta_tc with update_stream" << delta_tc << ", gen update_stream" << tmp << std::endl;
 ////		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, tmp);
 //
 //		// out without dup = update3
 //		Update_Stream out = triangle_counting.remove_dup(tmp);
+//		Global_Info::delete_upstream(tmp, e);
 ////		std::cout << "remove dup with update_stream" << tmp << ", gen update_stream" << out << std::endl;
 ////		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, out);
 //
 //		// delta with set diff = update4
 //		Update_Stream delta = triangle_counting.set_difference(out, tc);
+//		Global_Info::delete_upstream(out, e);
 ////		std::cout << "set diff with update_stream" << out << " and update_stream" << tc << ", gen update_stream" << delta << std::endl;
 ////		printUpdateStream<In_Update_TC>(e.num_partitions, e.filename, delta);
 //
@@ -175,7 +179,9 @@
 //		delta_tc = delta;
 //	}
 //
-//		std::cout << "Finish transitive closure." << std::endl;
+//		auto end = std::chrono::high_resolution_clock::now();
+//		std::chrono::duration<double> diff = end - start;
+//		std::cout << "Finish Transitive closure. Running time : " << diff.count() << " s\n";
 //		std::cout << "Transitive closure : " << Global_Info::count(tc, sizeof(Out_Update_TC), e) << std::endl;
 //}
 //

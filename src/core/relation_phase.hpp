@@ -457,6 +457,9 @@ namespace RStream {
 				char * update1_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(OutUpdateType));
 				int streaming_counter = update1_file_size / (IO_SIZE * sizeof(OutUpdateType)) + 1;
 
+				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
+							+ " of update1 size " + std::to_string(update1_file_size) + ", update2 size " + std::to_string(update2_file_size) + "\n");
+
 				// Assumption: update2 can be fully loaded into memory
 				char * update2_buf = new char[update2_file_size];
 				io_manager::read_from_file(fd_update2, update2_buf, update2_file_size, 0);
@@ -479,6 +482,8 @@ namespace RStream {
 						valid_io_size = IO_SIZE * sizeof(OutUpdateType);
 
 					assert(valid_io_size % sizeof(OutUpdateType) == 0);
+					print_thread_info_locked(std::to_string(counter) + "th streaming, start set diff of size "
+								+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 
 					io_manager::read_from_file(fd_update1, update1_buf, valid_io_size, offset);
 					offset += valid_io_size;
@@ -496,6 +501,9 @@ namespace RStream {
 						global_buffer<OutUpdateType>* global_buf = buffer_manager<OutUpdateType>::get_global_buffer(buffers, context.num_partitions, index);
 						global_buf->insert(one_update1, index);
 					}
+
+					print_thread_info_locked(std::to_string(counter) + "th streaming, finish set diff of size "
+								+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 				}
 
 				free(update1_buf);
@@ -552,6 +560,9 @@ namespace RStream {
 				char * update_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(OutUpdateType));
 				int streaming_counter = update_file_size / (IO_SIZE * sizeof(OutUpdateType)) + 1;
 
+				print_thread_info_locked("as a producer, remove dup with partition " + std::to_string(partition_id)
+							+ " of update1 size " + std::to_string(update_file_size) + "\n");
+
 				std::unordered_set<OutUpdateType> set_of_updates;
 
 				long valid_io_size = 0;
@@ -579,6 +590,9 @@ namespace RStream {
 				std::string file_name_str = (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_update_stream));
 				char* buf = reinterpret_cast<char*>(out_updates.data());
 				write_updates_to_file(buf, file_name_str, out_updates.size() * sizeof(OutUpdateType));
+
+				print_thread_info_locked("as a producer finish remove dup with partition " + std::to_string(partition_id)
+								+ " of update1 size " + std::to_string(update_file_size) + "\n");
 
 				free(update_buf);
 				close(fd_update);
