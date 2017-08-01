@@ -116,6 +116,20 @@ namespace RStream {
 //			delete[] vertex_intervals;
 		}
 
+		//clean files added by Zhiqiang
+		void clean_files(){
+			//delete .binary
+			FileUtil::delete_file(filename + ".binary");
+
+			//delete .meta
+			FileUtil::delete_file(filename + ".meta");
+
+			//delete partitions
+			for(int i = 0; i < num_partitions; ++i){
+				FileUtil::delete_file(filename + "." + std::to_string(i));
+			}
+		}
+
 //		void preprocess(){
 //			//TODO
 //

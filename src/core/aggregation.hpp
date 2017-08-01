@@ -25,7 +25,7 @@ namespace RStream {
 
 
 		//constructor
-		Aggregation(Engine & e) : context(e) {}
+		Aggregation(Engine & e, bool label_f) : context(e), label_flag(label_f) {}
 
 		virtual ~Aggregation() {}
 
@@ -45,22 +45,40 @@ namespace RStream {
 		Aggregation_Stream aggregate(Update_Stream in_update_stream, int sizeof_in_tuple) {
 			Aggregation_Stream stream_local = aggregate_local(in_update_stream, sizeof_in_tuple);
 			int sizeof_agg = get_out_size(sizeof_in_tuple);
-			return aggregate_global(stream_local, sizeof_agg);
+			Aggregation_Stream agg_stream = aggregate_global(stream_local, sizeof_agg);
+			delete_aggstream(stream_local);
+			return agg_stream;
 		}
 
 
 		Update_Stream aggregate_filter(Update_Stream up_stream, Aggregation_Stream agg_stream, int sizeof_in_tuple, int threshold){
 			Update_Stream up_stream_shuffled_on_canonical = shuffle_upstream_canonicalgraph(up_stream, sizeof_in_tuple);
-			return aggregate_filter_local(up_stream_shuffled_on_canonical, agg_stream, sizeof_in_tuple, threshold);
+			Update_Stream up_stream_filtered = aggregate_filter_local(up_stream_shuffled_on_canonical, agg_stream, sizeof_in_tuple, threshold);
+			MPhase::delete_upstream_static(up_stream_shuffled_on_canonical, context.num_partitions, context.filename);
+			return up_stream_filtered;
 		}
 
 		void printout_aggstream(Aggregation_Stream agg_stream){
 
 		}
 
+		void delete_aggstream(Aggregation_Stream agg_stream){
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				std::string filename = context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(agg_stream);
+				if (std::remove(filename.c_str()) != 0)
+					perror("Error deleting file.\n");
+				else
+					std::cout << (filename + " successfully deleted.\n");
+			}
+		}
 
 
 	private:
+		/* Private Fields */
+		bool label_flag;
+
+
+		/* Private Functions */
 
 		Update_Stream shuffle_upstream_canonicalgraph(Update_Stream in_update_stream, int sizeof_in_tuple){
 			atomic_init();
@@ -168,7 +186,7 @@ namespace RStream {
 		void shuffle_on_canonical(std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining ** buffers_for_shuffle){
 			// turn tuple to quick pattern
 			Quick_Pattern quick_pattern;
-			Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern);
+			Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern, label_flag);
 			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
 			Canonical_Graph* cf = Pattern::turn_canonical_graph(sub_graph, false);
 
@@ -328,7 +346,7 @@ namespace RStream {
 		bool filter_aggregate(std::vector<Element_In_Tuple> & update_tuple, std::unordered_map<Canonical_Graph, int>& map, int threshold){
 			// turn tuple to quick pattern
 			Quick_Pattern quick_pattern;
-			Pattern::turn_quick_pattern_pure(update_tuple, quick_pattern);
+			Pattern::turn_quick_pattern_pure(update_tuple, quick_pattern, label_flag);
 			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
 			Canonical_Graph* cf = Pattern::turn_canonical_graph(sub_graph, false);
 
@@ -591,7 +609,7 @@ namespace RStream {
 
 						// turn tuple to quick pattern
 						Quick_Pattern quick_pattern;
-						Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern);
+						Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern, label_flag);
 //						std::cout << "quick_pattern: \t" << quick_pattern << "\n" << std::endl;
 						aggregate_on_quick_pattern(quick_patterns_aggregation, quick_pattern);
 					}

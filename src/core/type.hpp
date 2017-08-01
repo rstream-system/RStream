@@ -10,6 +10,7 @@
 
 #include "../common/RStreamCommon.hpp"
 #include "../utility/Printer.hpp"
+#include "../utility/FileUtil.hpp"
 
 #include "defs.hh"
 #include "graph.hh"
