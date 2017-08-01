@@ -165,6 +165,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
+						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 //						//for debugging only
@@ -309,6 +310,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
+						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 //						//for debugging
@@ -604,6 +606,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
+						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 //						std::cout << "in_update: \t" << in_update_tuple << std::endl;
 

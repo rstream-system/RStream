@@ -9,7 +9,7 @@
 #define CORE_BUFFER_MANAGER_HPP_
 
 #include "../common/RStreamCommon.hpp"
-
+#include "../utility/Printer.hpp"
 #include "constants.hpp"
 
 namespace RStream {
@@ -84,6 +84,14 @@ namespace RStream {
 				index = 0;
 				not_full.notify_all();
 			}
+
+			//for debugging
+			if(is_full()){
+				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+			}
+			else{
+//				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+			}
 		}
 
 //		void flush_end(const char * file_name, const int i) {
@@ -116,6 +124,9 @@ namespace RStream {
 				io_manager::write_to_file(fd, buf, count * sizeof_tuple);
 				close(fd);
 //			}
+
+				//for debugging
+				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
 
 		}
 

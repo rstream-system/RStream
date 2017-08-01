@@ -10,7 +10,7 @@
 #include "../core/aggregation.hpp"
 #include "../utility/ResourceManager.hpp"
 
-#define MAXSIZE 3
+#define MAXSIZE 5
 
 using namespace RStream;
 
@@ -26,15 +26,6 @@ public:
 
 	bool filter_collect(std::vector<Element_In_Tuple> & update_tuple){
 		return false;
-	}
-
-private:
-	static int get_num_vertices(std::vector<Element_In_Tuple> & update_tuple){
-		std::unordered_set<VertexId> set;
-		for(auto it = update_tuple.cbegin(); it != update_tuple.cend(); ++it){
-			set.insert((*it).vertex_id);
-		}
-		return set.size();
 	}
 
 };

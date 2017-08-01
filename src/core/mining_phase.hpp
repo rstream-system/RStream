@@ -399,8 +399,12 @@ namespace RStream {
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
+						int cap = sizeof_in_tuple / sizeof(Element_In_Tuple);
+						std::unordered_set<VertexId> vertices_set;
+						vertices_set.reserve(cap);
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						in_update_tuple.reserve(cap + 1);
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple, vertices_set);
 
 						// get key index
 						BYTE key_index = get_key_index(in_update_tuple);
@@ -409,15 +413,15 @@ namespace RStream {
 						// get vertex_id as the key to index edge hashmap
 						VertexId key = in_update_tuple.at(key_index).vertex_id;
 
-						for(Element_In_Tuple& element : edge_hashmap[key - vertex_start]) {
+						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
-							gen_an_out_update(in_update_tuple, element, key_index);
+							gen_an_out_update(in_update_tuple, element, key_index, vertices_set);
 
 							// remove automorphism, only keep one unique tuple.
-							if(Pattern::is_automorphism(in_update_tuple))
-								continue;
-
-							shuffle_on_all_keys(in_update_tuple, buffers_for_shuffle);
+							if(!Pattern::is_automorphism(in_update_tuple) && !filter_join(in_update_tuple)){
+//								assert(partition_id == get_global_buffer_index(key));
+								shuffle_on_all_keys(in_update_tuple, buffers_for_shuffle);
+							}
 
 							in_update_tuple.pop_back();
 						}
@@ -509,8 +513,12 @@ namespace RStream {
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
+						int cap = sizeof_in_tuple / sizeof(Element_In_Tuple);
+						std::unordered_set<VertexId> vertices_set;
+						vertices_set.reserve(cap);
 						std::vector<Element_In_Tuple> in_update_tuple;
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						in_update_tuple.reserve(cap + 1);
+						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple, vertices_set);
 //						std::cout << in_update_tuple << std::endl;
 
 						// get key index
@@ -522,13 +530,13 @@ namespace RStream {
 
 						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
-							gen_an_out_update(in_update_tuple, element, key_index);
+							gen_an_out_update(in_update_tuple, element, key_index, vertices_set);
 //							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
 //								<< ", " << filter_join(in_update_tuple) << std::endl;
 
 							// remove automorphism, only keep one unique tuple.
 							if(!Pattern::is_automorphism(in_update_tuple) && !filter_join(in_update_tuple)){
-								assert(partition_id == get_global_buffer_index(key));
+//								assert(partition_id == get_global_buffer_index(key));
 								insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
 							}
 
@@ -605,6 +613,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
+						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
 						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						shuffle_on_all_keys(in_update_tuple, buffers_for_shuffle);
@@ -666,6 +675,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::vector<Element_In_Tuple> in_update_tuple;
+						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
 						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
 
 						if(!filter_collect(in_update_tuple)){
@@ -867,8 +877,12 @@ namespace RStream {
 		}
 
 
-		void gen_an_out_update(std::vector<Element_In_Tuple> & in_update_tuple, Element_In_Tuple & element, BYTE history) {
-			Element_In_Tuple new_element(element.vertex_id, element.edge_label, element.vertex_label, history);
+		void gen_an_out_update(std::vector<Element_In_Tuple> & in_update_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set) {
+			auto num_vertices = vertices_set.size();
+			if(vertices_set.find(element.vertex_id) == vertices_set.end()){
+				num_vertices += 1;
+			}
+			Element_In_Tuple new_element(element.vertex_id, (BYTE)num_vertices, element.edge_label, element.vertex_label, history);
 			in_update_tuple.push_back(new_element);
 		}
 
@@ -903,6 +917,16 @@ namespace RStream {
 		}
 
 	public:
+
+		int get_num_vertices(std::vector<Element_In_Tuple> & update_tuple){
+//			std::unordered_set<VertexId> set;
+//			for(auto it = update_tuple.cbegin(); it != update_tuple.cend(); ++it){
+//				set.insert((*it).vertex_id);
+//			}
+//			return set.size();
+			return update_tuple.back().key_index;
+		}
+
 		static concurrent_queue<std::tuple<int, long, long>>* divide_tasks(const int num_partitions, const std::string& filename, Update_Stream update_stream, int sizeof_in_tuple,
 				 long chunk_unit){
 			long real_chunk_unit = get_real_io_size(chunk_unit, sizeof_in_tuple);
@@ -951,8 +975,16 @@ namespace RStream {
 
 		static void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple) {
 			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
-				Element_In_Tuple & element = *(Element_In_Tuple*)(update_local_buf + index);
+				Element_In_Tuple element = *(Element_In_Tuple*)(update_local_buf + index);
 				tuple.push_back(element);
+			}
+		}
+
+		static void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple, std::unordered_set<VertexId>& vertices_set) {
+			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
+				Element_In_Tuple element = *(Element_In_Tuple*)(update_local_buf + index);
+				tuple.push_back(element);
+				vertices_set.insert(element.vertex_id);
 			}
 		}
 
