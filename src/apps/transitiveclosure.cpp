@@ -133,6 +133,7 @@
 ////	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 //	Engine e("/home/kai/workspace/rstream_data/random/test2.graph", 3, 300);
 //
+//	auto start = std::chrono::high_resolution_clock::now();
 //	//scatter phase first to generate updates
 //	// update0
 //	Scatter<BaseVertex, In_Update_TC> scatter_edges(e);
@@ -175,7 +176,9 @@
 //		delta_tc = delta;
 //	}
 //
-//		std::cout << "Finish transitive closure." << std::endl;
+//		auto end = std::chrono::high_resolution_clock::now();
+//		std::chrono::duration<double> diff = end - start;
+//		std::cout << "Finish Transitive closure. Running time : " << diff.count() << " s\n";
 //		std::cout << "Transitive closure : " << Global_Info::count(tc, sizeof(Out_Update_TC), e) << std::endl;
 //}
 //
