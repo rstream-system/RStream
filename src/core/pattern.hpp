@@ -54,7 +54,7 @@ public:
 	}
 
 
-	static bool is_automorphism(std::vector<Element_In_Tuple> & sub_graph) {
+	static bool is_automorphism(std::vector<Element_In_Tuple> & sub_graph, const bool vertex_existed) {
 		assert(sub_graph.size() >= 2);
 		Element_In_Tuple last_tuple = sub_graph.back();
 
@@ -72,13 +72,10 @@ public:
 		getEdge(sub_graph, sub_graph.size() - 1, added_edge);
 
 		//check to see if there already exists the vertex added; if so, just allow to add edge which is (smaller id -> bigger id)
-		if(added_edge.first > added_edge.second){
-			for(unsigned int i = 0; i < sub_graph.size() - 1; ++i){
-				if(sub_graph[i].vertex_id == last_tuple.vertex_id){
-					return true;
-				}
-			}
+		if(vertex_existed && added_edge.first > added_edge.second){
+			return true;
 		}
+
 
 		for(unsigned int index = last_tuple.history_info + 1; index < sub_graph.size() - 1; ++index){
 			std::pair<VertexId, VertexId> edge;
@@ -91,6 +88,12 @@ public:
 		}
 
 		return false;
+	}
+
+	static bool is_automorphism_init(std::vector<Element_In_Tuple> & sub_graph) {
+		assert(sub_graph.size() == 2);
+		//check with the first element
+		return sub_graph.back().vertex_id <= sub_graph.front().vertex_id;
 	}
 
 

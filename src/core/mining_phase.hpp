@@ -415,10 +415,10 @@ namespace RStream {
 
 						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
-							gen_an_out_update(in_update_tuple, element, key_index, vertices_set);
+							bool vertex_existed = gen_an_out_update(in_update_tuple, element, key_index, vertices_set);
 
 							// remove automorphism, only keep one unique tuple.
-							if(!Pattern::is_automorphism(in_update_tuple) && !filter_join(in_update_tuple)){
+							if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){
 //								assert(partition_id == get_global_buffer_index(key));
 								shuffle_on_all_keys(in_update_tuple, buffers_for_shuffle);
 							}
@@ -530,12 +530,12 @@ namespace RStream {
 
 						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
-							gen_an_out_update(in_update_tuple, element, key_index, vertices_set);
+							bool vertex_existed = gen_an_out_update(in_update_tuple, element, key_index, vertices_set);
 //							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
 //								<< ", " << filter_join(in_update_tuple) << std::endl;
 
 							// remove automorphism, only keep one unique tuple.
-							if(!Pattern::is_automorphism(in_update_tuple) && !filter_join(in_update_tuple)){
+							if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){
 //								assert(partition_id == get_global_buffer_index(key));
 								insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
 							}
@@ -736,7 +736,7 @@ namespace RStream {
 					// for each streaming
 					for(long pos = 0; pos < valid_io_size; pos += size_of_unit) {
 						// get an labeled edge
-						LabeledEdge & e = *(LabeledEdge*)(edge_local_buf + pos);
+						LabeledEdge e = *(LabeledEdge*)(edge_local_buf + pos);
 //						std::cout << e << std::endl;
 
 						std::vector<Element_In_Tuple> out_update_tuple;
@@ -744,7 +744,7 @@ namespace RStream {
 						out_update_tuple.push_back(Element_In_Tuple(e.target, 0, e.target_label));
 
 						// shuffle on both src and target
-						if(!Pattern::is_automorphism(out_update_tuple)){
+						if(!Pattern::is_automorphism_init(out_update_tuple)){
 							insert_tuple_to_buffer(partition_id, out_update_tuple, buffers_for_shuffle);
 						}
 					}
@@ -800,7 +800,7 @@ namespace RStream {
 					// for each streaming
 					for(long pos = 0; pos < valid_io_size; pos += size_of_unit) {
 						// get an labeled edge
-						LabeledEdge & e = *(LabeledEdge*)(edge_local_buf + pos);
+						LabeledEdge e = *(LabeledEdge*)(edge_local_buf + pos);
 //						std::cout << e << std::endl;
 
 						std::vector<Element_In_Tuple> out_update_tuple;
@@ -808,7 +808,7 @@ namespace RStream {
 						out_update_tuple.push_back(Element_In_Tuple(e.target, 0, e.target_label));
 
 						// shuffle on both src and target
-						if(!Pattern::is_automorphism(out_update_tuple)){
+						if(!Pattern::is_automorphism_init(out_update_tuple)){
 							shuffle_on_all_keys(out_update_tuple, buffers_for_shuffle);
 						}
 
@@ -877,13 +877,16 @@ namespace RStream {
 		}
 
 
-		void gen_an_out_update(std::vector<Element_In_Tuple> & in_update_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set) {
+		bool gen_an_out_update(std::vector<Element_In_Tuple> & in_update_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set) {
+			bool vertex_existed = true;
 			auto num_vertices = vertices_set.size();
 			if(vertices_set.find(element.vertex_id) == vertices_set.end()){
 				num_vertices += 1;
+				vertex_existed = false;
 			}
 			Element_In_Tuple new_element(element.vertex_id, (BYTE)num_vertices, element.edge_label, element.vertex_label, history);
 			in_update_tuple.push_back(new_element);
+			return vertex_existed;
 		}
 
 
