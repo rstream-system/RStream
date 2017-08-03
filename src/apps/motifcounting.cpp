@@ -30,7 +30,59 @@ public:
 
 };
 
-int main(int argc, char **argv) {
+
+int main_nonshuffle(int argc, char **argv) {
+	Engine e("/home/icuzzq/Workspace/git/RStream/input/citeseer.graph", 4, 1);
+	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
+
+	ResourceManager rm;
+
+	MC mPhase(e);
+	Aggregation agg(e, false);
+
+	//init: get the edges stream
+	std::cout << generate_log_del(std::string("init"), 1) << std::endl;
+	Update_Stream up_stream = mPhase.init();
+
+	Update_Stream up_stream_new;
+	Aggregation_Stream agg_stream;
+
+	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
+	for(int i = 1; i < max_iterations; ++i){
+		std::cout << "\n\n" << generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
+
+		//join on all keys
+		std::cout << "\n" << generate_log_del(std::string("joining"), 2) << std::endl;
+		up_stream_new = mPhase.join_all_keys_nonshuffle(up_stream);
+//		mPhase.delete_upstream(up_stream);
+		//aggregate
+		std::cout << "\n" << generate_log_del(std::string("aggregating"), 2) << std::endl;
+		agg_stream = agg.aggregate(up_stream_new, mPhase.sizeof_in_tuple);
+		//print out counts info
+		std::cout << "\n" << generate_log_del(std::string("printing"), 2) << std::endl;
+		agg.printout_aggstream(agg_stream);
+//		agg.delete_aggstream(agg_stream);
+
+		up_stream = up_stream_new;
+	}
+	//clean remaining stream files
+	std::cout << std::endl;
+//	mPhase.delete_upstream(up_stream);
+
+	//delete all generated files
+	std::cout << "\n\n" << generate_log_del(std::string("cleaning"), 1) << std::endl;
+	e.clean_files();
+
+
+	//print out resource usage
+	std::cout << "\n\n";
+	std::cout << "------------------------------ resource usage ------------------------------" << std::endl;
+	std::cout << rm.result() << std::endl;
+	std::cout << "------------------------------ resource usage ------------------------------" << std::endl;
+	std::cout << "\n\n";
+}
+
+int main_shuffle(int argc, char **argv) {
 	Engine e("/home/icuzzq/Workspace/git/RStream/input/citeseer.graph", 4, 1);
 	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 
@@ -81,11 +133,12 @@ int main(int argc, char **argv) {
 	std::cout << rm.result() << std::endl;
 	std::cout << "------------------------------ resource usage ------------------------------" << std::endl;
 	std::cout << "\n\n";
-
 }
 
 
-
+int main(int argc, char **argv){
+	main_nonshuffle(argc, argv);
+}
 
 
 
