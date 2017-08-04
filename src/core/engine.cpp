@@ -15,7 +15,7 @@ namespace RStream {
 
 		Engine::Engine(std::string _filename, int num_parts, int input_format) : filename(_filename) {
 //			num_threads = std::thread::hardware_concurrency();
-			num_threads = 1;
+			num_threads = 4;
 			num_write_threads = 1;
 			num_exec_threads = num_threads;
 

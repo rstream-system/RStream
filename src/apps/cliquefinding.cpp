@@ -44,14 +44,14 @@
 //
 //void main_nonshuffle(int argc, char **argv) {
 //	Engine e(std::string(argv[1]), atoi(argv[2]), 1);
-//	std::cout << Printer::generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
+//	std::cout << Logger::generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 //
 //	ResourceManager rm;
 //
 //	MC mPhase(e);
 //
 //	//init: get the edges stream
-//	std::cout << Printer::generate_log_del(std::string("init"), 1) << std::endl;
+//	std::cout << Logger::generate_log_del(std::string("init"), 1) << std::endl;
 //	Update_Stream up_stream = mPhase.init();
 //
 //	Update_Stream up_stream_new;
@@ -59,17 +59,17 @@
 //
 //	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
 //	for(int i = 1; i < max_iterations; ++i){
-//		std::cout << "\n\n" << Printer::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
+//		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 //
 //		//join on all keys
-//		std::cout << "\n" << Printer::generate_log_del(std::string("joining"), 2) << std::endl;
+//		std::cout << "\n" << Logger::generate_log_del(std::string("joining"), 2) << std::endl;
 //		up_stream_new = mPhase.join_all_keys_nonshuffle(up_stream);
 //		mPhase.delete_upstream(up_stream);
 //		//collect cliques
-//		std::cout << "\n" << Printer::generate_log_del(std::string("collecting"), 2) << std::endl;
+//		std::cout << "\n" << Logger::generate_log_del(std::string("collecting"), 2) << std::endl;
 //		clique_stream = mPhase.collect(up_stream_new);
 //		//print out cliques
-//		std::cout << "\n" << Printer::generate_log_del(std::string("printing"), 2) << std::endl;
+//		std::cout << "\n" << Logger::generate_log_del(std::string("printing"), 2) << std::endl;
 //		mPhase.printout_upstream(clique_stream);
 //		mPhase.delete_upstream(clique_stream);
 //
@@ -80,7 +80,7 @@
 //	mPhase.delete_upstream(up_stream);
 //
 //	//delete all generated files
-//	std::cout << "\n\n" << Printer::generate_log_del(std::string("cleaning"), 1) << std::endl;
+//	std::cout << "\n\n" << Logger::generate_log_del(std::string("cleaning"), 1) << std::endl;
 //	e.clean_files();
 //
 //	//print out resource usage
@@ -94,14 +94,14 @@
 //
 //void main_shuffle(int argc, char **argv) {
 //	Engine e(std::string(argv[1]), atoi(argv[2]), 1);
-//	std::cout << Printer::generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
+//	std::cout << Logger::generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 //
 //	ResourceManager rm;
 //
 //	MC mPhase(e);
 //
 //	//init: get the edges stream
-//	std::cout << Printer::generate_log_del(std::string("init-shuffling"), 1) << std::endl;
+//	std::cout << Logger::generate_log_del(std::string("init-shuffling"), 1) << std::endl;
 //	Update_Stream up_stream_shuffled = mPhase.init_shuffle_all_keys();
 //
 //	Update_Stream up_stream_non_shuffled;
@@ -109,21 +109,21 @@
 //
 //	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
 //	for(int i = 1; i < max_iterations; ++i){
-//		std::cout << "\n\n" << Printer::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
+//		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 //
 //		//join on all keys
-//		std::cout << "\n" << Printer::generate_log_del(std::string("joining"), 2) << std::endl;
+//		std::cout << "\n" << Logger::generate_log_del(std::string("joining"), 2) << std::endl;
 //		up_stream_non_shuffled = mPhase.join_mining(up_stream_shuffled);
 //		mPhase.delete_upstream(up_stream_shuffled);
 //		//collect cliques
-//		std::cout << "\n" << Printer::generate_log_del(std::string("collecting"), 2) << std::endl;
+//		std::cout << "\n" << Logger::generate_log_del(std::string("collecting"), 2) << std::endl;
 //		clique_stream = mPhase.collect(up_stream_non_shuffled);
 //		//print out cliques
-//		std::cout << "\n" << Printer::generate_log_del(std::string("printing"), 2) << std::endl;
+//		std::cout << "\n" << Logger::generate_log_del(std::string("printing"), 2) << std::endl;
 //		mPhase.printout_upstream(clique_stream);
 //		mPhase.delete_upstream(clique_stream);
 //		//shuffle for next join
-//		std::cout << "\n" << Printer::generate_log_del(std::string("shuffling"), 2) << std::endl;
+//		std::cout << "\n" << Logger::generate_log_del(std::string("shuffling"), 2) << std::endl;
 //		up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled);
 //		mPhase.delete_upstream(up_stream_non_shuffled);
 //	}
@@ -132,7 +132,7 @@
 //	mPhase.delete_upstream(up_stream_shuffled);
 //
 //	//delete all generated files
-//	std::cout << "\n\n" << Printer::generate_log_del(std::string("cleaning"), 1) << std::endl;
+//	std::cout << "\n\n" << Logger::generate_log_del(std::string("cleaning"), 1) << std::endl;
 //	e.clean_files();
 //
 //	//print out resource usage
