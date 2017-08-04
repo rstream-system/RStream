@@ -8,9 +8,10 @@
 #ifndef CORE_BUFFER_MANAGER_HPP_
 #define CORE_BUFFER_MANAGER_HPP_
 
-#include "../common/RStreamCommon.hpp"
-#include "../utility/Printer.hpp"
+//#include "../common/RStreamCommon.hpp"
+#include "../utility/Logger.hpp"
 #include "constants.hpp"
+#include "io_manager.hpp"
 
 namespace RStream {
 
@@ -87,10 +88,10 @@ namespace RStream {
 
 			//for debugging
 			if(is_full()){
-				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+				Logger::print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
 			}
 			else{
-//				print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+//				Printer::print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
 			}
 		}
 
@@ -126,7 +127,7 @@ namespace RStream {
 //			}
 
 				//for debugging
-				print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+				Logger::print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
 
 		}
 

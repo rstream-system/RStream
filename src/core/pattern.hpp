@@ -8,10 +8,10 @@
 #ifndef SRC_CORE_PATTERN_HPP_
 #define SRC_CORE_PATTERN_HPP_
 
-#include "type.hpp"
+#include "../struct/quick_pattern.hpp"
+#include "../struct/canonical_graph.hpp"
 
-
-//static bool opt_directed = false;
+namespace RStream {
 
 class Pattern {
 
@@ -269,5 +269,6 @@ private:
 	}
 
 };
+}
 
 #endif /* SRC_CORE_PATTERN_HPP_ */

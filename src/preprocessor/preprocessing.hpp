@@ -8,9 +8,9 @@
 #ifndef UTILITY_PREPROCESSING_HPP_
 #define UTILITY_PREPROCESSING_HPP_
 
-//#include <iostream>
 #include "../common/RStreamCommon.hpp"
-//#include "../core/engine.hpp"
+#include "../core/buffer_manager.hpp"
+#include "../utility/Logger.hpp"
 
 namespace RStream {
 	class Preprocessing {
@@ -298,7 +298,7 @@ namespace RStream {
 				g_buf->flush(file_name, i);
 			}
 
-			print_thread_info_locked("prepare to flush end...\n");
+			Printer::print_thread_info_locked("prepare to flush end...\n");
 
 			//the last run - deal with all remaining content in buffers
 			while(true){
