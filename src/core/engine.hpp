@@ -71,10 +71,10 @@ namespace RStream {
 
 //		Engine(std::string _filename, int num_parts, int _num_vertices) : filename(_filename) {
 		Engine(std::string _filename, int num_parts, int input_format) : filename(_filename) {
-//			num_threads = std::thread::hardware_concurrency();
-			num_threads = 1;
+			num_threads = std::thread::hardware_concurrency();
+//			num_threads = 4;
 			num_write_threads = 1;
-			num_exec_threads = 1;
+			num_exec_threads = num_threads;
 
 			num_partitions = num_parts;
 

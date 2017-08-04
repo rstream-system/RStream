@@ -42,7 +42,7 @@
 //
 //
 //int main(int argc, char **argv) {
-//	Engine e("/home/icuzzq/Workspace/git/RStream/input/citeseer.graph", 3, 1);
+//	Engine e(std::string(argv[1]), atoi(argv[2]), 1);
 //	std::cout << generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 //
 //	ResourceManager rm;

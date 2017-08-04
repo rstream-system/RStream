@@ -531,7 +531,7 @@ namespace RStream {
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
 				print_thread_info_locked("as a (join-all-keys-nonshuffle) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
-				unsigned int target_partition = 0;
+				int target_partition = 0;
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -591,6 +591,8 @@ namespace RStream {
 
 									// remove automorphism, only keep one unique tuple.
 									if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){
+//										insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
+
 										insert_tuple_to_buffer(target_partition++, in_update_tuple, buffers_for_shuffle);
 										if(target_partition == context.num_partitions)
 											target_partition = 0;

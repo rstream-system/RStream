@@ -31,6 +31,7 @@
 #include <cmath>
 
 #include <cstdint>
+#include <cstdlib>
 #include <time.h>
 #include <signal.h>
 
