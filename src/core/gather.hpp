@@ -95,8 +95,11 @@ namespace RStream {
 //				io_manager::read_from_file(fd_update, update_local_buf, update_file_size);
 
 				// streaming updates
-				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = update_file_size / IO_SIZE + 1;
+//				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+//				int streaming_counter = update_file_size / IO_SIZE + 1;
+
+				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(UpdateType));
+				int streaming_counter = update_file_size / (IO_SIZE * sizeof(UpdateType)) + 1;
 
 				// for each update
 				// size_t is unsigned int, too small for file size?
@@ -117,9 +120,11 @@ namespace RStream {
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+//						valid_io_size = update_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = update_file_size - IO_SIZE * sizeof(UpdateType) * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+//						valid_io_size = IO_SIZE;
+						valid_io_size = IO_SIZE * sizeof(UpdateType);
 
 					assert(valid_io_size % sizeof(UpdateType) == 0);
 

@@ -147,11 +147,14 @@ namespace RStream {
 
 		/* init vertex data*/
 		template <typename VertexDataType>
-		void init_vertex(std::function<void(char*)> init) {
+		void init_vertex(std::function<void(char*, VertexId)> init) {
 			vertex_unit = sizeof(VertexDataType);
 
 			// a pair of <vertex_file, num_vertices>
-			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(num_partitions);
+//			concurrent_queue<std::pair<int, int>> * task_queue = new concurrent_queue<std::pair<int, int>>(num_partitions);
+
+			// <vertex_file, num_vertices, start_vertex_id>
+			concurrent_queue<std::tuple<int, VertexId, VertexId>> * task_queue = new concurrent_queue<std::tuple<int, VertexId, VertexId>>(num_partitions);
 
 			for(int partition_id = 0; partition_id < num_partitions; partition_id++) {
 				int perms = O_WRONLY;
@@ -165,12 +168,12 @@ namespace RStream {
 //					task_queue->push(std::make_pair(fd, num_vertices_per_part));
 //				else
 //					task_queue->push(std::make_pair(fd, num_vertices - num_vertices_per_part * (num_partitions - 1)));
-				int n_vertices = vertex_intervals[partition_id].second - vertex_intervals[partition_id].first + 1;
-				task_queue->push(std::make_pair(fd, n_vertices));
+				VertexId n_vertices = vertex_intervals[partition_id].second - vertex_intervals[partition_id].first + 1;
+//				task_queue->push(std::make_pair(fd, n_vertices));
+				task_queue->push(std::make_tuple(fd, n_vertices, vertex_intervals[partition_id].first));
 
 			}
 
-			// threads will load vertex and update, and apply update one by one
 			std::vector<std::thread> threads;
 			for(int i = 0; i < num_threads; i++)
 				threads.push_back(std::thread(&Engine::init_produer<VertexDataType>, this, init, task_queue));
@@ -202,25 +205,35 @@ namespace RStream {
 			delete task_queue;
 		}
 
-
-
 	private:
 
 		template <typename VertexDataType>
-		void init_produer(std::function<void(char*)> init, concurrent_queue<std::pair<int, int>> * task_queue) {
-			std::pair<int, int> pair(-1, -1);
-			while(task_queue->test_pop_atomic(pair)) {
-				int fd = pair.first;
-				int num_vertex = pair.second;
-				assert(fd > 0 && num_vertex > 0 );
+//		void init_produer(std::function<void(char*)> init, concurrent_queue<std::pair<int, int>> * task_queue) {
+		void init_produer(std::function<void(char*, VertexId vertex_id)> init, concurrent_queue<std::tuple<int, VertexId, VertexId>> * task_queue) {
+//			std::pair<int, int> pair(-1, -1);
+
+			int fd = -1;
+			VertexId num_vertex = 0, start_vertex = -1;
+			auto one_task = std::make_tuple(fd, num_vertex, start_vertex);
+//			while(task_queue->test_pop_atomic(pair)) {
+			while(task_queue->test_pop_atomic(one_task)) {
+//				int fd = pair.first;
+//				int num_vertex = pair.second;
+//				assert(fd > 0 && num_vertex > 0 );
+
+				fd = std::get<0>(one_task);
+				num_vertex = std::get<1>(one_task);
+				start_vertex = std::get<2>(one_task);
 
 				// size_t ok??
 				size_t vertex_file_size = num_vertex * sizeof(VertexDataType);
 				char * vertex_local_buf = new char[vertex_file_size];
 
+				VertexId counter = 0;
 				// for each vertex
 				for(size_t pos = 0; pos < vertex_file_size; pos += sizeof(VertexDataType)) {
-					init(vertex_local_buf + pos);
+					init(vertex_local_buf + pos, start_vertex + counter);
+					counter++;
 				}
 
 				io_manager::write_to_file(fd, vertex_local_buf, vertex_file_size);
@@ -257,23 +270,28 @@ namespace RStream {
 				load_vertices_hashMap(vertex_local_buf, vertex_file_size, vertex_map);
 
 				// streaming edges
-				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = edge_file_size / IO_SIZE + 1;
+//				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+//				int streaming_counter = edge_file_size / IO_SIZE + 1;
+				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(Edge));
+				int streaming_counter = edge_file_size / (IO_SIZE * sizeof(Edge)) + 1;
 
 				long valid_io_size = 0;
 				long offset = 0;
 
+				assert(edge_unit == sizeof(Edge));
 				// for all streaming
 				for(int counter = 0; counter < streaming_counter; counter++) {
 
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = edge_file_size - IO_SIZE * (streaming_counter - 1);
+//						valid_io_size = edge_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = edge_file_size - IO_SIZE * sizeof(Edge) * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+//						valid_io_size = IO_SIZE;
+						valid_io_size = IO_SIZE * sizeof(Edge);
 
-					assert(valid_io_size % sizeof(edge_unit) == 0);
+					assert(valid_io_size % sizeof(Edge) == 0);
 
 					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
@@ -289,10 +307,10 @@ namespace RStream {
 				}
 
 				//for debugging
-				for(size_t off = 0; off < vertex_file_size; off += vertex_unit){
-					VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
-					std::cout << *v << std::endl;
-				}
+//				for(size_t off = 0; off < vertex_file_size; off += vertex_unit){
+//					VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
+//					std::cout << *v << std::endl;
+//				}
 
 				// write updated vertex value to disk
 				io_manager::write_to_file(fd_vertex, vertex_local_buf, vertex_file_size);

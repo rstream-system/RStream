@@ -49,6 +49,8 @@ namespace RStream {
 		Update_Stream scatter_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update) {
 			atomic_init();
 
+			print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
+
 			Update_Stream update_c = Engine::update_count++;
 
 			// a pair of <vertex, edge_stream> for each partition
@@ -81,6 +83,8 @@ namespace RStream {
 
 			delete[] buffers_for_shuffle;
 			delete task_queue;
+
+			print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
 
 			return update_c;
 		}
@@ -136,7 +140,6 @@ namespace RStream {
 
 	private:
 
-
 		void load_vertices_hashMap(char* vertex_local_buf, const int vertex_file_size, std::unordered_map<VertexId, VertexDataType*> & vertex_map){
 			for(size_t off = 0; off < vertex_file_size; off += context.vertex_unit){
 				VertexDataType* v = reinterpret_cast<VertexDataType*>(vertex_local_buf + off);
@@ -180,21 +183,28 @@ namespace RStream {
 //				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size);
 
 				// streaming edges
-				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				int streaming_counter = edge_file_size / IO_SIZE + 1;
+//				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+//				int streaming_counter = edge_file_size / IO_SIZE + 1;
+				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(Edge));
+				int streaming_counter = edge_file_size / (IO_SIZE * sizeof(Edge)) + 1;
 
 				long valid_io_size = 0;
 				long offset = 0;
 				int edge_unit = context.edge_unit;
+
+				assert(edge_unit == sizeof(Edge));
+
 				// for all streaming
 				for(int counter = 0; counter < streaming_counter; counter++) {
 
 					// last streaming
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
-						valid_io_size = edge_file_size - IO_SIZE * (streaming_counter - 1);
+//						valid_io_size = edge_file_size - IO_SIZE * (streaming_counter - 1);
+						valid_io_size = edge_file_size - IO_SIZE * sizeof(Edge) * (streaming_counter - 1);
 					else
-						valid_io_size = IO_SIZE;
+//						valid_io_size = IO_SIZE;
+						valid_io_size = IO_SIZE * sizeof(Edge);
 
 					assert(valid_io_size % edge_unit == 0);
 
@@ -224,26 +234,6 @@ namespace RStream {
 						global_buf->insert(update_info, index);
 					}
 				}
-
-				// for each edge
-//				for(size_t pos = 0; pos < edge_file_size; pos += context.edge_unit) {
-//					// get an edge
-//					Edge e = *(Edge*)(edge_local_buf + pos);
-////					std::cout << e << std::endl;
-//
-//					// gen one update
-//					assert(vertex_map.find(e.src) != vertex_map.end());
-//					VertexDataType * src_vertex = vertex_map.find(e.src)->second;
-//					UpdateType * update_info = generate_one_update(e, src_vertex);
-////					std::cout << update_info->target << std::endl;
-//
-//					// insert into shuffle buffer accordingly
-//					int index = get_global_buffer_index(update_info);
-//					global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
-//					global_buf->insert(update_info, index);
-//				}
-
-//				std::cout << std::endl;
 
 				// delete
 				delete[] vertex_local_buf;
