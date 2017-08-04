@@ -9,6 +9,7 @@
 #define CORE_GLOBAL_INFO_HPP_
 
 #include "scatter.hpp"
+#include "../utility/FileUtil.hpp"
 
 namespace RStream {
 	class Global_Info {
