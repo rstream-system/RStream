@@ -131,9 +131,11 @@
 ////	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 //
 ////	Engine e("/home/kai/workspace/rstream_data/soc-LiveJournal1.txt", 10, 4847571);
-//	Engine e("/home/kai/workspace/rstream_data/soc-LiveJournal1.txt", 10, 0);
+////	Engine e("/home/kai/workspace/rstream_data/soc-LiveJournal1.txt", 10, 0);
 ////	Engine e("/home/kai/workspace/rstream_data/com-amazon.ungraph.txt", 4, 600000);
 ////	Engine e("/home/kai/workspace/rstream_data/test.txt", 3, 7);
+//
+//	Engine e(std::string(argv[1]), atoi(argv[2]), atoi(argv[3]));
 //
 //	// get running time (wall time)
 ////	auto start = std::chrono::high_resolution_clock::now();

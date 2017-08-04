@@ -131,7 +131,8 @@
 //
 //int main(int argc, char ** argv) {
 ////	Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
-//	Engine e("/home/kai/workspace/rstream_data/random/test2.graph", 3, 300);
+////	Engine e("/home/kai/workspace/rstream_data/random/test2.graph", 3, 300);
+//	Engine e(std::string(argv[1]), atoi(argv[2]), atoi(argv[3]));
 //
 //	auto start = std::chrono::high_resolution_clock::now();
 //	//scatter phase first to generate updates
