@@ -20,7 +20,7 @@ namespace RStream {
 	class MPhase {
 
 	public:
-		MPhase(Engine & e);
+		MPhase(Engine & e, unsigned int maxsize);
 		virtual ~MPhase();
 
 
@@ -63,8 +63,12 @@ namespace RStream {
 
 
 		/*getter*/
-		inline int get_sizeof_in_tuple(){
+		inline unsigned int get_sizeof_in_tuple(){
 			return sizeof_in_tuple;
+		}
+
+		inline unsigned int get_max_size(){
+			return max_size;
 		}
 
 		/* Public Static Functions */
@@ -148,13 +152,15 @@ namespace RStream {
 
 
 	protected:
-		int get_num_vertices(std::vector<Element_In_Tuple> & update_tuple);
+		unsigned int max_size;
+
+		unsigned int get_num_vertices(std::vector<Element_In_Tuple> & update_tuple);
 
 
 	private:
 		void atomic_init();
 
-		int get_count(Update_Stream in_update_stream);
+		unsigned int get_count(Update_Stream in_update_stream);
 
 		void edges_loader(std::vector<Element_In_Tuple>* edge_hashmap, concurrent_queue<int> * read_task_queue);
 
@@ -206,7 +212,7 @@ namespace RStream {
 		std::atomic<int> atomic_partition_number;
 
 		// num of bytes for in_update_tuple
-		int sizeof_in_tuple;
+		unsigned int sizeof_in_tuple;
 
 	};
 }

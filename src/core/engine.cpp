@@ -45,7 +45,7 @@ namespace RStream {
 //			std::cout << "Input format: " << (input_format) << std::endl;
 			std::cout << "Number of vertices: " << num_vertices << std::endl;
 			std::cout << "Number of partitions: " << num_partitions << std::endl;
-//			std::cout << "Edge type: " << edge_type << std::endl;
+			std::cout << "Edge type: " << edge_type << std::endl;
 			std::cout << "Number of bytes per edge: " << edge_unit << std::endl;
 			std::cout << "Number of exec threads: " << num_exec_threads << std::endl;
 			std::cout << "Number of write threads: " << num_write_threads << std::endl;

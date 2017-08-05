@@ -37,23 +37,23 @@ enum class EdgeType {
 	Labeled = 2
 };
 
-//std::ostream& operator<<(std::ostream& o, EdgeType c)
-//{
-//    if(c == EdgeType::NO_WEIGHT){
-//    	o << "NO_WEIGHT";
-//    }
-//    else if(c == EdgeType::WITH_WEIGHT){
-//    	o << "WITH_WEIGHT";
-//    }
-//    else if(c == EdgeType::Labeled) {
-//    	o << "LabeledEdge";
-//    }
-//    else{
-//    	std::cout << "wrong edge type!!!" << std::endl;
-//    	throw std::exception();
-//    }
-//    return o;
-//}
+inline std::ostream& operator<<(std::ostream& o, const EdgeType& c)
+{
+    if(c == EdgeType::NO_WEIGHT){
+    	o << "NO_WEIGHT";
+    }
+    else if(c == EdgeType::WITH_WEIGHT){
+    	o << "WITH_WEIGHT";
+    }
+    else if(c == EdgeType::Labeled) {
+    	o << "LabeledEdge";
+    }
+    else{
+    	std::cout << "wrong edge type!!!" << std::endl;
+    	throw std::exception();
+    }
+    return o;
+}
 
 struct Edge {
 	VertexId src;

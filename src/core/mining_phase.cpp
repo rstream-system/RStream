@@ -11,7 +11,8 @@
 
 namespace RStream {
 
-		MPhase::MPhase(Engine & e) : context(e) {
+		MPhase::MPhase(Engine & e, unsigned int maxsize) : context(e) {
+			max_size = maxsize;
 			sizeof_in_tuple = 0;
 		}
 
@@ -371,8 +372,8 @@ namespace RStream {
 		}
 
 
-		int MPhase::get_count(Update_Stream in_update_stream){
-			int count_total = 0;
+		unsigned int MPhase::get_count(Update_Stream in_update_stream){
+			unsigned int count_total = 0;
 			// push task into concurrent queue
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
@@ -1063,7 +1064,7 @@ namespace RStream {
 		}
 
 
-		int MPhase::get_num_vertices(std::vector<Element_In_Tuple> & update_tuple){
+		unsigned int MPhase::get_num_vertices(std::vector<Element_In_Tuple> & update_tuple){
 //			std::unordered_set<VertexId> set;
 //			for(auto it = update_tuple.cbegin(); it != update_tuple.cend(); ++it){
 //				set.insert((*it).vertex_id);
