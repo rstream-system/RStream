@@ -9,34 +9,24 @@
 //#include "../core/aggregation.hpp"
 //#include "../utility/ResourceManager.hpp"
 //
-//#define MAXSIZE 4
-//#define THRESHOLD 300
+////#define MAXSIZE 4
+////#define THRESHOLD 300
 //
 //using namespace RStream;
 //
 //
 //class MC : public MPhase {
 //public:
-//	MC(Engine & e) : MPhase(e){};
+//	MC(Engine & e, unsigned int maxsize) : MPhase(e, maxsize){};
 //	~MC() {};
 //
 //	bool filter_join(std::vector<Element_In_Tuple> & update_tuple){
-//		return get_num_vertices(update_tuple) > MAXSIZE;
+//		return get_num_vertices(update_tuple) > max_size;
 //	}
 //
 //	bool filter_collect(std::vector<Element_In_Tuple> & update_tuple){
 //		return false;
 //	}
-//
-//private:
-//	static int get_num_vertices(std::vector<Element_In_Tuple> & update_tuple) {
-//		std::unordered_set<VertexId> set;
-//		for (auto it = update_tuple.cbegin(); it != update_tuple.cend(); ++it) {
-//			set.insert((*it).vertex_id);
-//		}
-//		return set.size();
-//	}
-//
 //
 //};
 //
@@ -47,8 +37,10 @@
 //
 //	ResourceManager rm;
 //
-//	MC mPhase(e);
+//	MC mPhase(e, atoi(argv[3]));
 //	Aggregation agg(e, true);
+//
+//	int threshold = atoi(argv[4]);
 //
 //	//get the non-shuffled edges stream
 //	std::cout << Logger::generate_log_del(std::string("init"), 1) << std::endl;
@@ -58,11 +50,12 @@
 //	Aggregation_Stream agg_stream = agg.aggregate(up_stream, mPhase.get_sizeof_in_tuple());
 //	//filter infrequent edges
 //	std::cout << "\n" << Logger::generate_log_del(std::string("filtering"), 2) << std::endl;
-//	Update_Stream up_stream_filtered = agg.aggregate_filter(up_stream, agg_stream, mPhase.get_sizeof_in_tuple(), THRESHOLD);
+//	Update_Stream up_stream_filtered = agg.aggregate_filter(up_stream, agg_stream, mPhase.get_sizeof_in_tuple(), threshold);
 //	mPhase.delete_upstream(up_stream);
 //	agg.delete_aggstream(agg_stream);
 //
-//	for(int i = 1; i <= MAXSIZE; ++i){
+//	unsigned int max_iterations = mPhase.get_max_size() * (mPhase.get_max_size() - 1) / 2;
+//	for(unsigned int i = 1; i <= max_iterations; ++i){
 //		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 //
 //		//join on all keys
@@ -77,7 +70,7 @@
 //		agg.printout_aggstream(agg_stream);
 //		//filter infrequent subgraphs
 //		std::cout << "\n" << Logger::generate_log_del(std::string("filtering"), 2) << std::endl;
-//		up_stream_filtered = agg.aggregate_filter(up_stream, agg_stream, mPhase.get_sizeof_in_tuple(), THRESHOLD);
+//		up_stream_filtered = agg.aggregate_filter(up_stream, agg_stream, mPhase.get_sizeof_in_tuple(), threshold);
 //		mPhase.delete_upstream(up_stream);
 //		agg.delete_aggstream(agg_stream);
 //	}
@@ -104,8 +97,10 @@
 //
 //	ResourceManager rm;
 //
-//	MC mPhase(e);
+//	MC mPhase(e, atoi(argv[3]));
 //	Aggregation agg(e, true);
+//
+//	int threshold = atoi(argv[4]);
 //
 //	//get the non-shuffled edges stream
 //	std::cout << Logger::generate_log_del(std::string("init"), 1) << std::endl;
@@ -118,7 +113,7 @@
 //	agg.printout_aggstream(agg_stream);
 //	//filter infrequent edges
 //	std::cout << "\n" << Logger::generate_log_del(std::string("filtering"), 2) << std::endl;
-//	Update_Stream up_stream_non_shuffled_filtered = agg.aggregate_filter(up_stream_non_shuffled, agg_stream, mPhase.get_sizeof_in_tuple(), THRESHOLD);
+//	Update_Stream up_stream_non_shuffled_filtered = agg.aggregate_filter(up_stream_non_shuffled, agg_stream, mPhase.get_sizeof_in_tuple(), threshold);
 //	mPhase.delete_upstream(up_stream_non_shuffled);
 //	agg.delete_aggstream(agg_stream);
 //	//shuffle edges
@@ -126,7 +121,8 @@
 //	Update_Stream up_stream_shuffled = mPhase.shuffle_all_keys(up_stream_non_shuffled_filtered);
 //	mPhase.delete_upstream(up_stream_non_shuffled_filtered);
 //
-//	for(int i = 1; i <= MAXSIZE; ++i){
+//	unsigned int max_iterations = mPhase.get_max_size() * (mPhase.get_max_size() - 1) / 2;
+//	for(unsigned int i = 1; i <= max_iterations; ++i){
 //		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 //
 //		//join on all keys
@@ -141,7 +137,7 @@
 //		agg.printout_aggstream(agg_stream);
 //		//filter infrequent subgraphs
 //		std::cout << "\n" << Logger::generate_log_del(std::string("filtering"), 2) << std::endl;
-//		up_stream_non_shuffled_filtered = agg.aggregate_filter(up_stream_non_shuffled, agg_stream, mPhase.get_sizeof_in_tuple(), THRESHOLD);
+//		up_stream_non_shuffled_filtered = agg.aggregate_filter(up_stream_non_shuffled, agg_stream, mPhase.get_sizeof_in_tuple(), threshold);
 //		mPhase.delete_upstream(up_stream_non_shuffled);
 //		agg.delete_aggstream(agg_stream);
 //		//shuffle

@@ -11,18 +11,18 @@
 //#include "../utility/ResourceManager.hpp"
 //
 //
-//#define MAXSIZE 3
+////#define MAXSIZE 3
 //
 //using namespace RStream;
 //
 //
 //class MC : public MPhase {
 //public:
-//	MC(Engine & e) : MPhase(e){};
+//	MC(Engine & e, unsigned int maxsize) : MPhase(e, maxsize){};
 //	~MC() {};
 //
 //	bool filter_join(std::vector<Element_In_Tuple> & update_tuple){
-//		return get_num_vertices(update_tuple) > MAXSIZE;
+//		return get_num_vertices(update_tuple) > max_size;
 //	}
 //
 //	bool filter_collect(std::vector<Element_In_Tuple> & update_tuple){
@@ -48,7 +48,7 @@
 //
 //	ResourceManager rm;
 //
-//	MC mPhase(e);
+//	MC mPhase(e, atoi(argv[3]));
 //
 //	//init: get the edges stream
 //	std::cout << Logger::generate_log_del(std::string("init"), 1) << std::endl;
@@ -57,8 +57,8 @@
 //	Update_Stream up_stream_new;
 //	Update_Stream clique_stream;
 //
-//	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
-//	for(int i = 1; i < max_iterations; ++i){
+//	unsigned int max_iterations = mPhase.get_max_size() * (mPhase.get_max_size() - 1) / 2;
+//	for(unsigned int i = 1; i < max_iterations; ++i){
 //		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 //
 //		//join on all keys
@@ -98,7 +98,7 @@
 //
 //	ResourceManager rm;
 //
-//	MC mPhase(e);
+//	MC mPhase(e, atoi(argv[3]));
 //
 //	//init: get the edges stream
 //	std::cout << Logger::generate_log_del(std::string("init-shuffling"), 1) << std::endl;
@@ -107,8 +107,8 @@
 //	Update_Stream up_stream_non_shuffled;
 //	Update_Stream clique_stream;
 //
-//	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
-//	for(int i = 1; i < max_iterations; ++i){
+//	unsigned int max_iterations = mPhase.get_max_size() * (mPhase.get_max_size() - 1) / 2;
+//	for(unsigned int i = 1; i < max_iterations; ++i){
 //		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 //
 //		//join on all keys
@@ -145,7 +145,7 @@
 //}
 //
 //int main(int argc, char **argv){
-//	main_nonshuffle(argc, argv);
 ////	main_shuffle(argc, argv);
+//	main_nonshuffle(argc, argv);
 //}
 >>>>>>> 79d1a00599eb8b94c7367a09dcb5bb91911162b8

@@ -10,18 +10,18 @@
 #include "../core/aggregation.hpp"
 #include "../utility/ResourceManager.hpp"
 
-#define MAXSIZE 3
+//#define MAXSIZE 3
 
 using namespace RStream;
 
 
 class MC : public MPhase {
 public:
-	MC(Engine & e) : MPhase(e){};
+	MC(Engine & e, unsigned int maxsize) : MPhase(e, maxsize){};
 	~MC() {};
 
 	bool filter_join(std::vector<Element_In_Tuple> & update_tuple){
-		return get_num_vertices(update_tuple) > MAXSIZE;
+		return get_num_vertices(update_tuple) > max_size;
 	}
 
 	bool filter_collect(std::vector<Element_In_Tuple> & update_tuple){
@@ -37,7 +37,7 @@ void main_nonshuffle(int argc, char **argv) {
 
 	ResourceManager rm;
 
-	MC mPhase(e);
+	MC mPhase(e, atoi(argv[3]));
 	Aggregation agg(e, false);
 
 	//init: get the edges stream
@@ -47,8 +47,8 @@ void main_nonshuffle(int argc, char **argv) {
 	Update_Stream up_stream_new;
 	Aggregation_Stream agg_stream;
 
-	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
-	for(int i = 1; i < max_iterations; ++i){
+	unsigned int max_iterations = mPhase.get_max_size() * (mPhase.get_max_size() - 1) / 2;
+	for(unsigned int i = 1; i < max_iterations; ++i){
 		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 
 		//join on all keys
@@ -88,7 +88,7 @@ void main_shuffle(int argc, char **argv) {
 
 	ResourceManager rm;
 
-	MC mPhase(e);
+	MC mPhase(e, atoi(argv[3]));
 	Aggregation agg(e, false);
 
 	//init: get the edges stream
@@ -98,8 +98,8 @@ void main_shuffle(int argc, char **argv) {
 	Update_Stream up_stream_non_shuffled;
 	Aggregation_Stream agg_stream;
 
-	int max_iterations = MAXSIZE * (MAXSIZE - 1) / 2;
-	for(int i = 1; i < max_iterations; ++i){
+	unsigned int max_iterations = mPhase.get_max_size() * (mPhase.get_max_size() - 1) / 2;
+	for(unsigned int i = 1; i < max_iterations; ++i){
 		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 
 		//join on all keys
