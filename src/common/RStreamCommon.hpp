@@ -60,6 +60,8 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 
+#include <sys/stat.h>
+
 //#include <boost/asio/io_service.hpp>
 //#include <boost/bind.hpp>
 //#include <boost/thread/thread.hpp>

@@ -36,7 +36,7 @@
 //	//	return strm;
 //	//}
 //
-//	void init(char* data, VertexId id) {
+//	void initttt(char* data, VertexId id) {
 //		struct Vertex * v = (struct Vertex*)data;
 //		v->degree = 0;
 //		v->sum = 0;
@@ -58,8 +58,9 @@
 //	int main(int argc, char ** argv) {
 ////		Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 //		Engine e(std::string(argv[1]), atoi(argv[2]), atoi(argv[3]));
-//		e.init_vertex<Vertex>(init);
-//		e.compute_degree<Vertex>();
+////		e.init_vertex<Vertex>(initttt);
+////		e.init_vertex<Vertex>(init);
+////		e.compute_degree<Vertex>();
 //
 //		int num_iters = 5;
 //		for(int i = 0; i < num_iters; i++) {

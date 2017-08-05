@@ -10,6 +10,8 @@
 
 #include "../common/RStreamCommon.hpp"
 
+namespace RStream{
+
 class FileUtil{
 
 public:
@@ -20,11 +22,9 @@ public:
 			std::cout << (file_name + " successfully deleted.\n");
 	}
 
-
-
 };
 
-
+}
 
 
 #endif /* SRC_UTILITY_FILEUTIL_HPP_ */

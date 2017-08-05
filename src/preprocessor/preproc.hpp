@@ -2,8 +2,8 @@
 #define PREPROC_HPP
 
 
-//#include <iostream>
 #include "../common/RStreamCommon.hpp"
+#include "../core/buffer_manager.hpp"
 
 namespace RStream {
 	class Preproc

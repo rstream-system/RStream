@@ -8,12 +8,12 @@
 #ifndef CORE_SCATTER_HPP_
 #define CORE_SCATTER_HPP_
 
-
-#include "io_manager.hpp"
-#include "buffer_manager.hpp"
-#include "concurrent_queue.hpp"
-#include "type.hpp"
-#include "constants.hpp"
+//#include "../utility/Logger.hpp"
+//#include "io_manager.hpp"
+//#include "buffer_manager.hpp"
+//#include "concurrent_queue.hpp"
+//#include "../struct/type.hpp"
+//#include "constants.hpp"
 #include "meta_info.hpp"
 
 namespace RStream {
@@ -49,7 +49,7 @@ namespace RStream {
 		Update_Stream scatter_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update) {
 			atomic_init();
 
-			print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
+			Logger::print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -84,7 +84,7 @@ namespace RStream {
 			delete[] buffers_for_shuffle;
 			delete task_queue;
 
-			print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
+			Logger::print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
 
 			return update_c;
 		}
@@ -93,7 +93,7 @@ namespace RStream {
 		Update_Stream scatter_no_vertex(std::function<UpdateType*(Edge*)> generate_one_update) {
 			atomic_init();
 
-			print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
+			Logger::print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -132,7 +132,7 @@ namespace RStream {
 			delete[] buffers_for_shuffle;
 			delete task_queue;
 
-			print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
+			Logger::print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
 
 			return update_c;
 		}
@@ -171,7 +171,7 @@ namespace RStream {
 				long vertex_file_size = io_manager::get_filesize(fd_vertex);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
-				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(edge_file_size) + "\n");
+				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(edge_file_size) + "\n");
 
 				// vertex data fully loaded into memory
 				char * vertex_local_buf = new char[vertex_file_size];
@@ -270,7 +270,7 @@ namespace RStream {
 
 				// get file size
 				long file_size = io_manager::get_filesize(fd);
-				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(file_size) + "\n");
+				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(file_size) + "\n");
 
 				// read from file to thread local buffer
 //				char * local_buf = new char[file_size];

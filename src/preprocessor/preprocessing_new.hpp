@@ -8,8 +8,7 @@
 #ifndef UTILITY_PREPROCESSING_NEW_HPP_
 #define UTILITY_PREPROCESSING_NEW_HPP_
 
-//#include <iostream>
-//#include <climits>
+#include "../core/buffer_manager.hpp"
 
 namespace RStream {
 	class Preprocessing_new {
