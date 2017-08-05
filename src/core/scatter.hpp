@@ -15,6 +15,16 @@ namespace RStream {
 	template <typename VertexDataType, typename UpdateType>
 	class Scatter {
 
+	static_assert(
+				std::is_base_of<BaseVertex, VertexDataType>::value,
+				"VertexDataType must be a subclass of BaseVertex."
+			);
+
+			static_assert(
+				std::is_base_of<BaseUpdate, UpdateType>::value,
+				"UpdateType must be a subclass of BaseUpdate."
+			);
+
 	public:
 		Scatter(Engine & e);
 		virtual ~Scatter();

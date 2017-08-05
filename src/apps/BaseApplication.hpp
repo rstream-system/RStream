@@ -10,8 +10,8 @@
 
 
 #include "../core/engine.hpp"
-#include "../core/scatter.hpp"
 #include "../core/gather.hpp"
+#include "../core/scatter.hpp"
 #include "../core/relation_phase.hpp"
 
 namespace RStream{
