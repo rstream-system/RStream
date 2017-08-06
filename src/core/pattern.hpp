@@ -10,6 +10,7 @@
 
 #include "../struct/quick_pattern.hpp"
 #include "../struct/canonical_graph.hpp"
+#include "../struct/mining_tuple.hpp"
 
 namespace RStream {
 
@@ -89,6 +90,46 @@ public:
 
 		return false;
 	}
+
+	static bool is_automorphism(MTuple_vector & sub_graph, const bool vertex_existed) {
+		assert(sub_graph.get_size() >= 2);
+		Element_In_Tuple last_tuple = sub_graph.at(sub_graph.get_size() - 1);
+
+		//check with the first element
+		if(last_tuple.vertex_id < sub_graph.at(0).vertex_id){
+			return true;
+		}
+
+		//check loop edge
+		if(last_tuple.vertex_id == sub_graph.at(sub_graph.at(last_tuple.history_info).history_info).vertex_id){
+			return true;
+		}
+
+		std::pair<VertexId, VertexId> added_edge;
+		getEdge(sub_graph, sub_graph.get_size() - 1, added_edge);
+
+		//check to see if there already exists the vertex added; if so, just allow to add edge which is (smaller id -> bigger id)
+		if(vertex_existed && added_edge.first > added_edge.second){
+			return true;
+		}
+
+
+		for(unsigned int index = last_tuple.history_info + 1; index < sub_graph.get_size() - 1; ++index){
+			std::pair<VertexId, VertexId> edge;
+			getEdge(sub_graph, index, edge);
+			int cmp = compare(added_edge, edge);
+//			assert(cmp != 0);
+			if(cmp <= 0){
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+//	static bool is_automorphism(MTuple_vector & sub_graph, const bool vertex_existed) {
+//		return is_automorphism(sub_graph.get_elements(), vertex_existed);
+//	}
 
 	static bool is_automorphism_init(std::vector<Element_In_Tuple> & sub_graph) {
 		assert(sub_graph.size() == 2);
@@ -175,6 +216,13 @@ private:
 	static void getEdge(std::vector<Element_In_Tuple> & sub_graph, unsigned int index, std::pair<VertexId, VertexId>& edge){
 		Element_In_Tuple tuple = sub_graph[index];
 		edge.first = sub_graph[tuple.history_info].vertex_id;
+		edge.second = tuple.vertex_id;
+		assert(edge.first != edge.second);
+	}
+
+	static void getEdge(MTuple_vector & sub_graph, unsigned int index, std::pair<VertexId, VertexId>& edge){
+		Element_In_Tuple tuple = sub_graph.at(index);
+		edge.first = sub_graph.at(tuple.history_info).vertex_id;
 		edge.second = tuple.vertex_id;
 		assert(edge.first != edge.second);
 	}

@@ -14,6 +14,7 @@
 #include "pattern.hpp"
 #include "../utility/Logger.hpp"
 
+
 namespace RStream {
 
 
@@ -131,6 +132,10 @@ namespace RStream {
 			}
 		}
 
+		static void get_an_in_update(char * update_local_buf, MTuple_vector & tuple, std::unordered_set<VertexId>& vertices_set) {
+			tuple.init(update_local_buf, vertices_set);
+		}
+
 		static void get_an_in_update(char * update_local_buf, std::vector<Element_In_Tuple> & tuple, int sizeof_in_tuple, std::unordered_set<VertexId>& vertices_set) {
 			for(int index = 0; index < sizeof_in_tuple; index += sizeof(Element_In_Tuple)) {
 				Element_In_Tuple element = *(Element_In_Tuple*)(update_local_buf + index);
@@ -156,6 +161,8 @@ namespace RStream {
 
 		unsigned int get_num_vertices(std::vector<Element_In_Tuple> & update_tuple);
 
+		unsigned int get_num_vertices(MTuple_vector & update_tuple);
+
 
 	private:
 		void atomic_init();
@@ -170,10 +177,14 @@ namespace RStream {
 		// each exec thread generates a join producer
 		void join_allkeys_nonshuffle_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap);
 
+		void join_allkeys_nonshuffle_tuple_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap);
+
 		// each exec thread generates a join producer
 		void join_mining_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue);
 
 		void insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle);
+
+		void insert_tuple_to_buffer(int partition_id, MTuple_vector& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle);
 
 		void shuffle_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue);
 
@@ -190,6 +201,8 @@ namespace RStream {
 
 		bool gen_an_out_update(std::vector<Element_In_Tuple> & in_update_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set);
 
+		bool gen_an_out_update(MTuple_vector & in_update_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set);
+
 		// key index is always stored in the first element of the vector
 		BYTE get_key_index(std::vector<Element_In_Tuple> & in_update_tuple);
 
@@ -203,6 +216,9 @@ namespace RStream {
 
 		virtual bool filter_join(std::vector<Element_In_Tuple> & update_tuple) = 0;
 		virtual bool filter_collect(std::vector<Element_In_Tuple> & update_tuple) = 0;
+
+		virtual bool filter_join(MTuple_vector & update_tuple) = 0;
+		virtual bool filter_collect(MTuple_vector & update_tuple) = 0;
 
 
 		/* Private fields */
