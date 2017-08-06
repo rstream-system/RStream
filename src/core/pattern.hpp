@@ -91,7 +91,7 @@ public:
 		return false;
 	}
 
-	static bool is_automorphism(MTuple_vector & sub_graph, const bool vertex_existed) {
+	static bool is_automorphism(MTuple_join & sub_graph, const bool vertex_existed) {
 		assert(sub_graph.get_size() >= 2);
 		Element_In_Tuple last_tuple = sub_graph.at(sub_graph.get_size() - 1);
 
@@ -220,7 +220,7 @@ private:
 		assert(edge.first != edge.second);
 	}
 
-	static void getEdge(MTuple_vector & sub_graph, unsigned int index, std::pair<VertexId, VertexId>& edge){
+	static void getEdge(MTuple_join & sub_graph, unsigned int index, std::pair<VertexId, VertexId>& edge){
 		Element_In_Tuple tuple = sub_graph.at(index);
 		edge.first = sub_graph.at(tuple.history_info).vertex_id;
 		edge.second = tuple.vertex_id;

@@ -639,7 +639,7 @@ namespace RStream {
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
 						std::unordered_set<VertexId> vertices_set;
-						MTuple_vector in_update_tuple(sizeof_in_tuple);
+						MTuple_join in_update_tuple(sizeof_in_tuple);
 						get_an_in_update(update_local_buf + pos, in_update_tuple, vertices_set);
 //						std::cout << in_update_tuple << std::endl;
 
@@ -651,7 +651,7 @@ namespace RStream {
 							if(set.find(id) == set.end()){
 								set.insert(id);
 
-								for(Element_In_Tuple element : edge_hashmap[id]) {
+								for(Element_In_Tuple& element : edge_hashmap[id]) {
 									// generate a new out update tuple
 									bool vertex_existed = gen_an_out_update(in_update_tuple, element, (BYTE)i, vertices_set);
 		//							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
@@ -804,10 +804,15 @@ namespace RStream {
 			global_buf->insert(out_update);
 		}
 
-		void MPhase::insert_tuple_to_buffer(int partition_id, MTuple_vector& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
-			char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
+		void MPhase::insert_tuple_to_buffer(int partition_id, MTuple_join& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
+//			char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
+//			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
+//			global_buf->insert(out_update);
+
+			char* out_elements = reinterpret_cast<char*>(in_update_tuple.get_elements());
+			char* out_added = reinterpret_cast<char*>(in_update_tuple.get_added_element());
 			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
-			global_buf->insert(out_update);
+			global_buf->insert(out_elements, out_added);
 		}
 
 
@@ -1121,7 +1126,7 @@ namespace RStream {
 		}
 
 
-		bool MPhase::gen_an_out_update(MTuple_vector & in_update_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set) {
+		bool MPhase::gen_an_out_update(MTuple_join & in_update_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set) {
 			bool vertex_existed = true;
 			auto num_vertices = vertices_set.size();
 			if(vertices_set.find(element.vertex_id) == vertices_set.end()){
@@ -1184,7 +1189,7 @@ namespace RStream {
 			return update_tuple.back().key_index;
 		}
 
-		unsigned int MPhase::get_num_vertices(MTuple_vector & update_tuple){
+		unsigned int MPhase::get_num_vertices(MTuple_join & update_tuple){
 			return update_tuple.get_num_vertices();
 		}
 

@@ -28,11 +28,11 @@ public:
 		return false;
 	}
 
-	bool filter_join(MTuple_vector & update_tuple){
+	bool filter_join(MTuple_join & update_tuple){
 		return get_num_vertices(update_tuple) > max_size;
 	}
 
-	bool filter_collect(MTuple_vector & update_tuple){
+	bool filter_collect(MTuple_join & update_tuple){
 		return false;
 	}
 
