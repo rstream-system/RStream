@@ -27,7 +27,20 @@ Element_In_Tuple& MTuple::at(unsigned int index){
 	return elements[index];
 }
 
+std::ostream & operator<<(std::ostream & strm, const MTuple& tuple){
+	if(tuple.get_size() == 0){
+		strm << "(empty)";
+		return strm;
+	}
 
+	strm << "(";
+	for(unsigned int index = 0; index < tuple.get_size() - 1; ++index){
+		strm << tuple.elements[index] << ", ";
+	}
+	strm << tuple.elements[tuple.get_size() - 1];
+	strm << ")";
+	return strm;
+}
 
 
 MTuple_join::MTuple_join(unsigned int size_of_t): MTuple(size_of_t) {

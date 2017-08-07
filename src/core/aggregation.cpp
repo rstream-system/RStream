@@ -141,9 +141,12 @@ namespace RStream {
 					// streaming tuples in, do aggregation
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-						std::vector<Element_In_Tuple> in_update_tuple;
-						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
-						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+//						std::vector<Element_In_Tuple> in_update_tuple;
+//						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
+//						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+
+						MTuple in_update_tuple(sizeof_in_tuple);
+						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple);
 
 //						//for debugging only
 //						std::cout << "tuple: " << in_update_tuple << std::endl;
@@ -161,12 +164,18 @@ namespace RStream {
 
 		}
 
-		void Aggregation::shuffle_on_canonical(std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining ** buffers_for_shuffle){
+		void Aggregation::shuffle_on_canonical(MTuple& in_update_tuple, global_buffer_for_mining ** buffers_for_shuffle){
+//			// turn tuple to quick pattern
+//			Quick_Pattern quick_pattern;
+//			Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern, label_flag);
+//			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
+
+
 			// turn tuple to quick pattern
-			Quick_Pattern quick_pattern;
+			Quick_Pattern quick_pattern(in_update_tuple.get_size() * sizeof(Element_In_Tuple));
 			Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern, label_flag);
-			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
-			Canonical_Graph* cf = Pattern::turn_canonical_graph(sub_graph, false);
+
+			Canonical_Graph* cf = Pattern::turn_canonical_graph(quick_pattern, false);
 
 			unsigned int hash = cf->get_hash();
 			unsigned int index = get_global_bucket_index(hash);
@@ -181,6 +190,12 @@ namespace RStream {
 
 		void Aggregation::insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
 			char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
+			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
+			global_buf->insert(out_update);
+		}
+
+		void Aggregation::insert_tuple_to_buffer(int partition_id, MTuple& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
+			char* out_update = reinterpret_cast<char*>(in_update_tuple.get_elements());
 			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
 			global_buf->insert(out_update);
 		}
@@ -286,9 +301,13 @@ namespace RStream {
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-						std::vector<Element_In_Tuple> in_update_tuple;
-						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
-						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+//						std::vector<Element_In_Tuple> in_update_tuple;
+//						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
+//						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+
+						MTuple in_update_tuple(sizeof_in_tuple);
+						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple);
+//						std::cout << "in_update: \t" << in_update_tuple << std::endl;
 
 //						//for debugging
 //						std::cout << in_update_tuple << " --> " << filter_aggregate(in_update_tuple, map, threshold) << std::endl;
@@ -322,12 +341,18 @@ namespace RStream {
 			}
 		}
 
-		bool Aggregation::filter_aggregate(std::vector<Element_In_Tuple> & update_tuple, std::unordered_map<Canonical_Graph, int>& map, int threshold){
+		bool Aggregation::filter_aggregate(MTuple & update_tuple, std::unordered_map<Canonical_Graph, int>& map, int threshold){
+//			// turn tuple to quick pattern
+//			Quick_Pattern quick_pattern;
+//			Pattern::turn_quick_pattern_pure(update_tuple, quick_pattern, label_flag);
+//			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
+
 			// turn tuple to quick pattern
-			Quick_Pattern quick_pattern;
+			Quick_Pattern quick_pattern(update_tuple.get_size() * sizeof(Element_In_Tuple));
 			Pattern::turn_quick_pattern_pure(update_tuple, quick_pattern, label_flag);
-			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
-			Canonical_Graph* cf = Pattern::turn_canonical_graph(sub_graph, false);
+
+			Canonical_Graph* cf = Pattern::turn_canonical_graph(quick_pattern, false);
+
 
 			assert(map.find(*cf) != map.end());
 			bool r = (map[*cf] < threshold);
@@ -568,15 +593,19 @@ namespace RStream {
 					// streaming tuples in, do aggregation
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-						std::vector<Element_In_Tuple> in_update_tuple;
-						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
-						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+//						std::vector<Element_In_Tuple> in_update_tuple;
+//						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
+//						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						MTuple in_update_tuple(sizeof_in_tuple);
+						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple);
 //						std::cout << "in_update: \t" << in_update_tuple << std::endl;
 
 						// turn tuple to quick pattern
-						Quick_Pattern quick_pattern;
+						Quick_Pattern quick_pattern(sizeof_in_tuple);
 						Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern, label_flag);
-//						std::cout << "quick_pattern: \t" << quick_pattern << "\n" << std::endl;
+//						std::cout << "quick_pattern: \t" << quick_pattern << std::endl;
+//						std::cout << "in_update: \t" << in_update_tuple << std::endl;
+//						std::cout << std::endl;
 						aggregate_on_quick_pattern(quick_patterns_aggregation, quick_pattern);
 					}
 
@@ -628,11 +657,14 @@ namespace RStream {
 
 		void Aggregation::aggregate_on_canonical_graph(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation){
 			for(auto it = quick_patterns_aggregation.begin(); it != quick_patterns_aggregation.end(); ++it){
-				std::vector<Element_In_Tuple> sub_graph = it->first.get_tuple();
+				Quick_Pattern sub_graph = it->first;
 //				std::cout << "quick_pattern: \t" << sub_graph << std::endl;
 				int s = it->second;
 				Canonical_Graph* cg = Pattern::turn_canonical_graph(sub_graph, false);
 //				std::cout << "canonical_graph: \t" << *cg << std::endl;
+
+				//clean quick_pattern
+				sub_graph.clean();
 
 //				std::cout << (canonical_graphs_aggregation.find(*cg) != canonical_graphs_aggregation.end()) << std::endl;
 				if(canonical_graphs_aggregation.find(*cg) != canonical_graphs_aggregation.end()){

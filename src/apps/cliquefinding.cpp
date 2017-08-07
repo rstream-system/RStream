@@ -29,6 +29,14 @@
 //		return !isClique(update_tuple);
 //	}
 //
+//	bool filter_join(MTuple_join & update_tuple){
+//		return get_num_vertices(update_tuple) > max_size;
+//	}
+//
+//	bool filter_collect(MTuple_join & update_tuple){
+//		return false;
+//	}
+//
 //private:
 //
 //	bool isClique(std::vector<Element_In_Tuple> & update_tuple){

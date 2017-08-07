@@ -13,6 +13,9 @@
 namespace RStream{
 
 class MTuple{
+
+	friend std::ostream & operator<<(std::ostream & strm, const MTuple& cg);
+
 public:
 	MTuple(unsigned int size_of_tuple);
 	virtual ~MTuple();
@@ -21,7 +24,7 @@ public:
 
 	virtual Element_In_Tuple& at(unsigned int index);
 
-	inline unsigned int get_size(){
+	inline unsigned int get_size() const{
 		return size;
 	}
 

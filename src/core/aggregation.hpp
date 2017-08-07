@@ -88,9 +88,10 @@ namespace RStream {
 
 		void shuffle_on_canonical_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, int sizeof_in_tuple);
 
-		void shuffle_on_canonical(std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining ** buffers_for_shuffle);
+		void shuffle_on_canonical(MTuple& in_update_tuple, global_buffer_for_mining ** buffers_for_shuffle);
 
 		void insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle);
+		void insert_tuple_to_buffer(int partition_id, MTuple& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle);
 
 
 		Update_Stream aggregate_filter_local(Update_Stream up_stream_shuffled_on_canonical, Aggregation_Stream agg_stream, int sizeof_in_tuple, int threshold);
@@ -99,7 +100,7 @@ namespace RStream {
 
 		void build_aggmap(std::unordered_map<Canonical_Graph, int>& map, char* agg_local_buf, long agg_file_size, int sizeof_agg);
 
-		bool filter_aggregate(std::vector<Element_In_Tuple> & update_tuple, std::unordered_map<Canonical_Graph, int>& map, int threshold);
+		bool filter_aggregate(MTuple & update_tuple, std::unordered_map<Canonical_Graph, int>& map, int threshold);
 
 		Aggregation_Stream aggregate_local(Update_Stream in_update_stream, int sizeof_in_tuple);
 

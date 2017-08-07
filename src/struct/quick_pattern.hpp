@@ -17,7 +17,7 @@ class Quick_Pattern {
 	friend std::ostream & operator<<(std::ostream & strm, const Quick_Pattern& quick_pattern);
 
 public:
-	Quick_Pattern();
+	Quick_Pattern(unsigned int size_of_tuple);
 
 //	Quick_Pattern(std::vector<Element_In_Tuple>& t){
 //		tuple = t;
@@ -30,16 +30,33 @@ public:
 
 	unsigned int get_hash() const;
 
-	inline void push(Element_In_Tuple& element){
-		tuple.push_back(element);
+
+	Element_In_Tuple& at(unsigned int index) const;
+
+//	inline void push(Element_In_Tuple& element){
+//		tuple.push_back(element);
+//	}
+
+//	inline std::vector<Element_In_Tuple> get_tuple() const {
+//		return tuple;
+//	}
+
+	inline unsigned int get_size() const {
+		return size;
 	}
 
-	inline std::vector<Element_In_Tuple> get_tuple() const {
-		return tuple;
+	inline Element_In_Tuple* get_elements(){
+		return elements;
+	}
+
+	inline void clean(){
+		delete[] elements;
 	}
 
 private:
-	std::vector<Element_In_Tuple> tuple;
+//	std::vector<Element_In_Tuple> tuple;
+	unsigned int size;
+	Element_In_Tuple* elements;
 
 };
 

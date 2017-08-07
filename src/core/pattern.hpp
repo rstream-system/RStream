@@ -30,6 +30,31 @@ class Pattern {
 
 public:
 
+	static bliss::AbstractGraph* turn_canonical_graph_bliss(Quick_Pattern & sub_graph, const bool is_directed) {
+		bliss::AbstractGraph* ag = 0;
+
+		//read graph from tuple
+		ag = readGraph(sub_graph, is_directed);
+//		std::cout << "done read." << std::endl;
+
+		//turn to canonical form
+		bliss::AbstractGraph* cf = turnCanonical(ag);
+//		std::cout << "done turn." << std::endl;
+
+		delete ag;
+		ag = 0;
+		return cf;
+	}
+
+	static Canonical_Graph* turn_canonical_graph(Quick_Pattern & sub_graph, const bool is_directed){
+		bliss::AbstractGraph* cf_bliss = turn_canonical_graph_bliss(sub_graph, is_directed);
+//		std::cout << "done bliss." << std::endl;
+		Canonical_Graph* cf = new Canonical_Graph(cf_bliss, is_directed);
+		delete cf_bliss;
+		return cf;
+	}
+
+
 	static bliss::AbstractGraph* turn_canonical_graph_bliss(std::vector<Element_In_Tuple> & sub_graph, const bool is_directed) {
 		bliss::AbstractGraph* ag = 0;
 
@@ -53,7 +78,6 @@ public:
 		delete cf_bliss;
 		return cf;
 	}
-
 
 	static bool is_automorphism(std::vector<Element_In_Tuple> & sub_graph, const bool vertex_existed) {
 		assert(sub_graph.size() >= 2);
@@ -181,36 +205,76 @@ public:
 //
 //		}
 
-	static void turn_quick_pattern_pure(std::vector<Element_In_Tuple> & sub_graph, Quick_Pattern & graph_quick_pattern, bool label_flag) {
+//	static void turn_quick_pattern_pure(std::vector<Element_In_Tuple> & sub_graph, Quick_Pattern & graph_quick_pattern, bool label_flag) {
+//		std::unordered_map<VertexId, VertexId> map;
+//		VertexId new_id = 1;
+//
+//		for(unsigned int i = 0; i < sub_graph.size(); i++) {
+//			Element_In_Tuple old_tuple = sub_graph[i];
+//
+//			Element_In_Tuple * new_tuple;
+//			if(label_flag)
+//				new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, old_tuple.vertex_label, old_tuple.history_info);
+//			else
+//				new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, (BYTE)0, old_tuple.history_info);
+//
+//			VertexId old_id = new_tuple->vertex_id;
+//			auto iterator = map.find(old_id);
+//			if(iterator == map.end()) {
+//				new_tuple->set_vertex_id(new_id);
+//				map[old_id] = new_id++;
+//
+//			} else {
+//				new_tuple->set_vertex_id(iterator->second);
+//			}
+//
+//			graph_quick_pattern.push(*new_tuple);
+//			delete new_tuple;
+//		}
+//	}
+
+	static void turn_quick_pattern_pure(MTuple & sub_graph, Quick_Pattern & graph_quick_pattern, bool label_flag) {
+		copy_elements(sub_graph, graph_quick_pattern);
+
 		std::unordered_map<VertexId, VertexId> map;
 		VertexId new_id = 1;
 
-		for(unsigned int i = 0; i < sub_graph.size(); i++) {
-			Element_In_Tuple old_tuple = sub_graph[i];
+		for(unsigned int i = 0; i < graph_quick_pattern.get_size(); i++) {
+			Element_In_Tuple& element = graph_quick_pattern.at(i);
 
-			Element_In_Tuple * new_tuple;
-			if(label_flag)
-				new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, old_tuple.vertex_label, old_tuple.history_info);
-			else
-				new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, (BYTE)0, old_tuple.history_info);
+//			Element_In_Tuple * new_tuple;
+//			if(label_flag)
+//				new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, old_tuple.vertex_label, old_tuple.history_info);
+//			else
+//				new_tuple = new Element_In_Tuple(old_tuple.vertex_id, old_tuple.key_index, (BYTE)0, (BYTE)0, old_tuple.history_info);
 
-			VertexId old_id = new_tuple->vertex_id;
+			if(!label_flag){
+				element.vertex_label = (BYTE)0;
+			}
+
+			VertexId old_id = element.vertex_id;
 			auto iterator = map.find(old_id);
 			if(iterator == map.end()) {
-				new_tuple->set_vertex_id(new_id);
+				element.set_vertex_id(new_id);
 				map[old_id] = new_id++;
 
 			} else {
-				new_tuple->set_vertex_id(iterator->second);
+				element.set_vertex_id(iterator->second);
 			}
 
-			graph_quick_pattern.push(*new_tuple);
-			delete new_tuple;
+//			graph_quick_pattern.push(*new_tuple);
+//			delete new_tuple;
 		}
 	}
 
 
+
+
 private:
+
+	static void copy_elements(MTuple & sub_graph, Quick_Pattern & graph_quick_pattern){
+		std::memcpy(graph_quick_pattern.get_elements(), sub_graph.get_elements(), graph_quick_pattern.get_size() * sizeof(Element_In_Tuple));
+	}
 
 	//generate a pair which consists of <keyId, addedId>
 	static void getEdge(std::vector<Element_In_Tuple> & sub_graph, unsigned int index, std::pair<VertexId, VertexId>& edge){
@@ -245,6 +309,48 @@ private:
 		else{
 			return oneEdge.first - otherEdge.first;
 		}
+	}
+
+	static bliss::AbstractGraph* readGraph(Quick_Pattern & sub_graph, bool opt_directed){
+		bliss::AbstractGraph* g = 0;
+
+		//get the number of vertices
+		std::unordered_map<VertexId, BYTE> vertices;
+		for(unsigned int index = 0; index < sub_graph.get_size(); ++index){
+			Element_In_Tuple tuple = sub_graph.at(index);
+			vertices[tuple.vertex_id] = tuple.vertex_label;
+		}
+//		//for debugging only
+//		for(auto it = vertices.begin(); it != vertices.end(); ++it){
+//			std::cout << it->first << ": " << (int)it->second << std::endl;
+//		}
+
+		//construct graph
+		const unsigned int number_vertices = vertices.size();
+		assert(!opt_directed);
+		if(opt_directed){
+			g = new bliss::Digraph(vertices.size());
+		}
+		else{
+			g = new bliss::Graph(vertices.size());
+		}
+
+		//set vertices
+		for(unsigned int i = 0; i < number_vertices; ++i){
+//			std::cout << i << ": " << (unsigned int)vertices[i + 1] << std::endl;
+			g->change_color(i, (unsigned int)vertices[i + 1]);
+		}
+
+		//read edges
+		assert(sub_graph.get_size() > 1);
+		for(unsigned int index = 1; index < sub_graph.get_size(); ++index){
+			Element_In_Tuple tuple = sub_graph.at(index);
+			VertexId from = sub_graph.at(tuple.history_info).vertex_id;
+			VertexId to = tuple.vertex_id;
+			g->add_edge(from - 1, to - 1);
+		}
+
+		return g;
 	}
 
 	static bliss::AbstractGraph* readGraph(std::vector<Element_In_Tuple> & sub_graph, bool opt_directed){
