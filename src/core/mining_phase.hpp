@@ -132,6 +132,10 @@ namespace RStream {
 			}
 		}
 
+		static void get_an_in_update(char * update_local_buf, MTuple & tuple) {
+			tuple.init(update_local_buf);
+		}
+
 		static void get_an_in_update(char * update_local_buf, MTuple_join & tuple, std::unordered_set<VertexId>& vertices_set) {
 			tuple.init(update_local_buf, vertices_set);
 		}
@@ -198,6 +202,7 @@ namespace RStream {
 		void consumer(Update_Stream out_update_stream, global_buffer_for_mining ** buffers_for_shuffle);
 
 		void shuffle_on_all_keys(std::vector<Element_In_Tuple> & out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle);
+		void shuffle_on_all_keys(MTuple & out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle);
 
 		bool gen_an_out_update(std::vector<Element_In_Tuple> & in_update_tuple, Element_In_Tuple & element, BYTE history, std::unordered_set<VertexId>& vertices_set);
 
@@ -205,8 +210,10 @@ namespace RStream {
 
 		// key index is always stored in the first element of the vector
 		BYTE get_key_index(std::vector<Element_In_Tuple> & in_update_tuple);
+		BYTE get_key_index(MTuple_join & in_update_tuple);
 
 		void set_key_index(std::vector<Element_In_Tuple> & out_update_tuple, int new_key_index);
+		void set_key_index(MTuple & out_update_tuple, int new_key_index);
 
 		// TODO: do we need to store src.label?
 		void build_edge_hashmap(char * edge_buf, std::vector<Element_In_Tuple> * edge_hashmap, size_t edge_file_size, int start_vertex);

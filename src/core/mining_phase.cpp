@@ -659,18 +659,16 @@ namespace RStream {
 
 									// remove automorphism, only keep one unique tuple.
 									if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){
-//										insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
+										insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
 
-										insert_tuple_to_buffer(target_partition++, in_update_tuple, buffers_for_shuffle);
-										if(target_partition == context.num_partitions)
-											target_partition = 0;
+//										insert_tuple_to_buffer(target_partition++, in_update_tuple, buffers_for_shuffle);
+//										if(target_partition == context.num_partitions)
+//											target_partition = 0;
 									}
 
 									in_update_tuple.pop();
 								}
 							}
-
-
 						}
 					}
 				}
@@ -680,8 +678,6 @@ namespace RStream {
 			}
 
 			atomic_num_producers--;
-
-//			std::cout << "end producer." << std::endl;
 		}
 
 		// each exec thread generates a join producer
@@ -751,17 +747,14 @@ namespace RStream {
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-						int cap = sizeof_in_tuple / sizeof(Element_In_Tuple);
 						std::unordered_set<VertexId> vertices_set;
-						vertices_set.reserve(cap);
-						std::vector<Element_In_Tuple> in_update_tuple;
-						in_update_tuple.reserve(cap + 1);
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple, vertices_set);
+						MTuple_join in_update_tuple(sizeof_in_tuple);
+						get_an_in_update(update_local_buf + pos, in_update_tuple, vertices_set);
 //						std::cout << in_update_tuple << std::endl;
 
 						// get key index
 						BYTE key_index = get_key_index(in_update_tuple);
-						assert(key_index >= 0 && key_index < in_update_tuple.size());
+						assert(key_index >= 0 && key_index < in_update_tuple.get_size());
 
 						// get vertex_id as the key to index edge hashmap
 						VertexId key = in_update_tuple.at(key_index).vertex_id;
@@ -778,10 +771,8 @@ namespace RStream {
 								insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
 							}
 
-							in_update_tuple.pop_back();
+							in_update_tuple.pop();
 						}
-
-//						std::cout << std::endl;
 					}
 				}
 
@@ -793,8 +784,6 @@ namespace RStream {
 			}
 
 			atomic_num_producers--;
-
-//			std::cout << "end producer." << std::endl;
 		}
 
 
@@ -805,10 +794,6 @@ namespace RStream {
 		}
 
 		void MPhase::insert_tuple_to_buffer(int partition_id, MTuple_join& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
-//			char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
-//			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
-//			global_buf->insert(out_update);
-
 			char* out_elements = reinterpret_cast<char*>(in_update_tuple.get_elements());
 			char* out_added = reinterpret_cast<char*>(in_update_tuple.get_added_element());
 			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
@@ -861,9 +846,8 @@ namespace RStream {
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-						std::vector<Element_In_Tuple> in_update_tuple;
-						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						MTuple in_update_tuple(sizeof_in_tuple);
+						get_an_in_update(update_local_buf + pos, in_update_tuple);
 
 						shuffle_on_all_keys(in_update_tuple, buffers_for_shuffle);
 					}
@@ -1120,9 +1104,29 @@ namespace RStream {
 					global_buf->insert(out_update);
 
 				}
-
 			}
+		}
 
+		void MPhase::shuffle_on_all_keys(MTuple& out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle) {
+			std::unordered_set<VertexId> vertex_set;
+			// shuffle on all other keys
+			for(unsigned i = 0; i < out_update_tuple.get_size(); i++) {
+				VertexId key = out_update_tuple.at(i).vertex_id;
+
+				// check if vertex id exsited already
+				// DO NOT shuffle if vertex exsited
+				if(vertex_set.find(key) == vertex_set.end()){
+					vertex_set.insert(key);
+
+					set_key_index(out_update_tuple, i);
+					char* out_update = reinterpret_cast<char*>(out_update_tuple.get_elements());
+
+					int index = get_global_buffer_index(key);
+					global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
+					global_buf->insert(out_update);
+
+				}
+			}
 		}
 
 
@@ -1133,8 +1137,6 @@ namespace RStream {
 				num_vertices += 1;
 				vertex_existed = false;
 			}
-//			Element_In_Tuple new_element(element.vertex_id, (BYTE)num_vertices, element.edge_label, element.vertex_label, history);
-//			in_update_tuple.push_back(new_element);
 
 			Element_In_Tuple new_element(element.vertex_id, (BYTE)0, element.edge_label, element.vertex_label, history);
 			in_update_tuple.push(new_element);
@@ -1162,7 +1164,15 @@ namespace RStream {
 			return in_update_tuple.at(0).key_index;
 		}
 
+		BYTE MPhase::get_key_index(MTuple_join & in_update_tuple) {
+			return in_update_tuple.at(0).key_index;
+		}
+
 		void MPhase::set_key_index(std::vector<Element_In_Tuple> & out_update_tuple, int new_key_index) {
+			out_update_tuple.at(0).key_index = new_key_index;
+		}
+
+		void MPhase::set_key_index(MTuple & out_update_tuple, int new_key_index) {
 			out_update_tuple.at(0).key_index = new_key_index;
 		}
 
@@ -1179,8 +1189,6 @@ namespace RStream {
 		}
 
 		int MPhase::get_global_buffer_index(VertexId key) {
-//			int partition_id = (key - 1) / context.num_vertices_per_part;
-//			return partition_id < (context.num_partitions - 1) ? partition_id : (context.num_partitions - 1);
 			return meta_info::get_index(key, context);
 		}
 
@@ -1192,10 +1200,6 @@ namespace RStream {
 		unsigned int MPhase::get_num_vertices(MTuple_join & update_tuple){
 			return update_tuple.get_num_vertices();
 		}
-
-
-
-
 
 }
 
