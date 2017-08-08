@@ -232,7 +232,8 @@ namespace RStream {
 
 				// delete
 				delete[] vertex_local_buf;
-				delete[] edge_local_buf;
+//				delete[] edge_local_buf;
+				free(edge_local_buf);
 				close(fd_vertex);
 				close(fd_edge);
 			}

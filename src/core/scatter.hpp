@@ -207,6 +207,8 @@ namespace RStream {
 						int index = meta_info::get_index(update_info->target, context);
 						global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
 						global_buf->insert(update_info, index);
+
+						delete update_info;
 					}
 				}
 
@@ -285,6 +287,8 @@ namespace RStream {
 
 						global_buffer<UpdateType>* global_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, index);
 						global_buf->insert(update_info, index);
+
+						delete update_info;
 					}
 				}
 
@@ -304,7 +308,7 @@ namespace RStream {
 
 				int i = counter++;
 
-				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count)).c_str();
+//				const char * file_name = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count)).c_str();
 				std::string file_name_str = (context.filename + "." + std::to_string(i) + ".update_stream_" + std::to_string(update_count));
 
 				global_buffer<UpdateType>* g_buf = buffer_manager<UpdateType>::get_global_buffer(buffers_for_shuffle, context.num_partitions, i);
