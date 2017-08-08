@@ -32,6 +32,10 @@ public:
 		return elements;
 	}
 
+	inline virtual unsigned int get_num_vertices(){
+		return elements[size - 1].key_index;
+	}
+
 protected:
 	unsigned int size;
 	Element_In_Tuple* elements;
@@ -54,21 +58,22 @@ public:
 
 	void pop();
 
-	inline void set_num_vertices(unsigned int num){
-		num_vertices = num;
-	}
-
-	inline unsigned int get_num_vertices(){
-		return num_vertices;
-	}
-
 	inline Element_In_Tuple* get_added_element(){
 		return added_element;
 	}
 
+	inline void set_num_vertices(unsigned int num){
+		added_element->key_index = (BYTE)num;
+	}
+
+	inline unsigned int get_num_vertices(){
+		return added_element->key_index;
+	}
+
+
 private:
 	unsigned int capacity;
-	unsigned int num_vertices;
+//	unsigned int num_vertices;
 	Element_In_Tuple* added_element;
 
 

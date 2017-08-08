@@ -45,7 +45,7 @@ std::ostream & operator<<(std::ostream & strm, const MTuple& tuple){
 
 MTuple_join::MTuple_join(unsigned int size_of_t): MTuple(size_of_t) {
 	capacity = size + 1;
-	num_vertices = 0;
+//	num_vertices = 0;
 	added_element = nullptr;
 }
 
@@ -57,8 +57,8 @@ void MTuple_join::init(char * update_local_buf, std::unordered_set<VertexId>& ve
 	vertices_set.reserve(size);
 
 	for(unsigned int index = 0; index < size; index++) {
-		Element_In_Tuple element = *(Element_In_Tuple*)(update_local_buf + index * sizeof(Element_In_Tuple));
-		vertices_set.insert(element.vertex_id);
+		Element_In_Tuple* element = (Element_In_Tuple*)(update_local_buf + index * sizeof(Element_In_Tuple));
+		vertices_set.insert(element->vertex_id);
 	}
 
 	elements = (Element_In_Tuple*)update_local_buf;

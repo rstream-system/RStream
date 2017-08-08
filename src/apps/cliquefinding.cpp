@@ -21,33 +21,44 @@
 //	MC(Engine & e, unsigned int maxsize) : MPhase(e, maxsize){};
 //	~MC() {};
 //
-//	bool filter_join(std::vector<Element_In_Tuple> & update_tuple){
-//		return get_num_vertices(update_tuple) > max_size;
-//	}
-//
-//	bool filter_collect(std::vector<Element_In_Tuple> & update_tuple){
-//		return !isClique(update_tuple);
-//	}
+////	bool filter_join(std::vector<Element_In_Tuple> & update_tuple){
+////		return get_num_vertices(update_tuple) > max_size;
+////	}
+////
+////	bool filter_collect(std::vector<Element_In_Tuple> & update_tuple){
+////		return !isClique(update_tuple);
+////	}
 //
 //	bool filter_join(MTuple_join & update_tuple){
 //		return get_num_vertices(update_tuple) > max_size;
 //	}
 //
-//	bool filter_collect(MTuple_join & update_tuple){
-//		return false;
+//	bool filter_collect(MTuple & update_tuple){
+//		return !isClique(update_tuple);
 //	}
 //
 //private:
 //
-//	bool isClique(std::vector<Element_In_Tuple> & update_tuple){
+//	bool isClique(MTuple & update_tuple){
 //		unsigned int num_vertices = get_num_vertices(update_tuple);
 //		unsigned int num_edges = get_num_edges(update_tuple);
 //		return num_edges == num_vertices * (num_vertices - 1) / 2;
 //	}
 //
-//	unsigned int get_num_edges(std::vector<Element_In_Tuple> & update_tuple){
-//		return update_tuple.size() - 1;
+//	unsigned int get_num_edges(MTuple & update_tuple){
+//		return update_tuple.get_size() - 1;
 //	}
+//
+////	bool isClique(std::vector<Element_In_Tuple> & update_tuple){
+////		unsigned int num_vertices = get_num_vertices(update_tuple);
+////		unsigned int num_edges = get_num_edges(update_tuple);
+////		return num_edges == num_vertices * (num_vertices - 1) / 2;
+////	}
+////
+////	unsigned int get_num_edges(std::vector<Element_In_Tuple> & update_tuple){
+////		return update_tuple.size() - 1;
+////	}
+//
 //};
 //
 //void main_nonshuffle(int argc, char **argv) {

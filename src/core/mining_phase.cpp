@@ -450,24 +450,38 @@ namespace RStream {
 
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
+//						// get an in_update_tuple
+//						int cap = sizeof_in_tuple / sizeof(Element_In_Tuple);
+//						std::unordered_set<VertexId> vertices_set;
+//						vertices_set.reserve(cap);
+//						std::vector<Element_In_Tuple> in_update_tuple;
+//						in_update_tuple.reserve(cap + 1);
+//						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple, vertices_set);
+//
+//						// get key index
+//						BYTE key_index = get_key_index(in_update_tuple);
+//						assert(key_index >= 0 && key_index < in_update_tuple.size());
+//
+//						// get vertex_id as the key to index edge hashmap
+//						VertexId key = in_update_tuple.at(key_index).vertex_id;
+
 						// get an in_update_tuple
-						int cap = sizeof_in_tuple / sizeof(Element_In_Tuple);
 						std::unordered_set<VertexId> vertices_set;
-						vertices_set.reserve(cap);
-						std::vector<Element_In_Tuple> in_update_tuple;
-						in_update_tuple.reserve(cap + 1);
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple, vertices_set);
+						MTuple_join in_update_tuple(sizeof_in_tuple);
+						get_an_in_update(update_local_buf + pos, in_update_tuple, vertices_set);
+//						std::cout << in_update_tuple << std::endl;
 
 						// get key index
 						BYTE key_index = get_key_index(in_update_tuple);
-						assert(key_index >= 0 && key_index < in_update_tuple.size());
+						assert(key_index >= 0 && key_index < in_update_tuple.get_size());
 
 						// get vertex_id as the key to index edge hashmap
 						VertexId key = in_update_tuple.at(key_index).vertex_id;
 
 						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
-							bool vertex_existed = gen_an_out_update(in_update_tuple, element, key_index, vertices_set);
+							Element_In_Tuple new_element(element.vertex_id, (BYTE)0, element.edge_label, element.vertex_label, key_index);
+							bool vertex_existed = gen_an_out_update(in_update_tuple, new_element, key_index, vertices_set);
 
 							// remove automorphism, only keep one unique tuple.
 							if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){
@@ -475,7 +489,8 @@ namespace RStream {
 								shuffle_on_all_keys(in_update_tuple, buffers_for_shuffle);
 							}
 
-							in_update_tuple.pop_back();
+//							in_update_tuple.pop_back();
+							in_update_tuple.pop();
 						}
 
 					}
@@ -493,102 +508,102 @@ namespace RStream {
 
 
 
-		// each exec thread generates a join producer
-		void MPhase::join_allkeys_nonshuffle_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap) {
-			std::tuple<int, long, long> task_id (-1, -1, -1);
-
-			// pop from queue
-			while(task_queue->test_pop_atomic(task_id)){
-				int partition_id = std::get<0>(task_id);
-				long offset_task = std::get<1>(task_id);
-				long size_task = std::get<2>(task_id);
-				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
-
-				Logger::print_thread_info_locked("as a (join-all-keys-nonshuffle) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
-				int target_partition = 0;
-
-				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
-				assert(fd_update > 0);
-
-				// get file size
-//				long update_file_size = io_manager::get_filesize(fd_update);
-				long update_file_size = size_task;
-
-				// streaming updates
-				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
-				int streaming_counter = update_file_size / real_io_size + 1;
-//				std::cout << "streaming counter: " << streaming_counter << std::endl;
-
-				long valid_io_size = 0;
-//				long offset = 0;
-				long offset = offset_task;
-
-				// for all streaming updates
-				for(int counter = 0; counter < streaming_counter; counter++) {
-					// last streaming
-					if(counter == streaming_counter - 1)
-						// TODO: potential overflow?
-						valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
-					else
-						valid_io_size = real_io_size;
-
-					assert(valid_io_size % sizeof_in_tuple == 0);
-
-					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
-					offset += valid_io_size;
-
-					// streaming updates in, do hash join
-					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
-						// get an in_update_tuple
-						int cap = sizeof_in_tuple / sizeof(Element_In_Tuple);
-						std::unordered_set<VertexId> vertices_set;
-						vertices_set.reserve(cap);
-						std::vector<Element_In_Tuple> in_update_tuple;
-						in_update_tuple.reserve(cap + 1);
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple, vertices_set);
-//						std::cout << in_update_tuple << std::endl;
-
-						std::unordered_set<VertexId> set;
-						for(unsigned int i = 0; i < in_update_tuple.size(); ++i){
-							VertexId id = in_update_tuple.at(i).vertex_id;
-
-							// check if vertex id exsited already
-							if(set.find(id) == set.end()){
-								set.insert(id);
-
-								for(Element_In_Tuple element : edge_hashmap[id]) {
-									// generate a new out update tuple
-									bool vertex_existed = gen_an_out_update(in_update_tuple, element, (BYTE)i, vertices_set);
-		//							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
-		//								<< ", " << filter_join(in_update_tuple) << std::endl;
-
-									// remove automorphism, only keep one unique tuple.
-									if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){
-//										insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
-
-										insert_tuple_to_buffer(target_partition++, in_update_tuple, buffers_for_shuffle);
-										if(target_partition == context.num_partitions)
-											target_partition = 0;
-									}
-
-									in_update_tuple.pop_back();
-								}
-							}
-
-
-						}
-					}
-				}
-
-				free(update_local_buf);
-				close(fd_update);
-			}
-
-			atomic_num_producers--;
-
-//			std::cout << "end producer." << std::endl;
-		}
+//		// each exec thread generates a join producer
+//		void MPhase::join_allkeys_nonshuffle_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap) {
+//			std::tuple<int, long, long> task_id (-1, -1, -1);
+//
+//			// pop from queue
+//			while(task_queue->test_pop_atomic(task_id)){
+//				int partition_id = std::get<0>(task_id);
+//				long offset_task = std::get<1>(task_id);
+//				long size_task = std::get<2>(task_id);
+//				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
+//
+//				Logger::print_thread_info_locked("as a (join-all-keys-nonshuffle) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+//				int target_partition = 0;
+//
+//				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+//				assert(fd_update > 0);
+//
+//				// get file size
+////				long update_file_size = io_manager::get_filesize(fd_update);
+//				long update_file_size = size_task;
+//
+//				// streaming updates
+//				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+//				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
+//				int streaming_counter = update_file_size / real_io_size + 1;
+////				std::cout << "streaming counter: " << streaming_counter << std::endl;
+//
+//				long valid_io_size = 0;
+////				long offset = 0;
+//				long offset = offset_task;
+//
+//				// for all streaming updates
+//				for(int counter = 0; counter < streaming_counter; counter++) {
+//					// last streaming
+//					if(counter == streaming_counter - 1)
+//						// TODO: potential overflow?
+//						valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
+//					else
+//						valid_io_size = real_io_size;
+//
+//					assert(valid_io_size % sizeof_in_tuple == 0);
+//
+//					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
+//					offset += valid_io_size;
+//
+//					// streaming updates in, do hash join
+//					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
+//						// get an in_update_tuple
+//						int cap = sizeof_in_tuple / sizeof(Element_In_Tuple);
+//						std::unordered_set<VertexId> vertices_set;
+//						vertices_set.reserve(cap);
+//						std::vector<Element_In_Tuple> in_update_tuple;
+//						in_update_tuple.reserve(cap + 1);
+//						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple, vertices_set);
+////						std::cout << in_update_tuple << std::endl;
+//
+//						std::unordered_set<VertexId> set;
+//						for(unsigned int i = 0; i < in_update_tuple.size(); ++i){
+//							VertexId id = in_update_tuple.at(i).vertex_id;
+//
+//							// check if vertex id exsited already
+//							if(set.find(id) == set.end()){
+//								set.insert(id);
+//
+//								for(Element_In_Tuple element : edge_hashmap[id]) {
+//									// generate a new out update tuple
+//									bool vertex_existed = gen_an_out_update(in_update_tuple, element, (BYTE)i, vertices_set);
+//		//							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
+//		//								<< ", " << filter_join(in_update_tuple) << std::endl;
+//
+//									// remove automorphism, only keep one unique tuple.
+//									if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){
+////										insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
+//
+//										insert_tuple_to_buffer(target_partition++, in_update_tuple, buffers_for_shuffle);
+//										if(target_partition == context.num_partitions)
+//											target_partition = 0;
+//									}
+//
+//									in_update_tuple.pop_back();
+//								}
+//							}
+//
+//
+//						}
+//					}
+//				}
+//
+//				free(update_local_buf);
+//				close(fd_update);
+//			}
+//
+//			atomic_num_producers--;
+//
+////			std::cout << "end producer." << std::endl;
+//		}
 
 		// each exec thread generates a join producer
 		void MPhase::join_allkeys_nonshuffle_tuple_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap) {
@@ -644,6 +659,7 @@ namespace RStream {
 //						std::cout << in_update_tuple << std::endl;
 
 						std::unordered_set<VertexId> set;
+//						set.reserve(vertices_set.size());
 						for(unsigned int i = 0; i < in_update_tuple.get_size(); ++i){
 							VertexId id = in_update_tuple.at(i).vertex_id;
 
@@ -762,7 +778,8 @@ namespace RStream {
 
 						for(Element_In_Tuple element : edge_hashmap[key - vertex_start]) {
 							// generate a new out update tuple
-							bool vertex_existed = gen_an_out_update(in_update_tuple, element, key_index, vertices_set);
+							Element_In_Tuple new_element(element.vertex_id, (BYTE)0, element.edge_label, element.vertex_label, key_index);
+							bool vertex_existed = gen_an_out_update(in_update_tuple, new_element, key_index, vertices_set);
 //							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
 //								<< ", " << filter_join(in_update_tuple) << std::endl;
 
@@ -790,6 +807,12 @@ namespace RStream {
 
 		void MPhase::insert_tuple_to_buffer(int partition_id, std::vector<Element_In_Tuple>& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
 			char* out_update = reinterpret_cast<char*>(in_update_tuple.data());
+			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
+			global_buf->insert(out_update);
+		}
+
+		void MPhase::insert_tuple_to_buffer(int partition_id, MTuple& in_update_tuple, global_buffer_for_mining** buffers_for_shuffle) {
+			char* out_update = reinterpret_cast<char*>(in_update_tuple.get_elements());
 			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
 			global_buf->insert(out_update);
 		}
@@ -908,9 +931,11 @@ namespace RStream {
 					// streaming updates in, do hash join
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-						std::vector<Element_In_Tuple> in_update_tuple;
-						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
-						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+//						std::vector<Element_In_Tuple> in_update_tuple;
+//						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
+//						get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
+						MTuple in_update_tuple(sizeof_in_tuple);
+						get_an_in_update(update_local_buf + pos, in_update_tuple);
 
 						if(!filter_collect(in_update_tuple)){
 							insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
@@ -1198,7 +1223,7 @@ namespace RStream {
 			return update_tuple.back().key_index;
 		}
 
-		unsigned int MPhase::get_num_vertices(MTuple_join & update_tuple){
+		unsigned int MPhase::get_num_vertices(MTuple & update_tuple){
 			return update_tuple.get_num_vertices();
 		}
 
