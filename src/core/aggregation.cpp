@@ -648,6 +648,7 @@ namespace RStream {
 		void Aggregation::aggregate_on_quick_pattern(std::unordered_map<Quick_Pattern, int>& quick_patterns_aggregation, Quick_Pattern& quick_pattern){
 			if(quick_patterns_aggregation.find(quick_pattern) != quick_patterns_aggregation.end()){
 				quick_patterns_aggregation[quick_pattern] = quick_patterns_aggregation[quick_pattern] + 1;
+				quick_pattern.clean();
 			}
 			else{
 				quick_patterns_aggregation[quick_pattern] = 1;
