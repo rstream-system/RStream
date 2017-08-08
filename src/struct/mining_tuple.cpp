@@ -71,12 +71,13 @@ Element_In_Tuple& MTuple_join::at(unsigned int index){
 	return elements[index];
 }
 
-void MTuple_join::push(Element_In_Tuple& element){
-	added_element = &element;
+void MTuple_join::push(Element_In_Tuple* element){
+	added_element = element;
 	size++;
 }
 
 void MTuple_join::pop(){
+//	delete added_element;
 	added_element = nullptr;
 	size--;
 }

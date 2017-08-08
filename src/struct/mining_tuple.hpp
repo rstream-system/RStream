@@ -50,7 +50,7 @@ public:
 
 	Element_In_Tuple& at(unsigned int index);
 
-	void push(Element_In_Tuple& element);
+	void push(Element_In_Tuple* element);
 
 	void pop();
 

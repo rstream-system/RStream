@@ -653,17 +653,18 @@ namespace RStream {
 
 								for(Element_In_Tuple& element : edge_hashmap[id]) {
 									// generate a new out update tuple
-									bool vertex_existed = gen_an_out_update(in_update_tuple, element, (BYTE)i, vertices_set);
+									Element_In_Tuple new_element(element.vertex_id, (BYTE)0, element.edge_label, element.vertex_label, (BYTE)i);
+									bool vertex_existed = gen_an_out_update(in_update_tuple, new_element, (BYTE)i, vertices_set);
 		//							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
 		//								<< ", " << filter_join(in_update_tuple) << std::endl;
 
 									// remove automorphism, only keep one unique tuple.
 									if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){
-										insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
+//										insert_tuple_to_buffer(partition_id, in_update_tuple, buffers_for_shuffle);
 
-//										insert_tuple_to_buffer(target_partition++, in_update_tuple, buffers_for_shuffle);
-//										if(target_partition == context.num_partitions)
-//											target_partition = 0;
+										insert_tuple_to_buffer(target_partition++, in_update_tuple, buffers_for_shuffle);
+										if(target_partition == context.num_partitions)
+											target_partition = 0;
 									}
 
 									in_update_tuple.pop();
@@ -1138,8 +1139,8 @@ namespace RStream {
 				vertex_existed = false;
 			}
 
-			Element_In_Tuple new_element(element.vertex_id, (BYTE)0, element.edge_label, element.vertex_label, history);
-			in_update_tuple.push(new_element);
+//			Element_In_Tuple* new_element = new Element_In_Tuple(element.vertex_id, (BYTE)0, element.edge_label, element.vertex_label, history);
+			in_update_tuple.push(&element);
 			in_update_tuple.set_num_vertices(num_vertices);
 			return vertex_existed;
 		}
