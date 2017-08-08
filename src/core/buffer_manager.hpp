@@ -92,18 +92,19 @@ namespace RStream {
 				io_manager::write_to_file(fd, buf, capacity * sizeof_tuple);
 				close(fd);
 
+				Logger::print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+
 				count = 0;
 				index = 0;
 				not_full.notify_all();
 			}
 
-			//for debugging
-			if(is_full()){
-				Logger::print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
-			}
-			else{
-//				Printer::print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
-			}
+//			//for debugging
+//			if(is_full()){
+//			}
+//			else{
+////				Printer::print_thread_info_locked("trying to flush buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+//			}
 		}
 
 //		void flush_end(const char * file_name, const int i) {
