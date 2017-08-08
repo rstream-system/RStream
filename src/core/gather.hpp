@@ -133,7 +133,8 @@ namespace RStream {
 
 				// delete
 				delete[] vertex_local_buf;
-				delete[] update_local_buf;
+//				delete[] update_local_buf;
+				free(update_local_buf);
 
 	//				//clear vertex_map
 	//				for(auto it = vertex_map.cbegin(); it != vertex_map.cend(); ++it){

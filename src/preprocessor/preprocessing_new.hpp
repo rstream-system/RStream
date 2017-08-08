@@ -52,9 +52,14 @@ namespace RStream {
 
 			// convert txt to binary
 			if(format == (int)FORMAT::EdgeList) {
-				std::cout << "start to convert edge list file..." << std::endl;
-				convert_edgelist();
-				std::cout << "convert edge list file done." << std::endl;
+
+				// check if .binary exists already
+				if(!FileUtil::file_exists(input + ".binary")) {
+					std::cout << "start to convert edge list file..." << std::endl;
+					convert_edgelist();
+					std::cout << "convert edge list file done." << std::endl;
+				}
+
 				if(edgeType == (int)EdgeType::NO_WEIGHT) {
 					std::cout << "start to partition on vertices..." << std::endl;
 					partition_on_vertices<Edge>();
@@ -69,9 +74,14 @@ namespace RStream {
 				write_meta_file();
 
 			} else if(format == (int)FORMAT::AdjList) {
-				std::cout << "start to convert adj list file..." << std::endl;
-				convert_adjlist();
-				std::cout << "convert adj list file done." << std::endl;
+
+				// check if .binary exists already
+				if(!FileUtil::file_exists(input + ".binary")) {
+					std::cout << "start to convert adj list file..." << std::endl;
+					convert_adjlist();
+					std::cout << "convert adj list file done." << std::endl;
+				}
+
 //				std::cout << "start to partition on vertices..." << std::endl;
 //				partition_on_vertices<LabeledEdge>();
 
@@ -137,25 +147,35 @@ namespace RStream {
 
 				degree.at(from)++;
 
-				void * data = nullptr;
+//				void * data = nullptr;
 				Weight val;
 				/* Check if has value */
 				t = strtok(NULL, delims);
 				if(t != NULL) {
 					val = atof(t);
-					data = new WeightedEdge(from, to, val);
+//					data = new WeightedEdge(from, to, val);
+					WeightedEdge * wedge = new WeightedEdge(from, to, val);
 					edge_unit = sizeof(VertexId) * 2 + sizeof(Weight);
-					std::memcpy(buf + pos, data, edge_unit);
+//					std::memcpy(buf + pos, data, edge_unit);
+					std::memcpy(buf + pos, (void*)wedge, edge_unit);
 					pos += edge_unit;
 					edgeType = (int)EdgeType::WITH_WEIGHT;
+					delete wedge;
+
 				} else {
-					data = new Edge(from, to);
+//					data = new Edge(from, to);
+					Edge * edge = new Edge(from, to);
 					edge_unit =  sizeof(VertexId) * 2;
-					std::memcpy(buf + pos, data, edge_unit);
+//					std::memcpy(buf + pos, data, edge_unit);
+					std::memcpy(buf + pos, (void*)edge, edge_unit);
 					pos += edge_unit;
 					edgeType = (int)EdgeType::NO_WEIGHT;
+					delete edge;
+
 				}
 				counter++;
+				if(counter % 1000000 == 0)
+					std::cout << "Processing " << counter << " lines " << std::endl;
 
 				assert(IO_SIZE % edge_unit == 0);
 				if(pos >= IO_SIZE) {
