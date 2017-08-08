@@ -368,7 +368,7 @@ namespace RStream {
 			// gen vertex interval info
 			for(unsigned int i = 0; i < degree.size(); i++) {
 				counter += degree.at(i);
-				if(counter > edges_per_part) {
+				if(counter >= edges_per_part) {
 					intervals.push_back(std::make_pair(intvalStart, i - 1));
 					intvalStart = i;
 					counter = 0;
