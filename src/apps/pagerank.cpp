@@ -58,11 +58,14 @@
 //	int main(int argc, char ** argv) {
 ////		Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 //		Engine e(std::string(argv[1]), atoi(argv[2]), atoi(argv[3]));
+//		std::cout << "--------------------Init Vertex--------------------" << std::endl;
 //		e.init_vertex<Vertex_PR>(init);
+//		std::cout << "--------------------Compute Degre--------------------" << std::endl;
 //		e.compute_degree<Vertex_PR>();
 //
 //		int num_iters = 5;
 //		for(int i = 0; i < num_iters; i++) {
+//			std::cout << "--------------------Iteration " << i << "--------------------" << std::endl;
 //			Scatter<Vertex_PR, Update_PR> scatter_phase(e);
 //			Update_Stream in_stream = scatter_phase.scatter_with_vertex(generate_one_update);
 //			Gather<Vertex_PR, Update_PR> gather_phase(e);
