@@ -8,6 +8,7 @@
 //	#include "../core/engine.hpp"
 //	#include "../core/scatter.hpp"
 //	#include "../core/gather.hpp"
+//	#include "../core/global_info.hpp"
 //	//#include "BaseApplication.hpp"
 //
 //	using namespace RStream;
@@ -45,7 +46,7 @@
 //	}
 //
 //	Update_PR * generate_one_update(Edge * e, Vertex_PR * v) {
-//		Update_PR * update = new Update_PR(e->src, v->rank / v->degree);
+//		Update_PR * update = new Update_PR(e->target, v->rank / v->degree);
 //		return update;
 //	}
 //
@@ -58,19 +59,30 @@
 //	int main(int argc, char ** argv) {
 ////		Engine e("/home/icuzzq/Workspace/git/RStream/input/input_new.txt", 3, 6);
 //		Engine e(std::string(argv[1]), atoi(argv[2]), atoi(argv[3]));
+//
+//		// get running time (wall time)
+//		auto start = std::chrono::high_resolution_clock::now();
+//
 //		std::cout << "--------------------Init Vertex--------------------" << std::endl;
 //		e.init_vertex<Vertex_PR>(init);
 //		std::cout << "--------------------Compute Degre--------------------" << std::endl;
 //		e.compute_degree<Vertex_PR>();
 //
-//		int num_iters = 5;
+//		int num_iters = 4;
 //		for(int i = 0; i < num_iters; i++) {
 //			std::cout << "--------------------Iteration " << i << "--------------------" << std::endl;
 //			Scatter<Vertex_PR, Update_PR> scatter_phase(e);
 //			Update_Stream in_stream = scatter_phase.scatter_with_vertex(generate_one_update);
 //			Gather<Vertex_PR, Update_PR> gather_phase(e);
 //			gather_phase.gather(in_stream, apply_one_update);
+//
+//			Global_Info::delete_upstream(in_stream, e);
 //		}
+//
+//		auto end = std::chrono::high_resolution_clock::now();
+//		std::chrono::duration<double> diff = end - start;
+//		std::cout << "Finish page rank. Running time : " << diff.count() << " s\n";
+//
 //	}
 //
 //

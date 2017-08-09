@@ -54,20 +54,20 @@ namespace RStream {
 			if(format == (int)FORMAT::EdgeList) {
 
 				// check if .binary exists already
-				if(!FileUtil::file_exists(input + ".binary")) {
+//				if(!FileUtil::file_exists(input + ".binary")) {
 					std::cout << "start to convert edge list file..." << std::endl;
 					convert_edgelist();
 					std::cout << "convert edge list file done." << std::endl;
-				}
+//				}
 
 				if(edgeType == (int)EdgeType::NO_WEIGHT) {
-					std::cout << "start to partition on vertices..." << std::endl;
-					partition_on_vertices<Edge>();
-					std::cout << "partition on vertices done." << std::endl;
+//					std::cout << "start to partition on vertices..." << std::endl;
+//					partition_on_vertices<Edge>();
+//					std::cout << "partition on vertices done." << std::endl;
 
-//					std::cout << "start to partition on edges..." << std::endl;
-//					partition_on_edges<Edge>();
-//					std::cout << "partition on edges done." << std::endl;
+					std::cout << "start to partition on edges..." << std::endl;
+					partition_on_edges<Edge>();
+					std::cout << "partition on edges done." << std::endl;
 				}
 
 				std::cout << "gen partition done!" << std::endl;
@@ -76,11 +76,11 @@ namespace RStream {
 			} else if(format == (int)FORMAT::AdjList) {
 
 				// check if .binary exists already
-				if(!FileUtil::file_exists(input + ".binary")) {
+//				if(!FileUtil::file_exists(input + ".binary")) {
 					std::cout << "start to convert adj list file..." << std::endl;
 					convert_adjlist();
 					std::cout << "convert adj list file done." << std::endl;
-				}
+//				}
 
 //				std::cout << "start to partition on vertices..." << std::endl;
 //				partition_on_vertices<LabeledEdge>();
@@ -486,22 +486,49 @@ namespace RStream {
 					dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
 					assert(src >= 0 && src < numVertices && dst >= 0 && dst < numVertices);
 
-					void * data = nullptr;
+//					void * data = nullptr;
 					if(typeid(T) == typeid(Edge)) {
-						data = new Edge(src, dst);
+//						data = new Edge(src, dst);
+						Edge * data = new Edge(src, dst);
+
+						int index = get_index_partition_vertices(src);
+
+						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+						global_buf->insert((T*)data, index);
+
+						delete data;
+
 					} else if(typeid(T) == typeid(WeightedEdge)) {
 						weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
-						data = new WeightedEdge(src, dst, weight);
+//						data = new WeightedEdge(src, dst, weight);
+						WeightedEdge * data = new WeightedEdge(src, dst, weight);
+
+						int index = get_index_partition_vertices(src);
+
+						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+						global_buf->insert((T*)data, index);
+
+						delete data;
+
+
 					} else if(typeid(T) == typeid(LabeledEdge)) {
 						src_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2);
 						dst_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2 + sizeof(BYTE));
-						data = new LabeledEdge(src, dst, src_label, dst_label);
+//						data = new LabeledEdge(src, dst, src_label, dst_label);
+						LabeledEdge * data = new LabeledEdge(src, dst, src_label, dst_label);
+
+						int index = get_index_partition_vertices(src);
+
+						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+						global_buf->insert((T*)data, index);
+
+						delete data;
 					}
 
-					int index = get_index_partition_vertices(src);
-
-					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
-					global_buf->insert((T*)data, index);
+//					int index = get_index_partition_vertices(src);
+//
+//					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+//					global_buf->insert((T*)data, index);
 
 				}
 
@@ -581,23 +608,52 @@ namespace RStream {
 					dst = *(VertexId*)(local_buf + pos + sizeof(VertexId));
 					assert(src >= 0 && src < numVertices && dst >= 0 && dst < numVertices);
 
-					void * data = nullptr;
+//					void * data = nullptr;
 					if(typeid(T) == typeid(Edge)) {
-						data = new Edge(src, dst);
+//						data = new Edge(src, dst);
+						Edge * data = new Edge(src, dst);
+
+						int index = get_index_partition_edges(src);
+						assert(index >= 0);
+
+						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+						global_buf->insert((T*)data, index);
+
+						delete data;
+
 					} else if(typeid(T) == typeid(WeightedEdge)) {
 						weight = *(Weight*)(local_buf + pos + sizeof(VertexId) * 2);
-						data = new WeightedEdge(src, dst, weight);
+//						data = new WeightedEdge(src, dst, weight);
+						WeightedEdge * data = new WeightedEdge(src, dst, weight);
+
+						int index = get_index_partition_edges(src);
+						assert(index >= 0);
+
+						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+						global_buf->insert((T*)data, index);
+
+						delete data;
+
 					} else if(typeid(T) == typeid(LabeledEdge)) {
 						src_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2);
 						dst_label = *(BYTE*)(local_buf + pos + sizeof(VertexId) * 2 + sizeof(BYTE));
-						data = new LabeledEdge(src, dst, src_label, dst_label);
+//						data = new LabeledEdge(src, dst, src_label, dst_label);
+						LabeledEdge * data = new LabeledEdge(src, dst, src_label, dst_label);
+
+						int index = get_index_partition_edges(src);
+						assert(index >= 0);
+
+						global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+						global_buf->insert((T*)data, index);
+
+						delete data;
 					}
 
-					int index = get_index_partition_edges(src);
-					assert(index >= 0);
-
-					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
-					global_buf->insert((T*)data, index);
+//					int index = get_index_partition_edges(src);
+//					assert(index >= 0);
+//
+//					global_buffer<T>* global_buf = buffer_manager<T>::get_global_buffer(buffers_for_shuffle, numPartitions, index);
+//					global_buf->insert((T*)data, index);
 
 				}
 
