@@ -46,7 +46,7 @@
 //	}
 //
 //	Update_PR * generate_one_update(Edge * e, Vertex_PR * v) {
-//		Update_PR * update = new Update_PR(e->src, v->rank / v->degree);
+//		Update_PR * update = new Update_PR(e->target, v->rank / v->degree);
 //		return update;
 //	}
 //

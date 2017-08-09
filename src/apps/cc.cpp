@@ -36,7 +36,7 @@
 //	}
 //
 //	Update_CC * generate_one_update(Edge * e, Vertex_CC * v) {
-//		Update_CC * update = new Update_CC(e->src, v->component);
+//		Update_CC * update = new Update_CC(e->target, v->component);
 //		return update;
 //	}
 //
