@@ -42,10 +42,11 @@ std::ostream & operator<<(std::ostream & strm, const MTuple& tuple){
 	return strm;
 }
 
+//-----------------------------------------------------------------------------------
+
 
 MTuple_join::MTuple_join(unsigned int size_of_t): MTuple(size_of_t) {
 	capacity = size + 1;
-//	num_vertices = 0;
 	added_element = nullptr;
 }
 
@@ -77,9 +78,108 @@ void MTuple_join::push(Element_In_Tuple* element){
 }
 
 void MTuple_join::pop(){
-//	delete added_element;
 	added_element = nullptr;
 	size--;
+}
+
+//======================================================================================
+
+
+MTuple_simple::MTuple_simple(unsigned int size_of_t){
+	size = size_of_t / sizeof(Base_Element);
+	elements = nullptr;
+}
+
+MTuple_simple::~MTuple_simple(){
+
+}
+
+void MTuple_simple::init(char* update_local_buf){
+	elements = (Base_Element*)update_local_buf;
+}
+
+Base_Element& MTuple_simple::at(unsigned int index){
+	return elements[index];
+}
+
+bool MTuple_simple::operator==(const MTuple_simple& other) const{
+	assert(size == other.size);
+	for(unsigned int i = 0; i < size; ++i){
+		if(elements[i].id != other.elements[i].id){
+			return false;
+		}
+	}
+
+	return true;
+}
+
+std::ostream & operator<<(std::ostream & strm, const MTuple_simple& tuple){
+	if(tuple.get_size() == 0){
+		strm << "(empty)";
+		return strm;
+	}
+
+	strm << "(";
+	for(unsigned int index = 0; index < tuple.get_size() - 1; ++index){
+		strm << tuple.elements[index] << ", ";
+	}
+	strm << tuple.elements[tuple.get_size() - 1];
+	strm << ")";
+	return strm;
+}
+
+//-----------------------------------------------------------------------------------
+
+MTuple_join_simple::MTuple_join_simple(unsigned int size_of_t) : MTuple_simple(size_of_t){
+	capacity = size + 1;
+	added_element = nullptr;
+}
+
+MTuple_join_simple::~MTuple_join_simple(){
+
+}
+
+Base_Element& MTuple_join_simple::at(unsigned int index){
+	if(index == capacity - 1){
+		return *added_element;
+	}
+	return elements[index];
+}
+
+
+void MTuple_join_simple::push(Base_Element* element){
+	added_element = element;
+	size++;
+}
+
+void MTuple_join_simple::pop(){
+	added_element = nullptr;
+	size--;
+}
+
+std::ostream & operator<<(std::ostream & strm, const MTuple_join_simple& tuple){
+	if(tuple.get_size() == 0){
+		strm << "(empty)";
+		return strm;
+	}
+
+	strm << "(";
+
+	if(tuple.size == tuple.capacity){
+		for(unsigned int index = 0; index < tuple.get_size() - 1; ++index){
+			strm << tuple.elements[index] << ", ";
+		}
+		strm << *(tuple.added_element);
+	}
+	else{
+		for(unsigned int index = 0; index < tuple.get_size() - 1; ++index){
+			strm << tuple.elements[index] << ", ";
+		}
+		strm << tuple.elements[tuple.get_size() - 1];
+	}
+
+	strm << ")";
+	return strm;
 }
 
 

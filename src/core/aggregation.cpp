@@ -56,6 +56,32 @@ namespace RStream {
 			}
 		}
 
+		Update_Stream Aggregation::aggregate_filter_clique(Update_Stream in_agg_stream, int sizeof_in_agg) {
+			Update_Stream aggreg_c = Engine::update_count++;
+
+			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				task_queue->push(partition_id);
+			}
+
+			// exec threads will do aggregate and push result patterns into shuffle buffers
+			std::vector<std::thread> exec_threads;
+			for(int i = 0; i < context.num_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->aggregate_filter_clique_per_thread(in_agg_stream, task_queue, sizeof_in_agg, aggreg_c); } ));
+
+			// join all threads
+			for(auto & t : exec_threads)
+				t.join();
+
+			std::cout << "filter done." << std::endl;
+
+			delete task_queue;
+
+			return aggreg_c;
+		}
+
 
 		Update_Stream Aggregation::shuffle_upstream_canonicalgraph(Update_Stream in_update_stream, int sizeof_in_tuple){
 			atomic_init();
@@ -469,6 +495,147 @@ namespace RStream {
 			}
 		}
 
+		void aggregate_clique(std::unordered_map<MTuple_simple, unsigned int>& mtuple_simple_aggregation, MTuple_simple& in_update_tuple){
+			if(mtuple_simple_aggregation.find(in_update_tuple) != mtuple_simple_aggregation.end()){
+				mtuple_simple_aggregation[in_update_tuple] = mtuple_simple_aggregation[in_update_tuple] + 1;
+			}
+			else{
+				mtuple_simple_aggregation[in_update_tuple] = 1;
+			}
+		}
+
+		void Aggregation::aggregate_filter_clique_per_thread(Update_Stream in_agg_stream, concurrent_queue<int> * task_queue, int sizeof_in_mtuple, Update_Stream out_agg_stream) {
+			int partition_id = -1;
+
+			// pop from queue
+			while(task_queue->test_pop_atomic(partition_id)) {
+				Logger::print_thread_info_locked("as a (aggregate-filter-clique) worker dealing with partition " + std::to_string(partition_id) + "\n");
+
+				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
+				assert(fd_agg > 0);
+
+				// read aggregation pair in, do aggregation
+				std::unordered_map<MTuple_simple, unsigned int>* mtuple_simple_aggregation = new std::unordered_map<MTuple_simple, unsigned int>;
+
+				// get file size
+				long agg_file_size = io_manager::get_filesize(fd_agg);
+
+				// streaming edges
+//				int size_of_unit = context.edge_unit;
+				char * agg_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				long real_io_size = MPhase::get_real_io_size(IO_SIZE, sizeof_in_mtuple);
+				int streaming_counter = agg_file_size / real_io_size + 1;
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				// for all streaming
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = agg_file_size - real_io_size * (streaming_counter - 1);
+					else
+						valid_io_size = real_io_size;
+
+					assert(valid_io_size % sizeof_in_mtuple == 0);
+
+					io_manager::read_from_file(fd_agg, agg_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
+
+					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_mtuple) {
+						// get an in_update_tuple
+						MTuple_simple in_update_tuple(sizeof_in_mtuple);
+						MPhase::get_an_in_update(agg_local_buf + pos, in_update_tuple);
+	//					std::cout << in_update_tuple << std::endl;
+
+						aggregate_clique(*mtuple_simple_aggregation, in_update_tuple);
+
+					}
+				}
+
+
+				for(auto it = mtuple_simple_aggregation->begin(); it != mtuple_simple_aggregation->end();){
+					if(it->second != it->first.get_size() - 1){
+						it = mtuple_simple_aggregation->erase(it);
+					}
+					else{
+						it++;
+					}
+				}
+
+				std::cout << "done aggregation at partition " << partition_id << std::endl;
+				std::cout << sizeof_in_mtuple << std::endl;
+
+				std::string file_name (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_agg_stream));
+				write_aggregation_clique(*mtuple_simple_aggregation, file_name, sizeof_in_mtuple);
+
+				delete mtuple_simple_aggregation;
+
+				std::cout << "done partition " << partition_id << std::endl;
+				free(agg_local_buf);
+				close(fd_agg);
+			}
+		}
+
+		void printout_aggregation_clique(std::unordered_map<MTuple_simple, unsigned int>& mtuple_aggregation){
+			std::cout << "mtuple aggregation map: \n";
+			for(auto it = mtuple_aggregation.begin(); it != mtuple_aggregation.end(); ++it){
+				std::cout << it->first << " --> " << it->second << std::endl;
+			}
+			std::cout << std::endl;
+		}
+
+		void Aggregation::write_aggregation_clique(std::unordered_map<MTuple_simple, unsigned int>& mtuple_aggregation, std::string& file_name, unsigned int sizeof_in_mtuple){
+////			//for debugging
+//			printout_aggregation_clique(mtuple_aggregation);
+
+			//write empty buffer to an empty file
+			if(mtuple_aggregation.empty()){
+				char* buf = (char *)malloc(0);
+				write_buf_to_file(file_name.c_str(), buf, 0);
+				free(buf);
+				return;
+			}
+
+			//assert size equality
+			if(!mtuple_aggregation.empty()){
+				assert(sizeof_in_mtuple == ((*mtuple_aggregation.begin()).first.get_size() * sizeof(Base_Element)));
+			}
+
+			char * local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+			long real_io_size = MPhase::get_real_io_size(IO_SIZE, sizeof_in_mtuple);
+			long offset = 0;
+
+			for(auto it = mtuple_aggregation.begin(); it != mtuple_aggregation.end(); ){
+				if(offset < real_io_size){
+					MTuple_simple tuple = it->first;
+					char* out_agg_pair = reinterpret_cast<char*>(tuple.get_elements());
+					std::memcpy(local_buf + offset, out_agg_pair, sizeof_in_mtuple);
+					offset += sizeof_in_mtuple;
+					++it;
+				}
+				else if (offset == real_io_size){
+					offset = 0;
+
+					//write to file
+					std::cout << "write to file " << file_name << std::endl;
+					write_buf_to_file(file_name.c_str(), local_buf, real_io_size);
+				}
+				else{
+					assert(false);
+				}
+			}
+
+			//deal with remaining buffer
+			if(offset != 0){
+				std::cout << "finally write to file " << file_name << std::endl;
+				write_buf_to_file(file_name.c_str(), local_buf, offset);
+			}
+
+			free(local_buf);
+		}
+
 		void Aggregation::aggregate_on_canonical_graph(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::pair<Canonical_Graph, int>& in_agg_pair){
 			if(canonical_graphs_aggregation.find(in_agg_pair.first) != canonical_graphs_aggregation.end()){
 				canonical_graphs_aggregation[in_agg_pair.first] = canonical_graphs_aggregation[in_agg_pair.first] + in_agg_pair.second;
@@ -494,9 +661,12 @@ namespace RStream {
 
 		}
 
+
+
 		void Aggregation::write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::string& file_name, unsigned int sizeof_in_agg){
-			//for debugging
-			printout_cg_aggmap(canonical_graphs_aggregation);
+//			//for debugging
+//			printout_cg_aggmap(canonical_graphs_aggregation);
+
 
 			//write empty buffer to an empty file
 			if(canonical_graphs_aggregation.empty()){
@@ -514,15 +684,16 @@ namespace RStream {
 			char * local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
 			long real_io_size = MPhase::get_real_io_size(IO_SIZE, sizeof_in_agg);
 			long offset = 0;
-			long index = 0;
+//			long index = 0;
 
-			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ++it){
+			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ){
 				if(offset < real_io_size){
 					char* out_agg_pair = convert_to_bytes(sizeof_in_agg, *it);
-					std::memcpy(local_buf + index, out_agg_pair, sizeof_in_agg);
+					std::memcpy(local_buf + offset, out_agg_pair, sizeof_in_agg);
 					free(out_agg_pair);
-					index += sizeof_in_agg;
+//					index += sizeof_in_agg;
 					offset += sizeof_in_agg;
+					++it;
 				}
 				else if (offset == real_io_size){
 					offset = 0;

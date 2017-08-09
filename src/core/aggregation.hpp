@@ -36,6 +36,8 @@ namespace RStream {
 
 		void delete_aggstream(Aggregation_Stream agg_stream);
 
+		Update_Stream aggregate_filter_clique(Update_Stream in_agg_stream, int sizeof_in_agg);
+
 
 		/*Static functions*/
 		static void write_buf_to_file(const char* file_name, char * local_buf, size_t fsize){
@@ -136,6 +138,9 @@ namespace RStream {
 
 		unsigned int get_global_bucket_index(unsigned int hash_val);
 
+
+		void aggregate_filter_clique_per_thread(Update_Stream in_agg_stream, concurrent_queue<int> * task_queue, int sizeof_in_agg, Update_Stream out_agg_stream);
+		void write_aggregation_clique(std::unordered_map<MTuple_simple, unsigned int>& canonical_graphs_aggregation, std::string& file_name, unsigned int sizeof_in_agg);
 
 	};
 }

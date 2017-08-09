@@ -60,6 +60,17 @@ namespace RStream {
 			count++;
 		}
 
+		void insert_simple(char * tuple, char* extra_element) {
+			std::unique_lock<std::mutex> lock(mutex);
+			not_full.wait(lock, [&] {return !is_full();});
+
+			// insert tuple to buffer
+			std::memcpy(buf + index, tuple, sizeof_tuple - sizeof(Base_Element));
+			std::memcpy(buf + index + sizeof_tuple - sizeof(Base_Element), extra_element, sizeof(Base_Element));
+			index += sizeof_tuple;
+			count++;
+		}
+
 //		void flush(const char * file_name, const int i) {
 //			std::unique_lock<std::mutex> lock(mutex);
 //

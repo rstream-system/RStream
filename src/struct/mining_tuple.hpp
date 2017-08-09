@@ -71,28 +71,101 @@ public:
 	}
 
 
-private:
+protected:
 	unsigned int capacity;
-//	unsigned int num_vertices;
 	Element_In_Tuple* added_element;
 
 
 };
 
 
+class MTuple_simple {
+	friend std::ostream & operator<<(std::ostream & strm, const MTuple_simple& cg);
+public:
+	MTuple_simple(unsigned int size_of_tuple);
+	virtual ~MTuple_simple();
+
+
+	void init(char * update_local_buf);
+
+	virtual Base_Element& at(unsigned int index);
+
+	bool operator==(const MTuple_simple& other) const;
+
+	virtual inline unsigned int get_hash() const {
+		bliss::UintSeqHash h;
+
+		for(unsigned int i = 0; i < size; ++i){
+			h.update(elements[i].id);
+		}
+
+		return h.get_value();
+	}
+
+	inline unsigned int get_size() const{
+		return size;
+	}
+
+	inline Base_Element* get_elements(){
+		return elements;
+	}
+
+
+protected:
+	unsigned int size;
+	Base_Element* elements;
+
+};
+
+
+class MTuple_join_simple : public MTuple_simple {
+	friend std::ostream & operator<<(std::ostream & strm, const MTuple_join_simple& cg);
+public:
+	MTuple_join_simple(unsigned int size_of_tuple);
+	virtual ~MTuple_join_simple();
+
+
+	Base_Element& at(unsigned int index);
+
+	void push(Base_Element* element);
+
+	void pop();
+
+	inline unsigned int get_hash(){
+		bliss::UintSeqHash h;
+
+		for(unsigned int i = 0; i < size; ++i){
+			h.update(elements[i].id);
+		}
+		h.update(added_element->id);
+
+		return h.get_value();
+	}
+
+	inline Base_Element* get_added_element(){
+		return added_element;
+	}
+
+
+private:
+	unsigned int capacity;
+	Base_Element* added_element;
+
+};
 
 
 
 
+}
 
-
-
-
-
-
-
-
-
+namespace std {
+	template<>
+	struct hash<RStream::MTuple_simple> {
+		std::size_t operator()(const RStream::MTuple_simple& qp) const {
+			//simple hash
+			return std::hash<int>()(qp.get_hash());
+		}
+	};
 }
 
 

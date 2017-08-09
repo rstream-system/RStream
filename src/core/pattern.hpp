@@ -161,6 +161,12 @@ public:
 		return sub_graph.back().vertex_id <= sub_graph.front().vertex_id;
 	}
 
+	static bool is_automorphism_init_clique(std::vector<Base_Element> & sub_graph) {
+		assert(sub_graph.size() == 2);
+		//check with the first element
+		return sub_graph.back().id <= sub_graph.front().id;
+	}
+
 
 //	static void turn_quick_pattern_sideffect(std::vector<Element_In_Tuple> & sub_graph) {
 //		std::unordered_map<VertexId, VertexId> map;

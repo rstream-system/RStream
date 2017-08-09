@@ -267,7 +267,19 @@ inline std::ostream & operator<<(std::ostream & strm, const std::vector<Element_
 }
 
 
+struct Base_Element {
+	VertexId id;
 
+//	BaseElement(){}
+
+	Base_Element(VertexId _vertex_id) : id(_vertex_id){}
+
+};
+
+inline std::ostream & operator<<(std::ostream & strm, const Base_Element& element){
+	strm << "[" << element.id << "]";
+	return strm;
+}
 
 
 
