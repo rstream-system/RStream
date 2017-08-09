@@ -138,28 +138,28 @@
 //	Engine e(std::string(argv[1]), atoi(argv[2]), atoi(argv[3]));
 //
 //	// get running time (wall time)
-////	auto start = std::chrono::high_resolution_clock::now();
+//	auto start = std::chrono::high_resolution_clock::now();
+//
+//	//scatter phase first to generate updates
+//	Scatter<BaseVertex, RInUpdate_TriC> scatter_phase(e);
+//	Update_Stream in_stream = scatter_phase.scatter_no_vertex(generate_one_update);
+////	printUpdateStream<RInUpdate_TriC>(e.num_partitions, e.filename, in_stream);
 ////
-////	//scatter phase first to generate updates
-////	Scatter<BaseVertex, RInUpdate_TriC> scatter_phase(e);
-////	Update_Stream in_stream = scatter_phase.scatter_no_vertex(generate_one_update);
-//////	printUpdateStream<RInUpdate_TriC>(e.num_partitions, e.filename, in_stream);
-//////
-//////	//relational phase 1
-////	R1 r1(e);
-////	Update_Stream out_stream_1 = r1.join(in_stream);
-//////	printUpdateStream<ROutUpdate_TriC>(e.num_partitions, e.filename, out_stream_1);
-//////
-//////	//relational phase 2
-////	R2 r2(e);
-////	Update_Stream out_stream_2 = r2.join(out_stream_1);
-//////	printUpdateStream<ROutUpdate_TriC>(e.num_partitions, e.filename, out_stream_2);
+////	//relational phase 1
+//	R1 r1(e);
+//	Update_Stream out_stream_1 = r1.join(in_stream);
+////	printUpdateStream<ROutUpdate_TriC>(e.num_partitions, e.filename, out_stream_1);
 ////
-////	auto end = std::chrono::high_resolution_clock::now();
-////	std::chrono::duration<double> diff = end - start;
-////	std::cout << "Finish triangle counting. Running time : " << diff.count() << " s\n";
-////
-////	std::cout << "Triangle Counting : " << Global_Info::count(out_stream_2, sizeof(ROutUpdate_TriC), e) << std::endl;
+////	//relational phase 2
+//	R2 r2(e);
+//	Update_Stream out_stream_2 = r2.join(out_stream_1);
+////	printUpdateStream<ROutUpdate_TriC>(e.num_partitions, e.filename, out_stream_2);
+//
+//	auto end = std::chrono::high_resolution_clock::now();
+//	std::chrono::duration<double> diff = end - start;
+//	std::cout << "Finish triangle counting. Running time : " << diff.count() << " s\n";
+//
+//	std::cout << "Triangle Counting : " << Global_Info::count(out_stream_2, sizeof(ROutUpdate_TriC), e) << std::endl;
 //}
 //
 //
