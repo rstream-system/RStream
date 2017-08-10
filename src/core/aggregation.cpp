@@ -42,8 +42,26 @@ namespace RStream {
 			return up_stream_filtered;
 		}
 
-		void Aggregation::printout_aggstream(Aggregation_Stream agg_stream){
+		void Aggregation::printout_aggstream(Aggregation_Stream agg_stream, int sizeof_in_tuple){
+			int sizeof_agg = get_out_size(sizeof_in_tuple);
+			std::cout << "Number of tuples in agg "<< agg_stream << ": \t" << get_count(agg_stream, sizeof_agg) << std::endl;
+			std::cout << "Size of agg: \t" << sizeof_agg << std::endl;
+		}
 
+		unsigned int Aggregation::get_count(Aggregation_Stream in_update_stream, int sizeof_agg){
+			unsigned int count_total = 0;
+			// push task into concurrent queue
+			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
+				assert(fd_update > 0);
+
+				// get file size
+				long update_file_size = io_manager::get_filesize(fd_update);
+
+				count_total += update_file_size / sizeof_agg;
+			}
+
+			return count_total;
 		}
 
 		void Aggregation::delete_aggstream(Aggregation_Stream agg_stream){
@@ -57,6 +75,7 @@ namespace RStream {
 		}
 
 		Update_Stream Aggregation::aggregate_filter_clique(Update_Stream in_agg_stream, int sizeof_in_agg) {
+			atomic_init();
 			Update_Stream aggreg_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -66,16 +85,27 @@ namespace RStream {
 				task_queue->push(partition_id);
 			}
 
+			// allocate global buffers for shuffling
+			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_in_agg);
+
 			// exec threads will do aggregate and push result patterns into shuffle buffers
 			std::vector<std::thread> exec_threads;
-			for(int i = 0; i < context.num_threads; i++)
-				exec_threads.push_back( std::thread([=] { this->aggregate_filter_clique_per_thread(in_agg_stream, task_queue, sizeof_in_agg, aggreg_c); } ));
+			for(int i = 0; i < context.num_exec_threads; i++)
+				exec_threads.push_back( std::thread([=] { this->aggregate_filter_clique_per_thread(buffers_for_shuffle, in_agg_stream, task_queue, sizeof_in_agg, aggreg_c); } ));
+
+			// write threads will flush shuffle buffer to update out stream file as long as it's full
+			std::vector<std::thread> write_threads;
+			for(int i = 0; i < context.num_write_threads; i++)
+				write_threads.push_back(std::thread(&Aggregation::update_consumer, this, aggreg_c, buffers_for_shuffle));
 
 			// join all threads
 			for(auto & t : exec_threads)
 				t.join();
 
-			std::cout << "filter done." << std::endl;
+			for(auto &t : write_threads)
+				t.join();
+
+//			std::cout << "filter done." << std::endl;
 
 			delete task_queue;
 
@@ -465,26 +495,49 @@ namespace RStream {
 				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
 				assert(fd_agg > 0);
 
-				// get file size
-				long agg_file_size = io_manager::get_filesize(fd_agg);
-
-				// streaming updates
-				char * agg_local_buf = (char *)malloc(agg_file_size);
-
-				io_manager::read_from_file(fd_agg, agg_local_buf, agg_file_size, 0);
-
 				// read aggregation pair in, do aggregation
 				std::unordered_map<Canonical_Graph, int> canonical_graphs_aggregation;
 
-				for(long pos = 0; pos < agg_file_size; pos += sizeof_in_agg) {
-					// get an in_update_tuple
-					std::pair<Canonical_Graph, int> in_agg_pair;
-					get_an_in_agg_pair(agg_local_buf + pos, in_agg_pair, sizeof_in_agg);
-//					std::cout << "{" << in_agg_pair.first << " --> " << in_agg_pair.second << std::endl;
+				// get file size
+				long agg_file_size = io_manager::get_filesize(fd_agg);
 
-					// for all the canonical graph pair, do local aggregation
-					aggregate_on_canonical_graph(canonical_graphs_aggregation, in_agg_pair);
+				char * agg_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+				long real_io_size = MPhase::get_real_io_size(IO_SIZE, sizeof_in_agg);
+				int streaming_counter = agg_file_size / real_io_size + 1;
+//				std::cout << "streaming counter: " << streaming_counter << std::endl;
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				// for all streaming updates
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						// TODO: potential overflow?
+						valid_io_size = agg_file_size - real_io_size * (streaming_counter - 1);
+					else
+						valid_io_size = real_io_size;
+
+					assert(valid_io_size % sizeof_in_agg == 0);
+
+
+	//				// streaming updates
+	//				char * agg_local_buf = (char *)malloc(agg_file_size);
+
+					io_manager::read_from_file(fd_agg, agg_local_buf, valid_io_size, offset);
+					offset += valid_io_size;
+
+					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_agg) {
+						// get an in_update_tuple
+						std::pair<Canonical_Graph, int> in_agg_pair;
+						get_an_in_agg_pair(agg_local_buf + pos, in_agg_pair, sizeof_in_agg);
+	//					std::cout << "{" << in_agg_pair.first << " --> " << in_agg_pair.second << std::endl;
+
+						// for all the canonical graph pair, do local aggregation
+						aggregate_on_canonical_graph(canonical_graphs_aggregation, in_agg_pair);
+					}
 				}
+
 
 				std::string file_name (context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(out_agg_stream));
 				write_canonical_aggregation(canonical_graphs_aggregation, file_name, sizeof_in_agg);
@@ -495,16 +548,36 @@ namespace RStream {
 			}
 		}
 
-		void aggregate_clique(std::unordered_map<MTuple_simple, unsigned int>& mtuple_simple_aggregation, MTuple_simple& in_update_tuple){
-			if(mtuple_simple_aggregation.find(in_update_tuple) != mtuple_simple_aggregation.end()){
-				mtuple_simple_aggregation[in_update_tuple] = mtuple_simple_aggregation[in_update_tuple] + 1;
+		void shuffle(MTuple_simple& out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle, int partition_id, int num_parts) {
+//			unsigned int hash = out_update_tuple.get_hash();
+//			unsigned int index = hash % context.num_partitions;
+//			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
+
+			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, num_parts, partition_id);
+			char* out_update = reinterpret_cast<char*>(out_update_tuple.get_elements());
+//			std::cout << *((Base_Element*)out_update) << std::endl;
+//			std::cout << *((Base_Element*)added) << std::endl;
+			global_buf->insert(out_update);
+
+		}
+
+		void aggregate_clique(global_buffer_for_mining ** buffers_for_shuffle, std::unordered_map<MTuple_simple, unsigned int>& mtuple_simple_aggregation, MTuple_simple& in_update_tuple, int partition_id, int num_parts){
+			auto it = mtuple_simple_aggregation.find(in_update_tuple);
+			if(it != mtuple_simple_aggregation.end()){
+				if(it->second == it->first.get_size() - 2){
+					shuffle(in_update_tuple, buffers_for_shuffle, partition_id, num_parts);
+					mtuple_simple_aggregation.erase(it);
+				}
+				else{
+					mtuple_simple_aggregation[in_update_tuple] = mtuple_simple_aggregation[in_update_tuple] + 1;
+				}
 			}
 			else{
 				mtuple_simple_aggregation[in_update_tuple] = 1;
 			}
 		}
 
-		void Aggregation::aggregate_filter_clique_per_thread(Update_Stream in_agg_stream, concurrent_queue<int> * task_queue, int sizeof_in_mtuple, Update_Stream out_agg_stream) {
+		void Aggregation::aggregate_filter_clique_per_thread(global_buffer_for_mining ** buffers_for_shuffle, Update_Stream in_agg_stream, concurrent_queue<int> * task_queue, int sizeof_in_mtuple, Update_Stream out_agg_stream) {
 			int partition_id = -1;
 
 			// pop from queue
@@ -538,6 +611,9 @@ namespace RStream {
 					else
 						valid_io_size = real_io_size;
 
+					if(valid_io_size % sizeof_in_mtuple != 0){
+						std::cout << valid_io_size << ", " << sizeof_in_mtuple << std::endl;
+					}
 					assert(valid_io_size % sizeof_in_mtuple == 0);
 
 					io_manager::read_from_file(fd_agg, agg_local_buf, valid_io_size, offset);
@@ -549,33 +625,33 @@ namespace RStream {
 						MPhase::get_an_in_update(agg_local_buf + pos, in_update_tuple);
 	//					std::cout << in_update_tuple << std::endl;
 
-						aggregate_clique(*mtuple_simple_aggregation, in_update_tuple);
-
+						aggregate_clique(buffers_for_shuffle, *mtuple_simple_aggregation, in_update_tuple, partition_id, context.num_partitions);
 					}
 				}
 
 
-				for(auto it = mtuple_simple_aggregation->begin(); it != mtuple_simple_aggregation->end();){
-					if(it->second != it->first.get_size() - 1){
-						it = mtuple_simple_aggregation->erase(it);
-					}
-					else{
-						it++;
-					}
-				}
-
-				std::cout << "done aggregation at partition " << partition_id << std::endl;
-				std::cout << sizeof_in_mtuple << std::endl;
-
-				std::string file_name (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_agg_stream));
-				write_aggregation_clique(*mtuple_simple_aggregation, file_name, sizeof_in_mtuple);
+//				for(auto it = mtuple_simple_aggregation->begin(); it != mtuple_simple_aggregation->end();){
+//					if(it->second != it->first.get_size() - 1){
+//						it = mtuple_simple_aggregation->erase(it);
+//					}
+//					else{
+//						it++;
+//					}
+//				}
+//
+//				std::cout << "done aggregation at partition " << partition_id << std::endl;
+//				std::cout << sizeof_in_mtuple << std::endl;
+//
+//				std::string file_name (context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(out_agg_stream));
+//				write_aggregation_clique(*mtuple_simple_aggregation, file_name, sizeof_in_mtuple);
 
 				delete mtuple_simple_aggregation;
 
-				std::cout << "done partition " << partition_id << std::endl;
+//				std::cout << "done partition " << partition_id << std::endl;
 				free(agg_local_buf);
 				close(fd_agg);
 			}
+			atomic_num_producers--;
 		}
 
 		void printout_aggregation_clique(std::unordered_map<MTuple_simple, unsigned int>& mtuple_aggregation){
@@ -664,8 +740,8 @@ namespace RStream {
 
 
 		void Aggregation::write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::string& file_name, unsigned int sizeof_in_agg){
-//			//for debugging
-//			printout_cg_aggmap(canonical_graphs_aggregation);
+			//for debugging
+			printout_cg_aggmap(canonical_graphs_aggregation);
 
 
 			//write empty buffer to an empty file

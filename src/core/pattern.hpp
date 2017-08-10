@@ -164,7 +164,7 @@ public:
 	static bool is_automorphism_init_clique(std::vector<Base_Element> & sub_graph) {
 		assert(sub_graph.size() == 2);
 		//check with the first element
-		return sub_graph.back().id <= sub_graph.front().id;
+		return sub_graph.back().id < sub_graph.front().id;
 	}
 
 

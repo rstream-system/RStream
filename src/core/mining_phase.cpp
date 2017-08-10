@@ -97,7 +97,7 @@ namespace RStream {
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
 				read_task_queue->push(partition_id);
 			}
-			std::vector<Element_In_Tuple>* edge_hashmap = new std::vector<Element_In_Tuple>[context.num_vertices];
+			std::vector<Base_Element>* edge_hashmap = new std::vector<Base_Element>[context.num_vertices];
 			std::vector<std::thread> read_threads;
 			for(int i = 0; i < context.num_threads; i++)
 				read_threads.push_back( std::thread([=] { this->edges_loader(edge_hashmap, read_task_queue); } ));
@@ -132,6 +132,25 @@ namespace RStream {
 			sizeof_in_tuple = sizeof_out_tuple;
 
 			return update_c;
+		}
+
+		void MPhase::edges_loader(std::vector<Base_Element>* edge_hashmap, concurrent_queue<int> * read_task_queue){
+			int partition_id = -1;
+			while(read_task_queue->test_pop_atomic(partition_id)){
+				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				assert(fd_edge > 0);
+				long edge_file_size = io_manager::get_filesize(fd_edge);
+
+				// edges are fully loaded into memory
+				char * edge_local_buf = (char *)malloc(edge_file_size);
+				io_manager::read_from_file(fd_edge, edge_local_buf, edge_file_size, 0);
+
+				// build edge hashmap
+				build_edge_hashmap(edge_local_buf, edge_hashmap, edge_file_size, 0);
+
+				free(edge_local_buf);
+				close(fd_edge);
+			}
 		}
 
 		void MPhase::edges_loader(std::vector<Element_In_Tuple>* edge_hashmap, concurrent_queue<int> * read_task_queue){
@@ -456,7 +475,8 @@ namespace RStream {
 
 
 		void MPhase::printout_upstream(Update_Stream in_update_stream){
-			std::cout << "Number of tuples in "<< in_update_stream << ": \t" << get_count(in_update_stream) << std::endl;
+			std::cout << "Number of tuples in update "<< in_update_stream << ": \t" << get_count(in_update_stream) << std::endl;
+			std::cout << "Size of tuple: \t" << sizeof_in_tuple << std::endl;
 		}
 
 		void MPhase::delete_upstream(Update_Stream in_update_stream){
@@ -790,7 +810,7 @@ namespace RStream {
 		}
 
 
-		void MPhase::join_allkeys_nonshuffle_tuple_producer_clique(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap) {
+		void MPhase::join_allkeys_nonshuffle_tuple_producer_clique(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Base_Element> * edge_hashmap) {
 			std::tuple<int, long, long> task_id (-1, -1, -1);
 
 			// pop from queue
@@ -842,10 +862,10 @@ namespace RStream {
 						for(unsigned int i = 0; i < in_update_tuple.get_size(); ++i){
 							VertexId id = in_update_tuple.at(i).id;
 
-							for(Element_In_Tuple& element : edge_hashmap[id]) {
+							for(Base_Element& element : edge_hashmap[id]) {
 								// generate a new out update tuple
-								Base_Element new_element(element.vertex_id);
-								gen_an_out_update(in_update_tuple, new_element);
+//								Base_Element new_element(element.id);
+								gen_an_out_update(in_update_tuple, element);
 //								std::cout << in_update_tuple  << " --> " << filter_join_clique(in_update_tuple) << std::endl;
 
 								// remove automorphism, only keep one unique tuple.
@@ -907,25 +927,25 @@ namespace RStream {
 				long update_file_size = size_task;
 
 				// streaming updates
-				char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
-				long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
-				int streaming_counter = update_file_size / real_io_size + 1;
-//				std::cout << "streaming counter: " << streaming_counter << std::endl;
+					char * update_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE);
+					long real_io_size = get_real_io_size(IO_SIZE, sizeof_in_tuple);
+					int streaming_counter = update_file_size / real_io_size + 1;
+	//				std::cout << "streaming counter: " << streaming_counter << std::endl;
 
-				long valid_io_size = 0;
-//				long offset = 0;
-				long offset = offset_task;
+					long valid_io_size = 0;
+	//				long offset = 0;
+					long offset = offset_task;
 
-				// for all streaming updates
-				for(int counter = 0; counter < streaming_counter; counter++) {
-					// last streaming
-					if(counter == streaming_counter - 1)
-						// TODO: potential overflow?
-						valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
-					else
-						valid_io_size = real_io_size;
+					// for all streaming updates
+					for(int counter = 0; counter < streaming_counter; counter++) {
+						// last streaming
+						if(counter == streaming_counter - 1)
+							// TODO: potential overflow?
+							valid_io_size = update_file_size - real_io_size * (streaming_counter - 1);
+						else
+							valid_io_size = real_io_size;
 
-					assert(valid_io_size % sizeof_in_tuple == 0);
+						assert(valid_io_size % sizeof_in_tuple == 0);
 
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					offset += valid_io_size;
@@ -1403,11 +1423,11 @@ namespace RStream {
 		}
 
 		void MPhase::shuffle(MTuple_join_simple& out_update_tuple, global_buffer_for_mining ** buffers_for_shuffle, int partition_id) {
-//			unsigned int hash = out_update_tuple.get_hash();
-//			unsigned int index = hash % context.num_partitions;
-//			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
+			unsigned int hash = out_update_tuple.get_hash();
+			unsigned int index = hash % context.num_partitions;
+			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, index);
 
-			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
+//			global_buffer_for_mining* global_buf = buffer_manager_for_mining::get_global_buffer_for_mining(buffers_for_shuffle, context.num_partitions, partition_id);
 			char* out_update = reinterpret_cast<char*>(out_update_tuple.get_elements());
 			char* added = reinterpret_cast<char*>(out_update_tuple.get_added_element());
 //			std::cout << *((Base_Element*)out_update) << std::endl;
@@ -1467,6 +1487,17 @@ namespace RStream {
 			out_update_tuple.at(0).key_index = new_key_index;
 		}
 
+		void MPhase::build_edge_hashmap(char * edge_buf, std::vector<Base_Element> * edge_hashmap, size_t edge_file_size, int start_vertex) {
+			// for each edge
+			for(size_t pos = 0; pos < edge_file_size; pos += context.edge_unit) {
+				// get a labeled edge
+				LabeledEdge e = *(LabeledEdge*)(edge_buf + pos);
+				// e.src is the key
+				if(e.src < e.target){
+					edge_hashmap[e.src - start_vertex].push_back(Base_Element(e.target));
+				}
+			}
+		}
 
 		// TODO: do we need to store src.label?
 		void MPhase::build_edge_hashmap(char * edge_buf, std::vector<Element_In_Tuple> * edge_hashmap, size_t edge_file_size, int start_vertex) {

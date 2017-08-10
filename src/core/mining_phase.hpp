@@ -185,6 +185,7 @@ namespace RStream {
 		unsigned int get_count(Update_Stream in_update_stream);
 
 		void edges_loader(std::vector<Element_In_Tuple>* edge_hashmap, concurrent_queue<int> * read_task_queue);
+		void edges_loader(std::vector<Base_Element>* edge_hashmap, concurrent_queue<int> * read_task_queue);
 
 		// each exec thread generates a join producer
 		void join_all_keys_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue);
@@ -193,7 +194,7 @@ namespace RStream {
 //		void join_allkeys_nonshuffle_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap);
 
 		void join_allkeys_nonshuffle_tuple_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap);
-		void join_allkeys_nonshuffle_tuple_producer_clique(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Element_In_Tuple> * edge_hashmap);
+		void join_allkeys_nonshuffle_tuple_producer_clique(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue, std::vector<Base_Element> * edge_hashmap);
 
 		// each exec thread generates a join producer
 		void join_mining_producer(Update_Stream in_update_stream, global_buffer_for_mining ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue);
@@ -232,6 +233,7 @@ namespace RStream {
 
 		// TODO: do we need to store src.label?
 		void build_edge_hashmap(char * edge_buf, std::vector<Element_In_Tuple> * edge_hashmap, size_t edge_file_size, int start_vertex);
+		void build_edge_hashmap(char * edge_buf, std::vector<Base_Element> * edge_hashmap, size_t edge_file_size, int start_vertex);
 
 		int get_global_buffer_index(VertexId key);
 

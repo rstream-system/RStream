@@ -40,6 +40,7 @@
 //	bool filter_join_clique(MTuple_join_simple& update_tuple){
 //		//TODO
 //		return update_tuple.get_added_element()->id <= update_tuple.at(update_tuple.get_size() - 2).id;
+////		return false;
 //	}
 //
 //
@@ -57,6 +58,7 @@
 //	//init: get the edges stream
 //	std::cout << Logger::generate_log_del(std::string("init"), 1) << std::endl;
 //	Update_Stream up_stream = mPhase.init_clique();
+//	mPhase.printout_upstream(up_stream);
 //
 //	Update_Stream up_stream_new;
 //	Update_Stream clique_stream;
@@ -68,15 +70,17 @@
 //		std::cout << "\n" << Logger::generate_log_del(std::string("joining"), 2) << std::endl;
 //		up_stream_new = mPhase.join_all_keys_nonshuffle_clique(up_stream);
 //		mPhase.delete_upstream(up_stream);
+//		mPhase.printout_upstream(up_stream_new);
 //
 //		//collect cliques
 //		std::cout << "\n" << Logger::generate_log_del(std::string("collecting"), 2) << std::endl;
 //		clique_stream = agg.aggregate_filter_clique(up_stream_new, mPhase.get_sizeof_in_tuple());
 //		mPhase.delete_upstream(up_stream_new);
-//
-//		//print out cliques
-//		std::cout << "\n" << Logger::generate_log_del(std::string("printing"), 2) << std::endl;
 //		mPhase.printout_upstream(clique_stream);
+//
+////		//print out cliques
+////		std::cout << "\n" << Logger::generate_log_del(std::string("printing"), 2) << std::endl;
+////		mPhase.printout_upstream(clique_stream);
 //
 //		up_stream = clique_stream;
 //	}
