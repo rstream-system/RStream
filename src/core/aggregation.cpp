@@ -44,8 +44,10 @@ namespace RStream {
 
 		void Aggregation::printout_aggstream(Aggregation_Stream agg_stream, int sizeof_in_tuple){
 			int sizeof_agg = get_out_size(sizeof_in_tuple);
-			std::cout << "Number of tuples in agg "<< agg_stream << ": \t" << get_count(agg_stream, sizeof_agg) << std::endl;
-			std::cout << "Size of agg: \t" << sizeof_agg << std::endl;
+//			std::cout << "Number of tuples in agg "<< agg_stream << ": \t" << get_count(agg_stream, sizeof_agg) << std::endl;
+//			std::cout << "Size of agg: \t" << sizeof_agg << std::endl;
+			unsigned int count = get_count(agg_stream, sizeof_agg);
+			std::cout << "a, " << agg_stream << ", " << count << ", " << sizeof_agg << ", " << (count * sizeof_agg) << std::endl;
 		}
 
 		unsigned int Aggregation::get_count(Aggregation_Stream in_update_stream, int sizeof_agg){
@@ -69,8 +71,9 @@ namespace RStream {
 				std::string filename = context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(agg_stream);
 				if (std::remove(filename.c_str()) != 0)
 					perror("Error deleting file.\n");
-				else
-					std::cout << (filename + " successfully deleted.\n");
+				else{
+//					std::cout << (filename + " successfully deleted.\n");
+				}
 			}
 		}
 
@@ -197,10 +200,6 @@ namespace RStream {
 					// streaming tuples in, do aggregation
 					for(long pos = 0; pos < valid_io_size; pos += sizeof_in_tuple) {
 						// get an in_update_tuple
-//						std::vector<Element_In_Tuple> in_update_tuple;
-//						in_update_tuple.reserve(sizeof_in_tuple / sizeof(Element_In_Tuple));
-//						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple, sizeof_in_tuple);
-
 						MTuple in_update_tuple(sizeof_in_tuple);
 						MPhase::get_an_in_update(update_local_buf + pos, in_update_tuple);
 
@@ -221,21 +220,20 @@ namespace RStream {
 		}
 
 		void Aggregation::shuffle_on_canonical(MTuple& in_update_tuple, global_buffer_for_mining ** buffers_for_shuffle){
-//			// turn tuple to quick pattern
-//			Quick_Pattern quick_pattern;
-//			Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern, label_flag);
-//			std::vector<Element_In_Tuple> sub_graph = quick_pattern.get_tuple();
-
-
 			// turn tuple to quick pattern
 			Quick_Pattern quick_pattern(in_update_tuple.get_size() * sizeof(Element_In_Tuple));
 			Pattern::turn_quick_pattern_pure(in_update_tuple, quick_pattern, label_flag);
 
-			Canonical_Graph* cf = Pattern::turn_canonical_graph(quick_pattern, false);
+//			Canonical_Graph* cf = Pattern::turn_canonical_graph(quick_pattern, false);
+//			unsigned int hash = cf->get_hash();
+//			delete cf;
 
-			unsigned int hash = cf->get_hash();
+			bliss::AbstractGraph* cf_bliss = Pattern::turn_canonical_graph_bliss(quick_pattern, false);
+			unsigned int hash = cf_bliss->get_hash();
+			delete cf_bliss;
 			unsigned int index = get_global_bucket_index(hash);
-			delete cf;
+
+			quick_pattern.clean();
 
 			//get tuple
 			insert_tuple_to_buffer(index, in_update_tuple, buffers_for_shuffle);
@@ -409,9 +407,11 @@ namespace RStream {
 
 			Canonical_Graph* cf = Pattern::turn_canonical_graph(quick_pattern, false);
 
+			quick_pattern.clean();
 
 			assert(map.find(*cf) != map.end());
 			bool r = (map[*cf] < threshold);
+
 			delete cf;
 			return r;
 		}
@@ -433,7 +433,7 @@ namespace RStream {
 			// tuples -- canonical pattern
 			// count -- counter for patterns
 			int sizeof_output = get_out_size(sizeof_in_tuple);
-			std::cout << "size_of_in_tuple = " << sizeof_in_tuple << ", size_of_agg = " << sizeof_output << std::endl;
+//			std::cout << "size_of_in_tuple = " << sizeof_in_tuple << ", size_of_agg = " << sizeof_output << std::endl;
 			// allocate global buffers for shuffling
 			global_buffer_for_mining ** buffers_for_shuffle = buffer_manager_for_mining::get_global_buffers_for_mining(context.num_partitions, sizeof_output);
 
@@ -740,8 +740,8 @@ namespace RStream {
 
 
 		void Aggregation::write_canonical_aggregation(std::unordered_map<Canonical_Graph, int>& canonical_graphs_aggregation, std::string& file_name, unsigned int sizeof_in_agg){
-			//for debugging
-			printout_cg_aggmap(canonical_graphs_aggregation);
+//			//for debugging
+//			printout_cg_aggmap(canonical_graphs_aggregation);
 
 
 			//write empty buffer to an empty file
