@@ -475,8 +475,10 @@ namespace RStream {
 
 
 		void MPhase::printout_upstream(Update_Stream in_update_stream){
-			std::cout << "Number of tuples in update "<< in_update_stream << ": \t" << get_count(in_update_stream) << std::endl;
-			std::cout << "Size of tuple: \t" << sizeof_in_tuple << std::endl;
+//			std::cout << "Number of tuples in update "<< in_update_stream << ": \t" << get_count(in_update_stream) << std::endl;
+//			std::cout << "Size of tuple: \t" << sizeof_in_tuple << std::endl;
+			unsigned int count = get_count(in_update_stream);
+			std::cout << "u, " << in_update_stream << ", " << count << ", " << sizeof_in_tuple << ", " << (count * sizeof_in_tuple) << std::endl;
 		}
 
 		void MPhase::delete_upstream(Update_Stream in_update_stream){

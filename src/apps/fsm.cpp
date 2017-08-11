@@ -72,7 +72,7 @@
 //	mPhase.printout_upstream(up_stream_filtered);
 //
 //	unsigned int max_iterations = mPhase.get_max_size() * (mPhase.get_max_size() - 1) / 2;
-//	for(unsigned int i = 1; i <= max_iterations; ++i){
+//	for(unsigned int i = 1; i < max_iterations; ++i){
 //		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 //
 //		//join on all keys
@@ -145,7 +145,7 @@
 //	mPhase.delete_upstream(up_stream_non_shuffled_filtered);
 //
 //	unsigned int max_iterations = mPhase.get_max_size() * (mPhase.get_max_size() - 1) / 2;
-//	for(unsigned int i = 1; i <= max_iterations; ++i){
+//	for(unsigned int i = 1; i < max_iterations; ++i){
 //		std::cout << "\n\n" << Logger::generate_log_del(std::string("Iteration ") + std::to_string(i), 1) << std::endl;
 //
 //		//join on all keys

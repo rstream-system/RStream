@@ -61,6 +61,7 @@ struct Edge {
 
 	Edge(VertexId _src, VertexId _target) : src(_src), target(_target) {}
 	Edge() : src(0), target(0) {}
+	~Edge(){}
 
 	std::string toString(){
 		return "(" + std::to_string(src) + ", " + std::to_string(target) + ")";
@@ -196,6 +197,10 @@ struct Element_In_Tuple {
 
 	}
 
+	~Element_In_Tuple(){
+
+	}
+
 	inline void set_vertex_id(VertexId new_id){
 		vertex_id = new_id;
 	}
@@ -273,6 +278,7 @@ struct Base_Element {
 //	BaseElement(){}
 
 	Base_Element(VertexId _vertex_id) : id(_vertex_id){}
+	~Base_Element(){}
 
 };
 

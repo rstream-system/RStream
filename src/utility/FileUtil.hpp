@@ -18,8 +18,9 @@ public:
 	static void delete_file(const std::string& file_name){
 		if (std::remove(file_name.c_str()) != 0)
 			perror("Error deleting file");
-		else
-			std::cout << (file_name + " successfully deleted.\n");
+		else{
+//			std::cout << (file_name + " successfully deleted.\n");
+		}
 	}
 
 	static bool file_exists(const std::string  filename) {
