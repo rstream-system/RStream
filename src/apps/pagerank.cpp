@@ -45,6 +45,11 @@
 //		v->id = id;
 //	}
 //
+//	Update_PR * generate_one_update_init(Edge * e, Vertex_PR * v) {
+//			Update_PR * update = new Update_PR(e->target, 1.0f / v->degree);
+//			return update;
+//		}
+//
 //	Update_PR * generate_one_update(Edge * e, Vertex_PR * v) {
 //		Update_PR * update = new Update_PR(e->target, v->rank / v->degree);
 //		return update;
@@ -69,11 +74,22 @@
 //		e.compute_degree<Vertex_PR>();
 //
 //		int num_iters = 4;
+//
+//		Scatter<Vertex_PR, Update_PR> scatter_phase(e);
+//		Gather<Vertex_PR, Update_PR> gather_phase(e);
+//
 //		for(int i = 0; i < num_iters; i++) {
 //			std::cout << "--------------------Iteration " << i << "--------------------" << std::endl;
-//			Scatter<Vertex_PR, Update_PR> scatter_phase(e);
-//			Update_Stream in_stream = scatter_phase.scatter_with_vertex(generate_one_update);
-//			Gather<Vertex_PR, Update_PR> gather_phase(e);
+//
+//			Update_Stream in_stream;
+//			if(i == 0) {
+//				in_stream = scatter_phase.scatter_with_vertex(generate_one_update_init);
+//			} else {
+//				in_stream = scatter_phase.scatter_with_vertex(generate_one_update);
+//			}
+////			Update_Stream in_stream = scatter_phase.scatter_with_vertex(generate_one_update);
+////			Gather<Vertex_PR, Update_PR> gather_phase(e);
+//
 //			gather_phase.gather(in_stream, apply_one_update);
 //
 //			Global_Info::delete_upstream(in_stream, e);
