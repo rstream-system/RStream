@@ -61,13 +61,13 @@ namespace RStream {
 //				}
 
 				if(edgeType == (int)EdgeType::NO_WEIGHT) {
-//					std::cout << "start to partition on vertices..." << std::endl;
-//					partition_on_vertices<Edge>();
-//					std::cout << "partition on vertices done." << std::endl;
+					std::cout << "start to partition on vertices..." << std::endl;
+					partition_on_vertices<Edge>();
+					std::cout << "partition on vertices done." << std::endl;
 
-					std::cout << "start to partition on edges..." << std::endl;
-					partition_on_edges<Edge>();
-					std::cout << "partition on edges done." << std::endl;
+//					std::cout << "start to partition on edges..." << std::endl;
+//					partition_on_edges<Edge>();
+//					std::cout << "partition on edges done." << std::endl;
 				}
 
 				std::cout << "gen partition done!" << std::endl;
@@ -82,11 +82,11 @@ namespace RStream {
 					std::cout << "convert adj list file done." << std::endl;
 //				}
 
-//				std::cout << "start to partition on vertices..." << std::endl;
-//				partition_on_vertices<LabeledEdge>();
+				std::cout << "start to partition on vertices..." << std::endl;
+				partition_on_vertices<LabeledEdge>();
 
-				std::cout << "start to partition on edges..." << std::endl;
-				partition_on_edges<LabeledEdge>();
+//				std::cout << "start to partition on edges..." << std::endl;
+//				partition_on_edges<LabeledEdge>();
 
 				std::cout << "gen partition done!" << std::endl;
 				write_meta_file();

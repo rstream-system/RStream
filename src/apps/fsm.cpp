@@ -48,6 +48,8 @@
 //	std::cout << Logger::generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 //
 //	ResourceManager rm;
+//	// get running time (wall time)
+//	auto start_fsm = std::chrono::high_resolution_clock::now();
 //
 //	MC mPhase(e, atoi(argv[3]));
 //	Aggregation agg(e, true);
@@ -105,6 +107,10 @@
 //	std::cout << "\n\n" << Logger::generate_log_del(std::string("cleaning"), 1) << std::endl;
 //	e.clean_files();
 //
+//	auto end_clique = std::chrono::high_resolution_clock::now();
+//	std::chrono::duration<double> diff_clique = end_clique - start_fsm;
+//	std::cout << "Finish clique-finding. Running time : " << diff_clique.count() << " s\n";
+//
 //	//print out resource usage
 //	std::cout << "\n\n";
 //	std::cout << "------------------------------ resource usage ------------------------------" << std::endl;
@@ -119,6 +125,8 @@
 //	std::cout << Logger::generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 //
 //	ResourceManager rm;
+//		// get running time (wall time)
+//		auto start_fsm = std::chrono::high_resolution_clock::now();
 //
 //	MC mPhase(e, atoi(argv[3]));
 //	Aggregation agg(e, true);
@@ -175,6 +183,11 @@
 //	//delete all generated files
 //	std::cout << "\n\n" << Logger::generate_log_del(std::string("cleaning"), 1) << std::endl;
 //	e.clean_files();
+//
+//
+//		auto end_clique = std::chrono::high_resolution_clock::now();
+//		std::chrono::duration<double> diff_clique = end_clique - start_fsm;
+//		std::cout << "Finish clique-finding. Running time : " << diff_clique.count() << " s\n";
 //
 //	//print out resource usage
 //	std::cout << "\n\n";

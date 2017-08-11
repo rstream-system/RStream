@@ -138,6 +138,9 @@ namespace RStream {
 			int partition_id = -1;
 			while(read_task_queue->test_pop_atomic(partition_id)){
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
+//				if(fd_edge <= 0){
+//					std::cout << (context.filename + "." + std::to_string(partition_id)) << std::endl;
+//				}
 				assert(fd_edge > 0);
 				long edge_file_size = io_manager::get_filesize(fd_edge);
 
