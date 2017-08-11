@@ -38,11 +38,43 @@ namespace RStream {
 			Update_Stream update_c = Engine::update_count++;
 
 			// a pair of <vertex, edge_stream> for each partition
-			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
+//
+//			// push task into concurrent queue
+//			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
+//				task_queue->push(partition_id);
+//			}
 
-			// push task into concurrent queue
+			std::vector<std::pair<long, std::tuple<int, long, long>>> tasks;
+			concurrent_queue<std::tuple<int, long, long>> * task_queue = new concurrent_queue<std::tuple<int, long, long>>(MAX_QUEUE_SIZE);
+
+			// divide in update stream into smaller chuncks, to get better workload balance
 			for(int partition_id = 0; partition_id < context.num_partitions; partition_id++) {
-				task_queue->push(partition_id);
+				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
+				long edge_file_size = io_manager::get_filesize(fd_edge);
+				int streaming_counter = edge_file_size / (CHUNK_SIZE * sizeof(Edge)) + 1;
+				assert((edge_file_size % sizeof(Edge)) == 0);
+
+				long valid_io_size = 0;
+				long offset = 0;
+
+				for(int counter = 0; counter < streaming_counter; counter++) {
+					// last streaming
+					if(counter == streaming_counter - 1)
+						valid_io_size = edge_file_size - IO_SIZE * sizeof(Edge) * (streaming_counter - 1);
+					else
+						valid_io_size = IO_SIZE * sizeof(Edge);
+
+					tasks.push_back(std::make_pair(valid_io_size, std::make_tuple(partition_id, offset, valid_io_size)));
+					offset += valid_io_size;
+				}
+
+			}
+
+			// sort tasks on size, larger size has a higher priority to run
+			std::sort(tasks.begin(), tasks.end());
+			for(int i = tasks.size() - 1; i >= 0; i--) {
+				task_queue->push(tasks.at(i).second);
 			}
 
 			// allocate global buffers for shuffling
@@ -134,14 +166,28 @@ namespace RStream {
 			}
 		}
 
+//		void scatter_producer_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update,
+//						global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
+
 		void scatter_producer_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update,
-						global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<int> * task_queue) {
-			int partition_id = -1;
+								global_buffer<UpdateType> ** buffers_for_shuffle, concurrent_queue<std::tuple<int, long, long>> * task_queue) {
+
+//			int partition_id = -1;
 			VertexId vertex_start = -1;
 			assert(context.vertex_unit == sizeof(VertexDataType));
 
+			int partition_id = -1;
+			long chunk_offset = 0, chunk_size = 0;
+			auto one_task = std::make_tuple(partition_id, chunk_offset, chunk_size);
+
 			// pop from queue
-			while(task_queue->test_pop_atomic(partition_id)){
+//			while(task_queue->test_pop_atomic(partition_id)){
+			while(task_queue->test_pop_atomic(one_task)){
+				partition_id = std::get<0>(one_task);
+				chunk_offset = std::get<1>(one_task);
+				chunk_size = std::get<2>(one_task);
+
+
 				int fd_vertex = open((context.filename + "." + std::to_string(partition_id) + ".vertex").c_str(), O_RDONLY);
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_vertex > 0 && fd_edge > 0 );
@@ -152,9 +198,9 @@ namespace RStream {
 
 				// get file size
 				long vertex_file_size = io_manager::get_filesize(fd_vertex);
-				long edge_file_size = io_manager::get_filesize(fd_edge);
+//				long edge_file_size = io_manager::get_filesize(fd_edge);
 
-				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(edge_file_size) + "\n");
+//				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(edge_file_size) + "\n");
 
 				// vertex data fully loaded into memory
 				char * vertex_local_buf = new char[vertex_file_size];
@@ -164,7 +210,9 @@ namespace RStream {
 
 				// streaming edges
 				char * edge_local_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(Edge));
-				int streaming_counter = edge_file_size / (IO_SIZE * sizeof(Edge)) + 1;
+//				int streaming_counter = edge_file_size / (IO_SIZE * sizeof(Edge)) + 1;
+				int streaming_counter = chunk_size / (IO_SIZE * sizeof(Edge)) + 1;
+				assert((chunk_size % sizeof(Edge)) == 0);
 
 				long valid_io_size = 0;
 				long offset = 0;
@@ -179,7 +227,8 @@ namespace RStream {
 					if(counter == streaming_counter - 1)
 						// TODO: potential overflow?
 	//						valid_io_size = edge_file_size - IO_SIZE * (streaming_counter - 1);
-						valid_io_size = edge_file_size - IO_SIZE * sizeof(Edge) * (streaming_counter - 1);
+//						valid_io_size = edge_file_size - IO_SIZE * sizeof(Edge) * (streaming_counter - 1);
+						valid_io_size = chunk_size - IO_SIZE * sizeof(Edge) * (streaming_counter - 1);
 					else
 	//						valid_io_size = IO_SIZE;
 						valid_io_size = IO_SIZE * sizeof(Edge);
@@ -187,7 +236,9 @@ namespace RStream {
 					assert(valid_io_size % edge_unit == 0);
 
 	//					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size);
-					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
+//					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, offset);
+					io_manager::read_from_file(fd_edge, edge_local_buf, valid_io_size, chunk_offset + offset);
+
 					offset += valid_io_size;
 
 					// for each streaming
