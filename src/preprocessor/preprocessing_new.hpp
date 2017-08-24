@@ -215,7 +215,7 @@ namespace RStream {
 			assert(fd != NULL);
 			
 			char buf[2048], delims[] = "\t ";
-			VertexId vert;
+			VertexId vert, oldVert = -1;
 			BYTE val;
 			int count = 0, size = 0, maxsize = 0;
 			std::vector<BYTE> vertLabels;
@@ -225,9 +225,16 @@ namespace RStream {
 					vert = std::stoi(strtok(buf, delims));
 					val = (BYTE)(std::stoi(strtok(NULL, delims)));
 					
-					if (count == 0) minVertexId = std::min(minVertexId, vert);
+					if (count != 0 && oldVert != (vert-1)) {
+						for (int n = oldVert+1; n < vert; n++) {
+							vertLabels.push_back(0);
+							count++;
+						}
+					}
+					minVertexId = std::min(minVertexId, vert);
 					vertLabels.push_back(val);
 					count++;
+					oldVert = vert;
 				}
 
 				size += len;
@@ -237,6 +244,7 @@ namespace RStream {
 				}
 			}
 			fclose(fd);
+
 			numVertices = count;
 			degree = std::vector<int>(numVertices);
 
