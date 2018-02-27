@@ -18,7 +18,6 @@ namespace RStream {
 
 		MPhase::~MPhase() {}
 
-
 		void MPhase::atomic_init(){
 			atomic_num_producers = context.num_exec_threads;
 			atomic_partition_id = -1;
@@ -790,6 +789,18 @@ namespace RStream {
 									bool vertex_existed = gen_an_out_update(in_update_tuple, new_element, (BYTE)i, vertices_set);
 		//							std::cout << in_update_tuple  << " --> " << Pattern::is_automorphism(in_update_tuple)
 		//								<< ", " << filter_join(in_update_tuple) << std::endl;
+
+									//for debugging
+									Engine::tuple_total++;
+									if(Pattern::is_automorphism(in_update_tuple, vertex_existed)){
+										Engine::tuple_auto++;
+									}
+									if(filter_join(in_update_tuple)){
+										Engine::tuple_long++;
+									}
+									if(filter_join(in_update_tuple) || Pattern::is_automorphism(in_update_tuple, vertex_existed)){
+										Engine::tuple_filter++;
+									}
 
 									// remove automorphism, only keep one unique tuple.
 									if(!filter_join(in_update_tuple) && !Pattern::is_automorphism(in_update_tuple, vertex_existed)){

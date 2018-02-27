@@ -763,6 +763,9 @@ namespace RStream {
 //			long index = 0;
 
 			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ){
+				//for debugging
+				std::cerr << it->first << ": " << it->second << "\n";
+
 				if(offset < real_io_size){
 					char* out_agg_pair = convert_to_bytes(sizeof_in_agg, *it);
 					std::memcpy(local_buf + offset, out_agg_pair, sizeof_in_agg);

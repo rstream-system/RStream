@@ -45,6 +45,12 @@ namespace RStream {
 		static unsigned update_count;
 		static unsigned aggregation_count;
 
+		//for debugging
+		static unsigned tuple_total;
+		static unsigned tuple_auto;
+		static unsigned tuple_long;
+		static unsigned tuple_filter;
+
 		Engine(std::string _filename, int num_parts, int input_format);
 
 		~Engine();

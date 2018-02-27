@@ -13,6 +13,11 @@ namespace RStream {
 		unsigned Engine::update_count = 0;
 		unsigned Engine::aggregation_count = 0;
 
+		unsigned Engine::tuple_total = 0;
+		unsigned Engine::tuple_auto = 0;
+		unsigned Engine::tuple_long = 0;
+		unsigned Engine::tuple_filter = 0;
+
 		Engine::Engine(std::string _filename, int num_parts, int input_format) : filename(_filename) {
 //			num_threads = std::thread::hardware_concurrency();
 			num_threads = 1;
