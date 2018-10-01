@@ -35,7 +35,7 @@ namespace RStream {
 		Update_Stream scatter_with_vertex(std::function<UpdateType*(Edge*, VertexDataType*)> generate_one_update) {
 			atomic_init();
 
-			Logger::print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -102,7 +102,7 @@ namespace RStream {
 			delete[] buffers_for_shuffle;
 			delete task_queue;
 
-			Logger::print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
 
 			return update_c;
 		}
@@ -111,7 +111,7 @@ namespace RStream {
 		Update_Stream scatter_no_vertex(std::function<UpdateType*(Edge*)> generate_one_update) {
 			atomic_init();
 
-			Logger::print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Start Scatter Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -150,7 +150,7 @@ namespace RStream {
 			delete[] buffers_for_shuffle;
 			delete task_queue;
 
-			Logger::print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Finish Scatter Phase-------------------\n\n");
 
 			return update_c;
 		}
@@ -296,7 +296,7 @@ namespace RStream {
 
 				// get file size
 				long file_size = io_manager::get_filesize(fd);
-				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(file_size) + "\n");
+//				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id) + " of size " + std::to_string(file_size) + "\n");
 
 				// streaming edges
 				char * local_buf = (char*)memalign(PAGE_SIZE, IO_SIZE * sizeof(Edge));

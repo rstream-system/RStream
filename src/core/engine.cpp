@@ -20,7 +20,7 @@ namespace RStream {
 
 		Engine::Engine(std::string _filename, int num_parts, int input_format) : filename(_filename) {
 //			num_threads = std::thread::hardware_concurrency();
-			num_threads = 1;
+			num_threads = 16;
 			num_write_threads = 1;
 			num_exec_threads = num_threads;
 
@@ -50,8 +50,8 @@ namespace RStream {
 //			std::cout << "Input format: " << (input_format) << std::endl;
 			std::cout << "Number of vertices: " << num_vertices << std::endl;
 			std::cout << "Number of partitions: " << num_partitions << std::endl;
-			std::cout << "Edge type: " << edge_type << std::endl;
-			std::cout << "Number of bytes per edge: " << edge_unit << std::endl;
+//			std::cout << "Edge type: " << edge_type << std::endl;
+//			std::cout << "Number of bytes per edge: " << edge_unit << std::endl;
 			std::cout << "Number of exec threads: " << num_exec_threads << std::endl;
 			std::cout << "Number of write threads: " << num_write_threads << std::endl;
 			std::cout << std::endl;

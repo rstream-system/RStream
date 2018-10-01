@@ -60,7 +60,7 @@ namespace RStream {
 		Update_Stream join(Update_Stream in_update_stream) {
 			atomic_init();
 
-			Logger::print_thread_info_locked("--------------------Start Join Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Start Join Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -126,7 +126,7 @@ namespace RStream {
 			delete[] buffers_for_shuffle;
 			delete task_queue;
 
-			Logger::print_thread_info_locked("--------------------Finish Join Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Finish Join Phase--------------------\n\n");
 
 			return update_c;
 		}
@@ -137,7 +137,7 @@ namespace RStream {
 		Update_Stream set_difference(Update_Stream update_stream1, Update_Stream update_stream2) {
 			atomic_init();
 
-			Logger::print_thread_info_locked("--------------------Start Set Difference Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Start Set Difference Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -170,14 +170,14 @@ namespace RStream {
 			delete[] buffers;
 			delete task_queue;
 
-			Logger::print_thread_info_locked("--------------------Finish Set Difference Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Finish Set Difference Phase--------------------\n\n");
 
 			return update_c;
 		}
 
 		// append update_stream2 to the end of update_stream1
 		void union_relation (Update_Stream update_stream1, Update_Stream update_stream2) {
-			Logger::print_thread_info_locked("--------------------Start Union Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Start Union Phase--------------------\n\n");
 //			Update_Stream update_c = Engine::update_count++;
 
 			concurrent_queue<int> * task_queue = new concurrent_queue<int>(context.num_partitions);
@@ -195,12 +195,12 @@ namespace RStream {
 
 			delete task_queue;
 
-			Logger::print_thread_info_locked("--------------------Finish Union Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Finish Union Phase--------------------\n\n");
 
 		}
 
 		Update_Stream remove_dup(Update_Stream update_stream) {
-			Logger::print_thread_info_locked("--------------------Start Remove Duplicates Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Start Remove Duplicates Phase--------------------\n\n");
 
 			Update_Stream update_c = Engine::update_count++;
 
@@ -219,7 +219,7 @@ namespace RStream {
 
 			delete task_queue;
 
-			Logger::print_thread_info_locked("--------------------Finish Remove Duplicates Phase--------------------\n\n");
+//			Logger::print_thread_info_locked("--------------------Finish Remove Duplicates Phase--------------------\n\n");
 
 			return update_c;
 		}
@@ -255,8 +255,8 @@ namespace RStream {
 //				print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
 //						+ " of update size " + std::to_string(update_file_size) + ", edge file size " + std::to_string(edge_file_size) + "\n");
 
-				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
-										+ " of update size " + std::to_string(chunk_size) + ", edge file size " + std::to_string(edge_file_size) + "\n");
+//				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
+//										+ " of update size " + std::to_string(chunk_size) + ", edge file size " + std::to_string(edge_file_size) + "\n");
 
 				// read from files to thread local buffer
 //				char * update_local_buf = new char[update_file_size];
@@ -307,8 +307,8 @@ namespace RStream {
 						valid_io_size = IO_SIZE * sizeof(InUpdateType);
 
 					assert(valid_io_size % sizeof(InUpdateType) == 0);
-					Logger::print_thread_info_locked(std::to_string(counter) + "th streaming, start join of size "
-							+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
+//					Logger::print_thread_info_locked(std::to_string(counter) + "th streaming, start join of size "
+//							+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 
 //					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, offset);
 					io_manager::read_from_file(fd_update, update_local_buf, valid_io_size, chunk_offset + offset);
@@ -350,8 +350,8 @@ namespace RStream {
 
 					}
 
-					Logger::print_thread_info_locked(std::to_string(counter) + "th streaming, finish join of size "
-												+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
+//					Logger::print_thread_info_locked(std::to_string(counter) + "th streaming, finish join of size "
+//												+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 
 				}
 
@@ -457,8 +457,8 @@ namespace RStream {
 				char * update1_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(OutUpdateType));
 				int streaming_counter = update1_file_size / (IO_SIZE * sizeof(OutUpdateType)) + 1;
 
-				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
-							+ " of update1 size " + std::to_string(update1_file_size) + ", update2 size " + std::to_string(update2_file_size) + "\n");
+//				Logger::print_thread_info_locked("as a producer dealing with partition " + std::to_string(partition_id)
+//							+ " of update1 size " + std::to_string(update1_file_size) + ", update2 size " + std::to_string(update2_file_size) + "\n");
 
 				// Assumption: update2 can be fully loaded into memory
 				char * update2_buf = new char[update2_file_size];
@@ -482,8 +482,8 @@ namespace RStream {
 						valid_io_size = IO_SIZE * sizeof(OutUpdateType);
 
 					assert(valid_io_size % sizeof(OutUpdateType) == 0);
-					Logger::print_thread_info_locked(std::to_string(counter) + "th streaming, start set diff of size "
-								+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
+//					Logger::print_thread_info_locked(std::to_string(counter) + "th streaming, start set diff of size "
+//								+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 
 					io_manager::read_from_file(fd_update1, update1_buf, valid_io_size, offset);
 					offset += valid_io_size;
@@ -502,8 +502,8 @@ namespace RStream {
 						global_buf->insert(one_update1, index);
 					}
 
-					Logger::print_thread_info_locked(std::to_string(counter) + "th streaming, finish set diff of size "
-								+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
+//					Logger::print_thread_info_locked(std::to_string(counter) + "th streaming, finish set diff of size "
+//								+ std::to_string(valid_io_size) + " with partition " + std::to_string(partition_id) + "\n");
 				}
 
 				free(update1_buf);
@@ -560,8 +560,8 @@ namespace RStream {
 				char * update_buf = (char *)memalign(PAGE_SIZE, IO_SIZE * sizeof(OutUpdateType));
 				int streaming_counter = update_file_size / (IO_SIZE * sizeof(OutUpdateType)) + 1;
 
-				Logger::print_thread_info_locked("as a producer, remove dup with partition " + std::to_string(partition_id)
-							+ " of update1 size " + std::to_string(update_file_size) + "\n");
+//				Logger::print_thread_info_locked("as a producer, remove dup with partition " + std::to_string(partition_id)
+//							+ " of update1 size " + std::to_string(update_file_size) + "\n");
 
 				std::unordered_set<OutUpdateType> set_of_updates;
 
@@ -591,8 +591,8 @@ namespace RStream {
 				char* buf = reinterpret_cast<char*>(out_updates.data());
 				write_updates_to_file(buf, file_name_str, out_updates.size() * sizeof(OutUpdateType));
 
-				Logger::print_thread_info_locked("as a producer finish remove dup with partition " + std::to_string(partition_id)
-								+ " of update1 size " + std::to_string(update_file_size) + "\n");
+//				Logger::print_thread_info_locked("as a producer finish remove dup with partition " + std::to_string(partition_id)
+//								+ " of update1 size " + std::to_string(update_file_size) + "\n");
 
 				free(update_buf);
 				close(fd_update);

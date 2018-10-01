@@ -165,7 +165,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (shuffle-upstream-on-canonical) producer dealing with partition " + MPhase::get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (shuffle-upstream-on-canonical) producer dealing with partition " + MPhase::get_string_task_tuple(task_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -305,7 +305,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (aggregate-filter) producer dealing with partition " + MPhase::get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (aggregate-filter) producer dealing with partition " + MPhase::get_string_task_tuple(task_id) + "\n");
 
 
 				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(agg_stream)).c_str(), O_RDONLY);
@@ -490,7 +490,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				Logger::print_thread_info_locked("as a (aggregate-global) worker dealing with partition " + std::to_string(partition_id) + "\n");
+//				Logger::print_thread_info_locked("as a (aggregate-global) worker dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".aggregate_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
 				assert(fd_agg > 0);
@@ -582,7 +582,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)) {
-				Logger::print_thread_info_locked("as a (aggregate-filter-clique) worker dealing with partition " + std::to_string(partition_id) + "\n");
+//				Logger::print_thread_info_locked("as a (aggregate-filter-clique) worker dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_agg = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_agg_stream)).c_str(), O_RDONLY);
 				assert(fd_agg > 0);
@@ -764,7 +764,7 @@ namespace RStream {
 
 			for(auto it = canonical_graphs_aggregation.begin(); it != canonical_graphs_aggregation.end(); ){
 				//for debugging
-				std::cerr << it->first << ": " << it->second << "\n";
+//				std::cerr << it->first << ": " << it->second << "\n";
 
 				if(offset < real_io_size){
 					char* out_agg_pair = convert_to_bytes(sizeof_in_agg, *it);
@@ -807,7 +807,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (aggregate-local) producer dealing with partition " + MPhase::get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (aggregate-local) producer dealing with partition " + MPhase::get_string_task_tuple(task_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);

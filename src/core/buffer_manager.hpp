@@ -103,7 +103,7 @@ namespace RStream {
 				io_manager::write_to_file(fd, buf, capacity * sizeof_tuple);
 				close(fd);
 
-				Logger::print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+//				Logger::print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
 
 				count = 0;
 				index = 0;
@@ -150,7 +150,7 @@ namespace RStream {
 //			}
 
 				//for debugging
-				Logger::print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
+//				Logger::print_thread_info_locked("flushed buffer[" + std::to_string(i) + "] to file " + file_name_str + "\n");
 
 		}
 

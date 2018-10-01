@@ -48,50 +48,51 @@ namespace RStream {
 		}
 
 		void run() {
-			std::cout << "start preprocessing..." << std::endl;
+			std::cout << "\n\n" << Logger::generate_log_del(std::string("start preprocessing"), 1) << std::endl;
 
 			// convert txt to binary
 			if(format == (int)FORMAT::EdgeList) {
 
 				// check if .binary exists already
 //				if(!FileUtil::file_exists(input + ".binary")) {
-					std::cout << "start to convert edge list file..." << std::endl;
+//					std::cout << "start to convert edge list file..." << std::endl;
 					convert_edgelist();
-					std::cout << "convert edge list file done." << std::endl;
+//					std::cout << "convert edge list file done." << std::endl;
 //				}
 
 				if(edgeType == (int)EdgeType::NO_WEIGHT) {
-					std::cout << "start to partition on vertices..." << std::endl;
+//					std::cout << "start to partition on vertices..." << std::endl;
 					partition_on_vertices<Edge>();
-					std::cout << "partition on vertices done." << std::endl;
+//					std::cout << "partition on vertices done." << std::endl;
 
 //					std::cout << "start to partition on edges..." << std::endl;
 //					partition_on_edges<Edge>();
 //					std::cout << "partition on edges done." << std::endl;
 				}
 
-				std::cout << "gen partition done!" << std::endl;
+//				std::cout << "gen partition done!" << std::endl;
 				write_meta_file();
 
 			} else if(format == (int)FORMAT::AdjList) {
 
 				// check if .binary exists already
 //				if(!FileUtil::file_exists(input + ".binary")) {
-					std::cout << "start to convert adj list file..." << std::endl;
+//					std::cout << "start to convert adj list file..." << std::endl;
 					convert_adjlist();
-					std::cout << "convert adj list file done." << std::endl;
+//					std::cout << "convert adj list file done." << std::endl;
 //				}
 
-				std::cout << "start to partition on vertices..." << std::endl;
+//				std::cout << "start to partition on vertices..." << std::endl;
 				partition_on_vertices<LabeledEdge>();
 
 //				std::cout << "start to partition on edges..." << std::endl;
 //				partition_on_edges<LabeledEdge>();
 
-				std::cout << "gen partition done!" << std::endl;
+//				std::cout << "gen partition done!" << std::endl;
 				write_meta_file();
 			}
-
+			
+//			std::cout << Logger::generate_log_del(std::string("finish preprocessing"), 1) << std::endl;
 		}
 
 		// note: vertex id always starts with 0
@@ -174,8 +175,8 @@ namespace RStream {
 
 				}
 				counter++;
-				if(counter % 1000000 == 0)
-					std::cout << "Processing " << counter << " lines " << std::endl;
+//				if(counter % 1000000 == 0)
+//					std::cout << "Processing " << counter << " lines " << std::endl;
 
 				assert(IO_SIZE % edge_unit == 0);
 				if(pos >= IO_SIZE) {

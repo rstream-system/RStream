@@ -516,7 +516,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (join-all-keys) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (join-all-keys) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
 
 
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
@@ -732,7 +732,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (join-all-keys-nonshuffle-tuple) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (join-all-keys-nonshuffle-tuple) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
 				int target_partition = 0;
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
@@ -836,7 +836,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (join-all-keys-nonshuffle-tuple-clique) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (join-all-keys-nonshuffle-tuple-clique) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
 				int target_partition = 0;
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
@@ -913,7 +913,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (join-mining) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (join-mining) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
 
 
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
@@ -1052,7 +1052,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (shuffle-all-keys) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (shuffle-all-keys) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -1113,7 +1113,7 @@ namespace RStream {
 				long size_task = std::get<2>(task_id);
 				assert(partition_id != -1 && offset_task != -1 && size_task != -1);
 
-				Logger::print_thread_info_locked("as a (collect) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
+//				Logger::print_thread_info_locked("as a (collect) producer dealing with partition " + get_string_task_tuple(task_id) + "\n");
 
 				int fd_update = open((context.filename + "." + std::to_string(partition_id) + ".update_stream_" + std::to_string(in_update_stream)).c_str(), O_RDONLY);
 				assert(fd_update > 0);
@@ -1174,7 +1174,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				Logger::print_thread_info_locked("as a (init) producer dealing with partition " + std::to_string(partition_id) + "\n");
+//				Logger::print_thread_info_locked("as a (init) producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_edge > 0 );
@@ -1238,7 +1238,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				Logger::print_thread_info_locked("as a (init-clique) producer dealing with partition " + std::to_string(partition_id) + "\n");
+//				Logger::print_thread_info_locked("as a (init-clique) producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_edge > 0 );
@@ -1303,7 +1303,7 @@ namespace RStream {
 
 			// pop from queue
 			while(task_queue->test_pop_atomic(partition_id)){
-				Logger::print_thread_info_locked("as a (shuffle-all-keys-init) producer dealing with partition " + std::to_string(partition_id) + "\n");
+//				Logger::print_thread_info_locked("as a (shuffle-all-keys-init) producer dealing with partition " + std::to_string(partition_id) + "\n");
 
 				int fd_edge = open((context.filename + "." + std::to_string(partition_id)).c_str(), O_RDONLY);
 				assert(fd_edge > 0 );
