@@ -9,7 +9,7 @@ OBJECTS=$(SOURCE:.cpp=.o)
 TARGETS=bin/clique_find bin/triangle_count bin/motif_count bin/trans_closure bin/fsm
 #TARGETS=bin/clique_find bin/triangle_count bin/motif_count bin/trans_closure bin/pagerank bin/fsm bin/pr_cf bin/cc
 
-all: bliss $(SOURCES) $(TARGETS)
+all: setup bliss $(SOURCES) $(TARGETS)
 
 #bin/clique_find: bliss src/apps/cliquefinding.cpp $(OBJECTS)
 #	$(CXX) $(CFLAGS) -o $@ src/apps/cliquefinding.cpp $(OBJECTS) $(LIBS)
@@ -44,6 +44,9 @@ bin/clique_find: src/apps/cliquefinding_simple.cpp $(OBJECTS)
 bliss:
 	make -C lib/bliss-0.73/
 
+
+setup:
+	mkdir -p bin
 
 clean:
 	rm -f $(TARGETS) $(OBJECTS)
